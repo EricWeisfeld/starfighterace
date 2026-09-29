@@ -3,16 +3,21 @@ using System.Collections.Generic;
 using System.Linq;
 using static SignalUi;
 
-/// <summary>Sandbox squad builder. It creates disposable level-cap pilots and never touches campaign data.</summary>
+/// <summary>
+/// Quick Battle setup, laid out for a portrait phone: pick a battlefield,
+/// fill up to three squadron slots from the hangar list, launch. Pilots are
+/// disposable max-level sandbox pilots and never touch campaign data.
+/// </summary>
 public partial class TestBattleSelect : Node2D
 {
-    const float ScreenW = 1152f;
-    const float ScreenH = 648f;
+    const int SquadSize = 3;
     readonly List<ShipType> _squad = new();
-    readonly List<Button> _addButtons = new();
-    readonly Button[] _slots = new Button[3];
+    readonly List<TapCard> _shipCards = new();
+    readonly List<Button> _mapButtons = new();
+    readonly Button[] _slots = new Button[SquadSize];
+    Label _squadLabel, _mapBriefing;
     Button _launch;
-    OptionButton _mapPicker;
+    int _mapIndex;
 
     public override void _Ready()
     {
@@ -23,114 +28,130 @@ public partial class TestBattleSelect : Node2D
 
     void BuildUi()
     {
-        var ui = new CanvasLayer();
-        AddChild(ui);
-        var root = new VBoxContainer { OffsetLeft = 42, OffsetTop = 24, OffsetRight = ScreenW - 42, OffsetBottom = ScreenH - 24 };
-        root.AddThemeConstantOverride("separation", 10);
-        ui.AddChild(root);
+        MarginContainer root = ScreenRoot(this, extraTop: 32, extraBottom: 32);
+        VBoxContainer page = Stack(18);
+        root.AddChild(page);
 
-        var title = Text("TEST BATTLE", 28, TextBright, 6);
-        title.HorizontalAlignment = HorizontalAlignment.Center;
-        root.AddChild(title);
-        var hint = Text($"MAX-LEVEL SQUAD BUILDER · EVERY TEST PILOT DEPLOYS AT LEVEL {PilotRoster.MaxLevel} WITH ITS FULL ABILITY TRACK", 9, Muted, 3);
-        hint.HorizontalAlignment = HorizontalAlignment.Center;
-        root.AddChild(hint);
-        var rule = new CenterContainer();
-        rule.AddChild(new ColorRect { CustomMinimumSize = new Vector2(560, 1), Color = Hairline });
-        root.AddChild(rule);
+        HBoxContainer header = Row(16);
+        Button back = TouchButton("<", fontSize: FontTitle);
+        back.CustomMinimumSize = new Vector2(TouchTarget, TouchTarget);
+        back.Pressed += () => GetTree().ChangeSceneToFile("res://Scenes/HomeScreen.tscn");
+        header.AddChild(back);
+        VBoxContainer titleBlock = Stack(0);
+        titleBlock.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        titleBlock.AddChild(Text("QUICK BATTLE", FontTitle, TextBright, 4));
+        titleBlock.AddChild(Text($"MAX-LEVEL PILOTS · LEVEL {PilotRoster.MaxLevel}", FontCaption, Muted, 2));
+        header.AddChild(titleBlock);
+        page.AddChild(header);
 
-        var mapRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        mapRow.AddThemeConstantOverride("separation", 10);
-        root.AddChild(mapRow);
-        mapRow.AddChild(Text("BATTLE MAP", 9, Muted, 4));
-        _mapPicker = new OptionButton { CustomMinimumSize = new Vector2(420, 34), TooltipText = "Choose the terrain layout for this test battle." };
-        _mapPicker.AddThemeFontSizeOverride("font_size", 11);
-        foreach (BattleMapDefinition map in BattleMaps.All)
-            _mapPicker.AddItem($"{map.DisplayName} — {map.Briefing}");
-        mapRow.AddChild(_mapPicker);
-
-        var cardScroll = new ScrollContainer
+        page.AddChild(Text("BATTLEFIELD", FontCaption, Muted, 4));
+        var maps = new GridContainer { Columns = 2, MouseFilter = Control.MouseFilterEnum.Ignore };
+        maps.AddThemeConstantOverride("h_separation", 12);
+        maps.AddThemeConstantOverride("v_separation", 12);
+        for (int i = 0; i < BattleMaps.All.Length; i++)
         {
-            CustomMinimumSize = new Vector2(0, 285),
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
-            TooltipText = "Scroll to browse the available ships."
-        };
-        root.AddChild(cardScroll);
-        var cards = new GridContainer { Columns = 5, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        cards.AddThemeConstantOverride("h_separation", 12);
-        cards.AddThemeConstantOverride("v_separation", 12);
-        cardScroll.AddChild(cards);
-        foreach (ShipType ship in ShipTypes.SandboxHulls)
-            cards.AddChild(BuildShipCard(ship));
+            int index = i;
+            Button map = SelectableButton(BattleMaps.All[i].DisplayName);
+            map.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            map.Pressed += () =>
+            {
+                _mapIndex = index;
+                Refresh();
+            };
+            _mapButtons.Add(map);
+            maps.AddChild(map);
+        }
+        page.AddChild(maps);
+        _mapBriefing = Text("", FontCaption, Body, 0, wrap: true);
+        _mapBriefing.CustomMinimumSize = new Vector2(0, 60);
+        page.AddChild(_mapBriefing);
 
-        var squadRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        squadRow.AddThemeConstantOverride("separation", 10);
-        root.AddChild(squadRow);
-        squadRow.AddChild(Text("TEST SQUAD", 9, Muted, 4));
-        for (int i = 0; i < _slots.Length; i++)
+        _squadLabel = Text("", FontCaption, Muted, 4);
+        page.AddChild(_squadLabel);
+        HBoxContainer slots = Row(12);
+        for (int i = 0; i < SquadSize; i++)
         {
             int slot = i;
-            var button = new Button { CustomMinimumSize = new Vector2(170, 56), TooltipText = "Empty slot" };
-            button.AddThemeFontSizeOverride("font_size", 10);
-            button.AddThemeColorOverride("font_color", Body);
-            button.AddThemeStyleboxOverride("normal", Box(CellBg, Hairline, 1, 6, 4));
-            button.AddThemeStyleboxOverride("hover", Box(CellBg, new Color(Accent.R, Accent.G, Accent.B, 0.7f), 1, 6, 4));
-            button.AddThemeStyleboxOverride("pressed", Box(CellBg, Accent, 1, 6, 4));
+            var button = SelectableButton("");
+            button.CustomMinimumSize = new Vector2(0, 132);
+            button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            button.IconAlignment = HorizontalAlignment.Center;
+            button.VerticalIconAlignment = VerticalAlignment.Top;
+            button.ExpandIcon = true;
+            button.AddThemeFontSizeOverride("font_size", FontMicro);
             button.Pressed += () => Remove(slot);
             _slots[i] = button;
-            squadRow.AddChild(button);
+            slots.AddChild(button);
         }
-        var actionRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        actionRow.AddThemeConstantOverride("separation", 12);
-        root.AddChild(actionRow);
-        _launch = FlatButton("LAUNCH TEST BATTLE  >", 13);
-        _launch.Disabled = true;
-        _launch.CustomMinimumSize = new Vector2(245, 42);
+        page.AddChild(slots);
+
+        page.AddChild(Text("HANGAR · TAP A SHIP TO ADD IT", FontCaption, Muted, 4));
+        var scroll = new TouchScroll { SizeFlagsVertical = Control.SizeFlags.ExpandFill };
+        page.AddChild(scroll);
+        VBoxContainer list = Stack(12);
+        list.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        scroll.AddChild(list);
+        foreach (ShipType ship in ShipTypes.SandboxHulls)
+            list.AddChild(BuildShipRow(ship));
+
+        _launch = TouchButton("LAUNCH", primary: true);
         _launch.Pressed += Launch;
-        actionRow.AddChild(_launch);
-        var back = FlatButton("<  HOME", 10);
-        back.CustomMinimumSize = new Vector2(110, 42);
-        back.Pressed += () => GetTree().ChangeSceneToFile("res://Scenes/HomeScreen.tscn");
-        actionRow.AddChild(back);
+        page.AddChild(_launch);
     }
 
-    Control BuildShipCard(ShipType ship)
+    /// <summary>Outlined button whose border lights up when selected (see <see cref="SetSelected"/>).</summary>
+    static Button SelectableButton(string text)
     {
-        var panel = new PanelContainer { CustomMinimumSize = new Vector2(196, 270) };
-        panel.AddThemeStyleboxOverride("panel", Box(CellBg, Hairline, 1, 12, 10));
-        var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 6);
-        panel.AddChild(box);
-        var image = new TextureRect
+        Button button = TouchButton(text, fontSize: FontCaption);
+        SetSelected(button, false);
+        return button;
+    }
+
+    static void SetSelected(Button button, bool selected)
+    {
+        Color border = selected ? Accent : Hairline;
+        Color fill = selected ? new Color(Accent, 0.14f) : new Color(CellBg, 0.9f);
+        StyleBoxFlat style = Box(fill, border, selected ? 3 : 2, 12, 8);
+        button.AddThemeStyleboxOverride("normal", style);
+        button.AddThemeStyleboxOverride("hover", style);
+        button.AddThemeStyleboxOverride("pressed", Box(new Color(Accent, 0.22f), Accent, 3, 12, 8));
+        button.AddThemeColorOverride("font_color", selected ? TextBright : Body);
+        button.AddThemeColorOverride("font_hover_color", selected ? TextBright : Body);
+    }
+
+    Control BuildShipRow(ShipType ship)
+    {
+        // The whole card is the add button.
+        var card = new TapCard { CustomMinimumSize = new Vector2(0, 150) };
+        card.Tapped += () => Add(ship);
+        _shipCards.Add(card);
+        HBoxContainer row = Row(16);
+        card.AddChild(row);
+        row.AddChild(new TextureRect
         {
             Texture = ship.GetSkin(0).Base,
-            CustomMinimumSize = new Vector2(0, 80),
+            CustomMinimumSize = new Vector2(104, 104),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
-        };
-        box.AddChild(image);
-        var name = Text(ship.DisplayName.ToUpper(), 14, TextBright, 2);
-        name.HorizontalAlignment = HorizontalAlignment.Center;
-        box.AddChild(name);
-        var description = Text(ship.Description, 9, Muted, 0, wrap: true);
-        description.CustomMinimumSize = new Vector2(0, 39);
-        box.AddChild(description);
-        box.AddChild(Text($"SHD {ship.MaxShield} +{ship.ShieldRegenPerTurn}/T · HULL {ship.MaxHp} · DMG {ship.ShotDamage} · EVA {ship.Evasion * 100:0}%", 9, Body));
-        string abilities = ship.ManeuverPool.Length == 0 ? "FULL TRACK · BASE SYSTEMS" : $"FULL TRACK · {string.Join(" · ", ship.ManeuverPool.Select(AbilityName).Select(name => name.ToUpper()))}";
-        var ability = Text(abilities, 8, Muted, 0, wrap: true);
-        ability.CustomMinimumSize = new Vector2(0, 32);
-        box.AddChild(ability);
-        Button add = FlatButton("ADD TO SQUAD", 9);
-        add.CustomMinimumSize = new Vector2(0, 28);
-        add.Pressed += () => Add(ship);
-        _addButtons.Add(add);
-        box.AddChild(add);
-        return panel;
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        });
+        VBoxContainer info = Stack(4);
+        info.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        info.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        info.AddChild(Text(ship.DisplayName.ToUpper(), FontBody, TextBright, 2));
+        info.AddChild(Text($"HULL {ship.MaxHp} · SHIELD {ship.MaxShield} · DMG {ship.ShotDamage} · EVA {ship.Evasion * 100:0}%", FontMicro, Body, 1));
+        string maneuvers = string.Join(" · ", ship.ManeuverPool.Take(3).Select(a => ManeuverCatalog.AbilityName(a).ToUpper()));
+        Label pool = Text(maneuvers, FontMicro, Muted, 1, wrap: true);
+        info.AddChild(pool);
+        row.AddChild(info);
+        return card;
     }
 
     void Add(ShipType ship)
     {
-        if (_squad.Count < 3)
+        if (_squad.Count < SquadSize)
         {
             _squad.Add(ship);
             Refresh();
@@ -148,45 +169,33 @@ public partial class TestBattleSelect : Node2D
 
     void Refresh()
     {
+        for (int i = 0; i < _mapButtons.Count; i++)
+            SetSelected(_mapButtons[i], i == _mapIndex);
+        _mapBriefing.Text = BattleMaps.All[_mapIndex].Briefing;
+
+        _squadLabel.Text = $"SQUADRON · {_squad.Count}/{SquadSize} · TAP TO REMOVE";
         for (int i = 0; i < _slots.Length; i++)
         {
             bool occupied = i < _squad.Count;
             _slots[i].Icon = occupied ? _squad[i].GetSkin(0).Base : null;
-            _slots[i].Text = occupied ? $"{_squad[i].DisplayName}\nLV {PilotRoster.MaxLevel}" : "EMPTY";
-            _slots[i].TooltipText = occupied ? $"{_squad[i].DisplayName}, level {PilotRoster.MaxLevel}. Click to remove." : "Empty slot";
+            _slots[i].Text = occupied ? _squad[i].DisplayName.ToUpper() : "EMPTY";
+            SetSelected(_slots[i], occupied);
         }
-        foreach (Button add in _addButtons)
-            add.Disabled = _squad.Count >= 3;
-        _launch.Disabled = _squad.Count != 3;
+        foreach (TapCard card in _shipCards)
+            card.Disabled = _squad.Count >= SquadSize;
+        _launch.Disabled = _squad.Count == 0;
     }
 
     void Launch()
     {
-        GameSetup.StartTestBattle(_squad, BattleMaps.All[_mapPicker.Selected]);
+        GameSetup.StartTestBattle(_squad, BattleMaps.All[_mapIndex]);
         GetTree().ChangeSceneToFile("res://Scenes/Battle.tscn");
     }
 
-    static string AbilityName(ShipAbility ability) => ability switch
-    {
-        ShipAbility.UTurn => "U-Turn",
-        ShipAbility.BreakTurn => "Break Turn",
-        ShipAbility.EngineBoost => "Engine Boost",
-        ShipAbility.RotatingGuns => "Rotating Guns",
-        ShipAbility.SuppressionFire => "Suppression Fire",
-        ShipAbility.EmergencyThrusters => "Emergency Thrusters",
-        ShipAbility.SnapTurn => "Snap Turn",
-        ShipAbility.HunterLock => "Hunter Lock",
-        ShipAbility.PursuitBurn => "Pursuit Burn",
-        ShipAbility.EcmJink => "ECM Jink",
-        ShipAbility.SensorScramble => "Sensor Scramble",
-        ShipAbility.GhostRun => "Ghost Run",
-        ShipAbility.EvasiveDodge => "Evasive Dodge",
-        _ => ability.ToString(),
-    };
-
     public override void _Draw()
     {
-        DrawStarfield(this, 7342, ScreenW, ScreenH);
-        DrawNebula(this, new Vector2(200, 100), new Color(0.16f, 0.86f, 0.75f), 12, 20, 0.005f);
+        Vector2 size = GetViewportRect().Size;
+        DrawStarfield(this, 7342, size.X, size.Y, 200);
+        DrawNebula(this, new Vector2(size.X * 0.2f, size.Y * 0.1f), new Color(0.16f, 0.86f, 0.75f), 12, 20, 0.005f);
     }
 }

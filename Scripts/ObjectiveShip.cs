@@ -105,9 +105,19 @@ public partial class ObjectiveShip : Fighter
 
     public override void _Draw()
     {
+        // The node turns with its heading; keep the readout upright and at a
+        // constant on-screen size (the distance itself lives in the HUD).
+        float s = BattleManager.Instance?.ScreenToWorldScale ?? 1f;
+        DrawSetTransform(Vector2.Zero, -Rotation, Vector2.One);
         Color hull = IsAlive ? new Color(0.72f, 0.9f, 1f) : new Color(0.35f, 0.12f, 0.12f);
-        DrawRect(new Rect2(-32, -32, 64, 5), new Color(0.02f, 0.04f, 0.08f, 0.9f));
-        DrawRect(new Rect2(-32, -32, 64 * Hp / (float)MaxHp, 5), new Color(0.4f, 1f, 0.7f));
-        DrawString(ThemeDB.FallbackFont, new Vector2(-68, -42), Escaped ? "JUMP ZONE REACHED" : $"TRANSPORT · {DistanceRemaining:0} TO JUMP", HorizontalAlignment.Center, 136, 10, hull);
+        float width = Mathf.Max(64f, 72f * s);
+        float barY = -40f - 8f * s;
+        DrawRect(new Rect2(-width / 2f, barY, width, 7f * s), new Color(0.02f, 0.04f, 0.08f, 0.9f));
+        DrawRect(new Rect2(-width / 2f, barY, width * Mathf.Clamp(Hp / (float)MaxHp, 0f, 1f), 7f * s), new Color(0.4f, 1f, 0.7f));
+        string label = Escaped ? "JUMP ZONE REACHED" : "TRANSPORT";
+        int size = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontMicro * s));
+        Vector2 extent = ThemeDB.FallbackFont.GetStringSize(label, HorizontalAlignment.Left, -1f, size);
+        DrawString(ThemeDB.FallbackFont, new Vector2(-extent.X / 2f, barY - 6f * s), label, HorizontalAlignment.Left, -1f, size, hull);
+        DrawSetTransform(Vector2.Zero);
     }
 }

@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>One circular tactical feature placed on a battle map.</summary>
 public class TerrainFeature
@@ -35,7 +36,11 @@ public class BattleSpawn
     }
 }
 
-/// <summary>Data for a deliberately authored tactical battlefield.</summary>
+/// <summary>
+/// Data for a deliberately authored tactical battlefield. Maps are authored
+/// in a landscape frame (player squadron on the left, enemies on the right)
+/// and turned into the portrait battlefield by <see cref="ToPortrait()"/>.
+/// </summary>
 public class BattleMapDefinition
 {
     public string Id;
@@ -48,12 +53,49 @@ public class BattleMapDefinition
     public BattleSpawn EscortSpawn;
     public Vector2 EscortDestination;
     public float EscortDestinationRadius;
+
+    /// <summary>
+    /// Returns a copy turned a quarter-turn anticlockwise so the authored
+    /// left-to-right approach runs bottom-to-top on a portrait screen: the
+    /// player's squadron starts at the bottom and the enemy wing at the top.
+    /// </summary>
+    public BattleMapDefinition ToPortrait() => new()
+    {
+        Id = Id,
+        DisplayName = DisplayName,
+        Briefing = Briefing,
+        Terrain = Terrain.Select(feature =>
+        {
+            Vector2 p = ToPortrait(feature.Position);
+            return new TerrainFeature(feature.Type, p.X, p.Y, feature.Radius);
+        }).ToArray(),
+        PlayerSpawns = ToPortrait(PlayerSpawns),
+        EnemySpawns = ToPortrait(EnemySpawns),
+        EscortReinforcementSpawns = ToPortrait(EscortReinforcementSpawns),
+        EscortSpawn = EscortSpawn == null ? null : ToPortrait(EscortSpawn),
+        // Vector2.Zero means "not authored"; keep it recognisable after the turn.
+        EscortDestination = EscortDestination == Vector2.Zero ? Vector2.Zero : ToPortrait(EscortDestination),
+        EscortDestinationRadius = EscortDestinationRadius,
+    };
+
+    static Vector2 ToPortrait(Vector2 authored) => new(authored.Y, BattleMaps.AuthoredWidth - authored.X);
+
+    static BattleSpawn ToPortrait(BattleSpawn spawn)
+    {
+        Vector2 p = ToPortrait(spawn.Position);
+        return new BattleSpawn(p.X, p.Y, spawn.HeadingDegrees - 90f);
+    }
+
+    static BattleSpawn[] ToPortrait(BattleSpawn[] spawns) => spawns?.Select(ToPortrait).ToArray();
 }
 
 /// <summary>Battle maps rotate terrain and opening angles instead of always staging a head-on joust.</summary>
 public static class BattleMaps
 {
     public const string EscortCorridorId = "escort-corridor";
+    // Authored (landscape) battlefield size. The portrait arena swaps these.
+    public const float AuthoredWidth = 2400f;
+    public const float AuthoredHeight = 1350f;
 
     public static readonly BattleMapDefinition ShardRun = new()
     {
@@ -171,7 +213,10 @@ public static class BattleMaps
 
     public static readonly BattleMapDefinition[] All = { ShardRun, CobaltVeil, BrokenRing, EscortCorridor };
 
-    public static BattleMapDefinition ForCurrentBattle()
+    /// <summary>The portrait battlefield for the battle that is about to start.</summary>
+    public static BattleMapDefinition ForCurrentBattle() => AuthoredForCurrentBattle().ToPortrait();
+
+    static BattleMapDefinition AuthoredForCurrentBattle()
     {
         if (GameSetup.IsTestBattle)
             return GameSetup.TestBattleMap ?? ShardRun;
@@ -190,11 +235,25 @@ public static class BattleMaps
 public partial class TerrainLayer : Node2D
 {
     readonly IEnumerable<TerrainFeature> _terrain;
+    float _drawnScale = -1f;
+
+    /// <summary>Engine-required parameterless constructor; use the terrain overload in code.</summary>
+    public TerrainLayer() => _terrain = System.Array.Empty<TerrainFeature>();
 
     public TerrainLayer(IEnumerable<TerrainFeature> terrain) => _terrain = terrain;
 
+    // Labels keep a constant on-screen size, so redraw when the zoom changes.
+    public override void _Process(double delta)
+    {
+        float scale = BattleManager.Instance?.ScreenToWorldScale ?? 1f;
+        if (!Mathf.IsEqualApprox(scale, _drawnScale))
+            QueueRedraw();
+    }
+
     public override void _Draw()
     {
+        _drawnScale = BattleManager.Instance?.ScreenToWorldScale ?? 1f;
+        int labelSize = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontMicro * _drawnScale));
         foreach (TerrainFeature feature in _terrain)
         {
             if (feature.Type == TerrainFeatureType.Nebula)
@@ -202,8 +261,9 @@ public partial class TerrainLayer : Node2D
                 DrawCircle(feature.Position, feature.Radius, new Color(0.20f, 0.42f, 0.72f, 0.10f));
                 DrawCircle(feature.Position, feature.Radius * 0.72f, new Color(0.36f, 0.24f, 0.72f, 0.11f));
                 DrawArc(feature.Position, feature.Radius, 0, Mathf.Tau, 48, new Color(0.38f, 0.65f, 1f, 0.42f), 2f, true);
-                DrawString(ThemeDB.FallbackFont, feature.Position + new Vector2(-80, 4), "NEBULA", HorizontalAlignment.Center,
-                    160, 12, new Color(0.56f, 0.76f, 1f, 0.58f));
+                Vector2 extent = ThemeDB.FallbackFont.GetStringSize("NEBULA", HorizontalAlignment.Left, -1f, labelSize);
+                DrawString(ThemeDB.FallbackFont, feature.Position + new Vector2(-extent.X / 2f, labelSize * 0.35f), "NEBULA",
+                    HorizontalAlignment.Left, -1f, labelSize, new Color(0.56f, 0.76f, 1f, 0.58f));
                 continue;
             }
 
@@ -211,7 +271,7 @@ public partial class TerrainLayer : Node2D
             DrawCircle(feature.Position, feature.Radius, new Color(0.20f, 0.23f, 0.30f, 1f));
             DrawCircle(feature.Position - new Vector2(feature.Radius * 0.20f, feature.Radius * 0.22f), feature.Radius * 0.50f,
                 new Color(0.30f, 0.34f, 0.42f, 1f));
-            DrawArc(feature.Position, feature.Radius, 0, Mathf.Tau, 20, new Color(0.62f, 0.68f, 0.78f, 0.52f), 1.5f, true);
+            DrawArc(feature.Position, feature.Radius, 0, Mathf.Tau, 32, new Color(0.62f, 0.68f, 0.78f, 0.52f), 1.5f * Mathf.Max(1f, _drawnScale), true);
         }
     }
 }

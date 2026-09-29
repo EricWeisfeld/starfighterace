@@ -73,13 +73,32 @@ public partial class BattleOverlay : Node2D
         public readonly float[] Headings = new float[TargetingTimeSamples + 1];
     }
 
+    // World units per viewport pixel for this frame. Text, HP bars and line
+    // widths are multiplied by it so they keep a constant, readable size on
+    // screen at any camera zoom.
+    float _s = 1f;
+
+    float Px(float screenPixels) => screenPixels * _s;
+    int FontPx(int screenSize) => Mathf.Max(1, Mathf.RoundToInt(screenSize * _s));
+    float W(float width) => width * Mathf.Max(1f, _s);
+
     public override void _Process(double delta) => QueueRedraw();
+
+    /// <summary>Draws a label centred on a world point at a constant on-screen size.</summary>
+    void DrawLabel(Vector2 center, string text, int screenSize, Color color)
+    {
+        Font font = ThemeDB.FallbackFont;
+        int size = FontPx(screenSize);
+        Vector2 extent = font.GetStringSize(text, HorizontalAlignment.Left, -1f, size);
+        DrawString(font, center + new Vector2(-extent.X / 2f, size * 0.35f), text, HorizontalAlignment.Left, -1f, size, color);
+    }
 
     public override void _Draw()
     {
         var mgr = BattleManager.Instance;
         if (mgr == null)
             return;
+        _s = mgr.ScreenToWorldScale;
 
         Fighter focusedTarget = null;
         TargetingAnalysis targetingAnalysis = null;
@@ -111,8 +130,6 @@ public partial class BattleOverlay : Node2D
                 DrawPlan(mgr, f, f.PlannedTurnAngleRadians ?? 0f, alpha, showCone: f == mgr.Selected,
                     targeting: f == mgr.Selected ? targetingAnalysis : null,
                     threat: f == mgr.Selected ? threatAnalysis : null);
-                if (f == mgr.Selected)
-                    DrawManeuverIcons(mgr, f);
             }
         }
 
@@ -123,8 +140,8 @@ public partial class BattleOverlay : Node2D
         if (mgr.PriorityTarget != null && mgr.PriorityTarget.IsAlive)
         {
             Vector2 p = mgr.PriorityTarget.Position;
-            DrawArc(p, 34f, 0, Mathf.Tau, 28, SignalUi.Warning, 2f, true);
-            DrawString(ThemeDB.FallbackFont, p + new Vector2(-70, -38), "PRIORITY TARGET", HorizontalAlignment.Center, 140, 11, SignalUi.Warning);
+            DrawArc(p, 34f, 0, Mathf.Tau, 28, SignalUi.Warning, W(2f), true);
+            DrawLabel(p + new Vector2(0f, -34f - Px(22f)), "PRIORITY TARGET", SignalUi.FontMicro, SignalUi.Warning);
         }
 
         if (targetingAnalysis != null)
@@ -142,166 +159,37 @@ public partial class BattleOverlay : Node2D
     void DrawEscortObjective(ObjectiveShip transport)
     {
         Color zone = transport.Escaped ? SignalUi.Positive : new Color(0.35f, 0.9f, 1f, 0.9f);
-        DrawLine(transport.Position, transport.Destination, new Color(zone, 0.18f), 2f, true);
+        DrawLine(transport.Position, transport.Destination, new Color(zone, 0.18f), W(2f), true);
         DrawCircle(transport.Destination, transport.DestinationRadius, new Color(zone, 0.08f));
-        DrawArc(transport.Destination, transport.DestinationRadius, 0f, Mathf.Tau, 48, zone, 3f, true);
-        DrawArc(transport.Destination, transport.DestinationRadius * 0.62f, 0f, Mathf.Tau, 36, new Color(zone, 0.45f), 1.5f, true);
-        DrawString(ThemeDB.FallbackFont, transport.Destination + new Vector2(-90f, -transport.DestinationRadius - 14f),
-            transport.Escaped ? "TRANSPORT SECURED" : "JUMP ZONE",
-            HorizontalAlignment.Center, 180f, 13, zone);
+        DrawArc(transport.Destination, transport.DestinationRadius, 0f, Mathf.Tau, 48, zone, W(3f), true);
+        DrawArc(transport.Destination, transport.DestinationRadius * 0.62f, 0f, Mathf.Tau, 36, new Color(zone, 0.45f), W(1.5f), true);
+        DrawLabel(transport.Destination + new Vector2(0f, -transport.DestinationRadius - Px(18f)),
+            transport.Escaped ? "TRANSPORT SECURED" : "JUMP ZONE", SignalUi.FontCaption, zone);
     }
-
-    void DrawManeuverIcons(BattleManager mgr, Fighter fighter)
-    {
-        var icons = mgr.GetManeuverIcons(fighter);
-        Vector2 mouse = GetGlobalMousePosition();
-        string hoveredName = null;
-        Font font = ThemeDB.FallbackFont;
-
-        for (int i = 0; i < icons.Count; i++)
-        {
-            BattleManager.ManeuverIcon icon = icons[i];
-            Rect2 bounds = mgr.GetManeuverIconBounds(fighter, i, icons.Count);
-            Color color = mgr.GetManeuverIconColor(icon);
-            bool hovered = bounds.HasPoint(mouse);
-            bool active = IsActiveManeuverIcon(fighter, icon);
-            Color fill = new Color(color, active ? 0.42f : hovered ? 0.32f : 0.16f);
-
-            DrawRect(bounds, fill, true);
-            DrawRect(bounds, new Color(color, hovered ? 1f : 0.7f), false, hovered ? 2.5f : 1.5f);
-            DrawString(font, bounds.Position + new Vector2(0f, 22f), mgr.GetManeuverIconSymbol(icon),
-                HorizontalAlignment.Center, bounds.Size.X, 13, new Color(1f, 1f, 1f, 0.95f));
-            if (hovered)
-                hoveredName = mgr.GetManeuverIconName(fighter, icon);
-        }
-
-        if (hoveredName != null)
-        {
-            Rect2 firstIcon = mgr.GetManeuverIconBounds(fighter, 0, icons.Count);
-            DrawString(font, firstIcon.Position + new Vector2(44f, -8f), hoveredName,
-                HorizontalAlignment.Left, -1f, 12, new Color(0.85f, 0.94f, 1f, 0.96f));
-        }
-    }
-
-    static bool IsActiveManeuverIcon(Fighter fighter, BattleManager.ManeuverIcon icon) => icon switch
-    {
-        BattleManager.ManeuverIcon.Normal => fighter.PlannedManeuver == ManeuverType.Normal,
-        BattleManager.ManeuverIcon.UTurnLeft => fighter.PlannedManeuver == ManeuverType.UTurn && fighter.PlannedTurnAngleRadians < 0f,
-        BattleManager.ManeuverIcon.UTurnRight => fighter.PlannedManeuver == ManeuverType.UTurn && fighter.PlannedTurnAngleRadians > 0f,
-        BattleManager.ManeuverIcon.BreakTurnLeft =>
-            fighter.PlannedManeuver == ManeuverType.BreakTurn && fighter.PlannedTurnAngleRadians < 0f,
-        BattleManager.ManeuverIcon.BreakTurnRight =>
-            fighter.PlannedManeuver == ManeuverType.BreakTurn && fighter.PlannedTurnAngleRadians > 0f,
-        BattleManager.ManeuverIcon.EngineBoost => fighter.PlannedManeuver == ManeuverType.EngineBoost,
-        BattleManager.ManeuverIcon.RotatingGuns => fighter.PlannedManeuver == ManeuverType.RotatingGuns,
-        BattleManager.ManeuverIcon.EmergencyThrusters => fighter.PlannedManeuver == ManeuverType.EmergencyThrusters,
-        BattleManager.ManeuverIcon.SnapTurnLeft => fighter.PlannedManeuver == ManeuverType.SnapTurn && fighter.PlannedTurnAngleRadians < 0f,
-        BattleManager.ManeuverIcon.SnapTurnRight => fighter.PlannedManeuver == ManeuverType.SnapTurn && fighter.PlannedTurnAngleRadians > 0f,
-        BattleManager.ManeuverIcon.PursuitBurn => fighter.PlannedManeuver == ManeuverType.PursuitBurn,
-        BattleManager.ManeuverIcon.EcmJink => fighter.PlannedManeuver == ManeuverType.EcmJink,
-        BattleManager.ManeuverIcon.GhostRun => fighter.PlannedManeuver == ManeuverType.GhostRun,
-        BattleManager.ManeuverIcon.EvasiveDodgeLeft => fighter.PlannedManeuver == ManeuverType.EvasiveDodge && fighter.PlannedTurnAngleRadians < 0f,
-        BattleManager.ManeuverIcon.EvasiveDodgeRight => fighter.PlannedManeuver == ManeuverType.EvasiveDodge && fighter.PlannedTurnAngleRadians > 0f,
-        _ => false,
-    };
 
     void DrawSelection(BattleManager mgr, Fighter f)
     {
-        DrawArc(f.Position, 24f, 0, Mathf.Tau, 40, new Color(0.302f, 0.639f, 1f, 0.9f), 2f, true);
+        DrawArc(f.Position, 26f, 0, Mathf.Tau, 40, new Color(0.302f, 0.639f, 1f, 0.9f), W(2.5f), true);
         if (f.PlannedManeuver is ManeuverType.Normal or ManeuverType.EngineBoost or ManeuverType.EmergencyThrusters or ManeuverType.PursuitBurn or ManeuverType.EcmJink or ManeuverType.GhostRun)
             DrawReachableFan(f);
-        DrawMoveDistanceReadout(f);
+        if (f.PlannedManeuver == ManeuverType.Normal)
+            DrawThrottleGauge(f);
     }
 
-    void DrawMoveDistanceReadout(Fighter f)
+    /// <summary>
+    /// The normal-flight throttle range along the ship's heading, with the
+    /// planned distance marked. The numbers live in the HUD.
+    /// </summary>
+    void DrawThrottleGauge(Fighter f)
     {
-        Font font = ThemeDB.FallbackFont;
-        if (f.PlannedManeuver == ManeuverType.UTurn)
-        {
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"U-TURN {f.PlannedPathDistance:0}  //  180 deg",
-                HorizontalAlignment.Center, 180f, 12, new Color(0.5f, 0.85f, 1f, 0.9f));
-            return;
-        }
-        if (f.PlannedManeuver == ManeuverType.BreakTurn)
-        {
-            string name = "BREAK TURN";
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"{name} {f.PlannedPathDistance:0}  //  180 deg",
-                HorizontalAlignment.Center, 180f, 12, new Color(1f, 0.62f, 0.3f, 0.95f));
-            return;
-        }
-        if (f.PlannedManeuver == ManeuverType.EngineBoost)
-        {
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"ENGINE BOOST {f.PlannedPathDistance:0}  //  ONCE PER BATTLE",
-                HorizontalAlignment.Center, 180f, 12, new Color(0.35f, 1f, 0.8f, 0.95f));
-            return;
-        }
-        if (f.PlannedManeuver == ManeuverType.PursuitBurn)
-        {
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"PURSUIT BURN {f.PlannedPathDistance:0}  //  {f.PursuitBurnTurnLimitDegrees:0} DEG MAX TURN",
-                HorizontalAlignment.Center, 180f, 12, new Color(0.4f, 1f, 0.7f, 0.95f));
-            return;
-        }
-        if (f.PlannedManeuver == ManeuverType.SnapTurn)
-        {
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"SNAP TURN {f.PlannedPathDistance:0}  //  145 DEG",
-                HorizontalAlignment.Center, 180f, 12, new Color(0.95f, 0.55f, 1f, 0.95f));
-            return;
-        }
-        if (f.PlannedManeuver == ManeuverType.EcmJink)
-        {
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"ECM JINK {f.PlannedPathDistance:0}  //  EVA +{f.Type.EcmJinkEvasionBonus * 100:0}%",
-                HorizontalAlignment.Center, 180f, 12, new Color(0.45f, 0.7f, 1f, 0.95f));
-            return;
-        }
-        if (f.PlannedManeuver == ManeuverType.GhostRun)
-        {
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"GHOST RUN {f.PlannedPathDistance:0}  //  EVA +{f.Type.GhostRunEvasionBonus * 100:0}%",
-                HorizontalAlignment.Center, 180f, 12, new Color(0.6f, 0.95f, 1f, 0.95f));
-            return;
-        }
-        if (f.PlannedManeuver == ManeuverType.EvasiveDodge)
-        {
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"EVASIVE DODGE {f.PlannedPathDistance:0}  //  {f.Type.EvasiveDodgeAngleDegrees:0} DEG + EVA +{f.Type.EvasiveDodgeEvasionBonus * 100:0}%",
-                HorizontalAlignment.Center, 180f, 12, new Color(0.35f, 0.9f, 1f, 0.95f));
-            return;
-        }
-        if (f.PlannedManeuver == ManeuverType.RotatingGuns)
-        {
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"ROTATING GUNS {f.PlannedPathDistance:0}  //  {f.EffectiveFireConeDeg:0}° FIRE ARC",
-                HorizontalAlignment.Center, 180f, 12, new Color(1f, 0.78f, 0.35f, 0.95f));
-            return;
-        }
-        if (f.PlannedManeuver == ManeuverType.EmergencyThrusters)
-        {
-            DrawString(font, f.Position + new Vector2(-90f, 44f),
-                $"EMERGENCY THRUSTERS {f.PlannedPathDistance:0}  //  EVA -{f.Type.EmergencyThrustersEvasionPenalty * 100:0}%",
-                HorizontalAlignment.Center, 180f, 12, new Color(1f, 0.38f, 0.3f, 0.95f));
-            return;
-        }
-        DrawString(font, f.Position + new Vector2(-90f, 40f),
-            $"NORMAL MOVE {f.PlannedPathDistance:0} / {f.NormalMoveMinDistance:0}-{f.NormalMoveMaxDistance:0}",
-            HorizontalAlignment.Center, 180f, 12, new Color(1f, 1f, 1f, 0.75f));
-        DrawString(font, f.Position + new Vector2(-90f, 55f),
-            $"MAX TURN {f.PlannedNormalTurnLimitDegrees:0}°",
-            HorizontalAlignment.Center, 180f, 12, new Color(0.302f, 0.639f, 1f, 0.9f));
-
         Vector2 forward = Vector2.FromAngle(f.Heading);
         Vector2 min = f.Position + forward * f.NormalMoveMinDistance;
         Vector2 max = f.Position + forward * f.NormalMoveMaxDistance;
         Vector2 current = f.Position + forward * f.PlannedPathDistance;
-        DrawLine(min, max, new Color(0.302f, 0.639f, 1f, 0.55f), 3f, true);
-        DrawCircle(min, 4f, new Color(1f, 1f, 1f, 0.4f));
-        DrawCircle(max, 4f, new Color(1f, 1f, 1f, 0.4f));
-        DrawCircle(current, 6f, new Color(0.302f, 0.639f, 1f, 0.9f));
+        DrawLine(min, max, new Color(0.302f, 0.639f, 1f, 0.55f), W(3f), true);
+        DrawCircle(min, Px(4f), new Color(1f, 1f, 1f, 0.4f));
+        DrawCircle(max, Px(4f), new Color(1f, 1f, 1f, 0.4f));
+        DrawCircle(current, Px(6f), new Color(0.302f, 0.639f, 1f, 0.9f));
     }
 
     void DrawReachableFan(Fighter f)
@@ -329,9 +217,9 @@ public partial class BattleOverlay : Node2D
         edge.CopyTo(poly, 0);
         poly[samples + 1] = f.Position;
         DrawColoredPolygon(poly, FanFill);
-        DrawPolyline(edge, FanEdge, 1.5f, true);
-        DrawLine(f.Position, edge[0], FanEdge, 1.5f, true);
-        DrawLine(f.Position, edge[samples], FanEdge, 1.5f, true);
+        DrawPolyline(edge, FanEdge, W(1.5f), true);
+        DrawLine(f.Position, edge[0], FanEdge, W(1.5f), true);
+        DrawLine(f.Position, edge[samples], FanEdge, W(1.5f), true);
     }
 
     void DrawPlan(BattleManager mgr, Fighter f, float turn, float alpha, bool showCone = false,
@@ -366,24 +254,29 @@ public partial class BattleOverlay : Node2D
         if (targeting != null && !fatalAsteroidPath)
             DrawTargetedPath(pts, pathColor, alpha, targeting);
         else
-            DrawPolyline(pts, new Color(pathColor, pathColor.A * alpha / 0.8f), 2f, true);
+            DrawPolyline(pts, new Color(pathColor, pathColor.A * alpha / 0.8f), W(2.5f), true);
 
         Vector2 end = pts[samples];
         if (showCone)
             DrawFireCone(end, endHeading, f.EffectiveFireRange, f.EffectiveFireConeDeg);
+        Vector2 labelAt = end + new Vector2(0f, -24f - Px(16f));
         if (fatalAsteroidPath)
-            DrawString(ThemeDB.FallbackFont, end + new Vector2(-55f, -24f), "FATAL COLLISION",
-                HorizontalAlignment.Center, 110f, 11, new Color(1f, 0.35f, 0.3f, alpha));
+            DrawLabel(labelAt, "FATAL COLLISION", SignalUi.FontMicro, new Color(1f, 0.35f, 0.3f, alpha));
         else if (scrapeDamage > 0)
-            DrawString(ThemeDB.FallbackFont, end + new Vector2(-55f, -24f), $"SCRAPE - {scrapeDamage} HULL",
-                HorizontalAlignment.Center, 110f, 11, new Color(1f, 0.72f, 0.28f, alpha));
+            DrawLabel(labelAt, $"SCRAPE -{scrapeDamage} HULL", SignalUi.FontMicro, new Color(1f, 0.72f, 0.28f, alpha));
         else if (threat != null)
-            DrawThreatReadout(end, threat, alpha);
+            DrawThreatReadout(labelAt, threat, alpha);
 
         Texture2D tex = f.BaseTexture;
         DrawSetTransform(end, endHeading + Mathf.Pi / 2f, Vector2.One);
         DrawTexture(tex, -tex.GetSize() / 2f, new Color(1, 1, 1, alpha * 0.6f));
         DrawSetTransform(Vector2.Zero);
+
+        // The ghost is the drag handle; give it a finger-sized ring so it
+        // reads as grabbable even when the camera is pulled back.
+        float handle = Mathf.Max(24f, Px(26f));
+        DrawCircle(end, handle, new Color(pathColor, 0.08f * alpha));
+        DrawArc(end, handle, 0f, Mathf.Tau, 36, new Color(pathColor, 0.7f * alpha), W(2f), true);
     }
 
     void DrawThreatPath(Vector2[] points, ThreatAnalysis threat)
@@ -398,7 +291,7 @@ public partial class BattleOverlay : Node2D
                 continue;
 
             Color color = ThreatColor(risk);
-            DrawLine(points[i], points[i + 1], new Color(color, 0.13f + risk * 0.3f), 6f, true);
+            DrawLine(points[i], points[i + 1], new Color(color, 0.13f + risk * 0.3f), W(7f), true);
 
             if (risk < 0.12f)
                 continue;
@@ -407,7 +300,7 @@ public partial class BattleOverlay : Node2D
                 continue;
             Vector2 mid = points[i].Lerp(points[i + 1], 0.5f);
             Vector2 normal = segment.Normalized().Rotated(Mathf.Pi / 2f) * 4f;
-            DrawLine(mid - normal, mid + normal, color, 1.5f, true);
+            DrawLine(mid - normal * Mathf.Max(1f, _s), mid + normal * Mathf.Max(1f, _s), color, W(1.5f), true);
         }
     }
 
@@ -424,8 +317,7 @@ public partial class BattleOverlay : Node2D
             ? new Color(0.45f, 0.9f, 0.75f, alpha)
             : new Color(ThreatColor(threat.PeakRisk), alpha);
         string contacts = threat.Contacts == 1 ? "1 CONTACT" : $"{threat.Contacts} CONTACTS";
-        DrawString(ThemeDB.FallbackFont, end + new Vector2(-68f, -24f),
-            $"THREAT // {status}  {contacts}", HorizontalAlignment.Center, 136f, 10, color);
+        DrawLabel(end, $"THREAT {status} · {contacts}", SignalUi.FontMicro, color);
     }
 
     static Color ThreatColor(float risk) => ThreatLow.Lerp(ThreatHigh, Mathf.Clamp(risk / 0.35f, 0f, 1f));
@@ -433,19 +325,19 @@ public partial class BattleOverlay : Node2D
     void DrawTargetedPath(Vector2[] points, Color maneuverColor, float alpha, TargetingAnalysis targeting)
     {
         float baseAlpha = Mathf.Min(0.34f, maneuverColor.A * alpha / 0.8f * 0.55f);
-        DrawPolyline(points, new Color(maneuverColor, baseAlpha), 1.6f, true);
+        DrawPolyline(points, new Color(maneuverColor, baseAlpha), W(1.6f), true);
 
         for (int i = 0; i < TargetingTimeSamples; i++)
         {
             float coverage = Mathf.Max(targeting.Coverage[i], targeting.Coverage[i + 1]);
             if (coverage >= StrongCoverageThreshold)
             {
-                DrawLine(points[i], points[i + 1], StrongSolution, 3f, true);
+                DrawLine(points[i], points[i + 1], StrongSolution, W(3.5f), true);
             }
             else if (coverage > 0f)
             {
                 Vector2 dashEnd = points[i].Lerp(points[i + 1], 0.58f);
-                DrawLine(points[i], dashEnd, PossibleSolution, 2.5f, true);
+                DrawLine(points[i], dashEnd, PossibleSolution, W(3f), true);
             }
         }
     }
@@ -471,9 +363,9 @@ public partial class BattleOverlay : Node2D
         float cone = Mathf.DegToRad(coneDeg);
         float left = heading - cone;
         float right = heading + cone;
-        DrawLine(tip, tip + Vector2.FromAngle(left) * range, TimeSliceCone, 1f, true);
-        DrawLine(tip, tip + Vector2.FromAngle(right) * range, TimeSliceCone, 1f, true);
-        DrawArc(tip, range, left, right, 10, TimeSliceCone, 1f, true);
+        DrawLine(tip, tip + Vector2.FromAngle(left) * range, TimeSliceCone, W(1f), true);
+        DrawLine(tip, tip + Vector2.FromAngle(right) * range, TimeSliceCone, W(1f), true);
+        DrawArc(tip, range, left, right, 10, TimeSliceCone, W(1f), true);
     }
 
     TargetingAnalysis AnalyzeTargeting(BattleManager mgr, Fighter shooter, Fighter target)
@@ -620,7 +512,7 @@ public partial class BattleOverlay : Node2D
             : analysis.BestCoverage > 0f ? PossibleSolution : NoSolution;
 
         if (analysis.BestCoverage >= StrongCoverageThreshold)
-            DrawArc(center, 27f, 0f, Mathf.Tau, 32, color, 2f, true);
+            DrawArc(center, 27f, 0f, Mathf.Tau, 32, color, W(2.5f), true);
         else
             DrawDashedArc(center, 27f, color);
 
@@ -628,17 +520,17 @@ public partial class BattleOverlay : Node2D
         const float bracketOuterY = 14f;
         const float bracketInnerY = 7f;
         const float bracketArm = 7f;
-        DrawLine(center + new Vector2(-bracketX, -bracketOuterY), center + new Vector2(-bracketX, -bracketInnerY), color, 2f, true);
-        DrawLine(center + new Vector2(-bracketX, -bracketOuterY), center + new Vector2(-bracketX + bracketArm, -bracketOuterY), color, 2f, true);
-        DrawLine(center + new Vector2(-bracketX, bracketOuterY), center + new Vector2(-bracketX, bracketInnerY), color, 2f, true);
-        DrawLine(center + new Vector2(-bracketX, bracketOuterY), center + new Vector2(-bracketX + bracketArm, bracketOuterY), color, 2f, true);
-        DrawLine(center + new Vector2(bracketX, -bracketOuterY), center + new Vector2(bracketX, -bracketInnerY), color, 2f, true);
-        DrawLine(center + new Vector2(bracketX, -bracketOuterY), center + new Vector2(bracketX - bracketArm, -bracketOuterY), color, 2f, true);
-        DrawLine(center + new Vector2(bracketX, bracketOuterY), center + new Vector2(bracketX, bracketInnerY), color, 2f, true);
-        DrawLine(center + new Vector2(bracketX, bracketOuterY), center + new Vector2(bracketX - bracketArm, bracketOuterY), color, 2f, true);
+        DrawLine(center + new Vector2(-bracketX, -bracketOuterY), center + new Vector2(-bracketX, -bracketInnerY), color, W(2.5f), true);
+        DrawLine(center + new Vector2(-bracketX, -bracketOuterY), center + new Vector2(-bracketX + bracketArm, -bracketOuterY), color, W(2.5f), true);
+        DrawLine(center + new Vector2(-bracketX, bracketOuterY), center + new Vector2(-bracketX, bracketInnerY), color, W(2.5f), true);
+        DrawLine(center + new Vector2(-bracketX, bracketOuterY), center + new Vector2(-bracketX + bracketArm, bracketOuterY), color, W(2.5f), true);
+        DrawLine(center + new Vector2(bracketX, -bracketOuterY), center + new Vector2(bracketX, -bracketInnerY), color, W(2.5f), true);
+        DrawLine(center + new Vector2(bracketX, -bracketOuterY), center + new Vector2(bracketX - bracketArm, -bracketOuterY), color, W(2.5f), true);
+        DrawLine(center + new Vector2(bracketX, bracketOuterY), center + new Vector2(bracketX, bracketInnerY), color, W(2.5f), true);
+        DrawLine(center + new Vector2(bracketX, bracketOuterY), center + new Vector2(bracketX - bracketArm, bracketOuterY), color, W(2.5f), true);
 
         if (pinned)
-            DrawCircle(center + new Vector2(0f, -31f), 3.5f, color);
+            DrawCircle(center + new Vector2(0f, -31f), Px(4f), color);
 
         string status;
         if (analysis.BestCoverage >= StrongCoverageThreshold)
@@ -662,8 +554,9 @@ public partial class BattleOverlay : Node2D
             status = "NO WINDOW";
         }
 
-        DrawString(ThemeDB.FallbackFont, center + new Vector2(37f, 4f), status,
-            HorizontalAlignment.Left, -1f, 11, color);
+        int size = FontPx(SignalUi.FontMicro);
+        DrawString(ThemeDB.FallbackFont, center + new Vector2(37f + Px(4f), size * 0.35f), status,
+            HorizontalAlignment.Left, -1f, size, color);
     }
 
     void DrawDashedArc(Vector2 center, float radius, Color color)
@@ -673,7 +566,7 @@ public partial class BattleOverlay : Node2D
         for (int i = 0; i < dashes; i++)
         {
             float start = i * Mathf.Tau / dashes;
-            DrawArc(center, radius, start, start + dashWidth, 4, color, 2f, true);
+            DrawArc(center, radius, start, start + dashWidth, 4, color, W(2.5f), true);
         }
     }
 
@@ -751,35 +644,35 @@ public partial class BattleOverlay : Node2D
             poly[i + 1] = tip + Vector2.FromAngle(a) * range;
         }
         DrawColoredPolygon(poly, ConeFill);
-        DrawLine(tip, poly[1], ConeEdge, 1f, true);
-        DrawLine(tip, poly[samples + 1], ConeEdge, 1f, true);
-        DrawArc(tip, range, heading - cone, heading + cone, samples + 1, ConeEdge, 1f, true);
+        DrawLine(tip, poly[1], ConeEdge, W(1f), true);
+        DrawLine(tip, poly[samples + 1], ConeEdge, W(1f), true);
+        DrawArc(tip, range, heading - cone, heading + cone, samples + 1, ConeEdge, W(1f), true);
     }
 
+    /// <summary>
+    /// Shield and hull bars under each ship, drawn at a constant screen size
+    /// so they stay legible when the camera pulls back. Player ships also
+    /// carry a callsign above them.
+    /// </summary>
     void DrawHpBar(Fighter f, Color color)
     {
         if (!f.IsAlive)
             return;
-        const float width = 28f;
-        const float shieldHeight = 3f;
-        const float hullHeight = 4f;
-        Vector2 shieldTopLeft = f.Position + new Vector2(-width / 2f, 20f);
+        float width = Px(44f);
+        float shieldHeight = Px(4f);
+        float hullHeight = Px(6f);
+        Vector2 shieldTopLeft = f.Position + new Vector2(-width / 2f, 22f + Px(2f));
         DrawRect(new Rect2(shieldTopLeft, new Vector2(width, shieldHeight)), new Color(0.2f, 0.5f, 1f, 0.2f));
         float shieldFraction = f.MaxShield > 0 ? f.Shield / (float)f.MaxShield : 0f;
         DrawRect(new Rect2(shieldTopLeft, new Vector2(width * shieldFraction, shieldHeight)), new Color(0.35f, 0.7f, 1f));
 
-        Vector2 hullTopLeft = f.Position + new Vector2(-width / 2f, 25f);
+        Vector2 hullTopLeft = shieldTopLeft + new Vector2(0f, shieldHeight + Px(2f));
         DrawRect(new Rect2(hullTopLeft, new Vector2(width, hullHeight)), new Color(1, 1, 1, 0.13f));
-        float hullFraction = f.Hp / (float)f.MaxHp;
+        float hullFraction = Mathf.Clamp(f.Hp / (float)f.MaxHp, 0f, 1f);
         DrawRect(new Rect2(hullTopLeft, new Vector2(width * hullFraction, hullHeight)), color);
 
-        // Campaign pilots wear a nameplate so you know who is on the line
-        // (above the ship: the move readout owns the space below).
-        if (f.Pilot != null)
-        {
-            DrawString(ThemeDB.FallbackFont, f.Position + new Vector2(-60f, -30f),
-                $"{f.Pilot.Callsign} · LV{f.Pilot.Level}",
-                HorizontalAlignment.Center, 120f, 10, new Color(SignalUi.Body.R, SignalUi.Body.G, SignalUi.Body.B, 0.75f));
-        }
+        if (f.Team == 0)
+            DrawLabel(f.Position + new Vector2(0f, -26f - Px(12f)), BattleManager.CallsignOf(f), SignalUi.FontMicro,
+                new Color(SignalUi.Body.R, SignalUi.Body.G, SignalUi.Body.B, 0.85f));
     }
 }

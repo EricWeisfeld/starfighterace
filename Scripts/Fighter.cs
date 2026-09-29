@@ -795,7 +795,12 @@ public partial class EjectPod : Node2D
             DrawCircle(Vector2.Zero, 2f, new Color(0.3f, 1f, 0.5f)); // rescue beacon blink
         float labelAlpha = Mathf.Clamp(3f - _t, 0f, 1f);
         if (labelAlpha > 0f)
-            DrawString(ThemeDB.FallbackFont, new Vector2(-60f, -14f), "EJECTED",
-                HorizontalAlignment.Center, 120f, 12, new Color(1f, 1f, 1f, labelAlpha));
+        {
+            float s = BattleManager.Instance?.ScreenToWorldScale ?? 1f;
+            int size = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontMicro * s));
+            Vector2 extent = ThemeDB.FallbackFont.GetStringSize("EJECTED", HorizontalAlignment.Left, -1f, size);
+            DrawString(ThemeDB.FallbackFont, new Vector2(-extent.X / 2f, -10f - 8f * s), "EJECTED",
+                HorizontalAlignment.Left, -1f, size, new Color(1f, 1f, 1f, labelAlpha));
+        }
     }
 }

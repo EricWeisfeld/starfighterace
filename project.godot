@@ -12,13 +12,19 @@ config_version=5
 
 config/name="AceStarPilot"
 run/main_scene="res://Scenes/HomeScreen.tscn"
-config/features=PackedStringArray("4.6", "C#", "Forward Plus")
+config/features=PackedStringArray("4.6", "C#", "GL Compatibility")
 config/icon="res://icon.svg"
+config/quit_on_go_back=false
 
 [display]
 
-window/size/mode=2
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/size/window_width_override=432
+window/size/window_height_override=936
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
 
 [dotnet]
 
@@ -29,11 +35,16 @@ project/assembly_name="AceStarPilot"
 theme/default_font_hinting=0
 theme/default_font_subpixel_positioning=3
 
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
 [physics]
 
 3d/physics_engine="Jolt Physics"
 
 [rendering]
 
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=0
-rendering_device/driver.windows="d3d12"

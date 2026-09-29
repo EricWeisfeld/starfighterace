@@ -152,10 +152,7 @@ public partial class RunScreen
         }
         content.AddChild(wing);
 
-        bool flyingWounded = !Run.Ready.Any();
         content.AddChild(Text($"CHOOSE UP TO {RunState.SquadLimit} PILOTS · {_briefingPicks.Count} SELECTED", FontCaption, Muted, 4));
-        if (flyingWounded)
-            content.AddChild(Text("Nobody is fit to fly, so the wounded are going up anyway.", FontCaption, Warning, 0, wrap: true));
         foreach (Pilot pilot in deployable)
         {
             bool picked = _briefingPicks.Contains(pilot.Callsign);
@@ -176,8 +173,6 @@ public partial class RunScreen
             card.Selected = picked;
             content.AddChild(card);
         }
-        foreach (Pilot pilot in Run.Living.Except(deployable))
-            content.AddChild(Text($"{pilot.Callsign} is wounded and sits this one out.", FontCaption, Muted, 0, wrap: true));
 
         Button launch = TouchButton("LAUNCH", primary: true);
         launch.Disabled = _briefingPicks.Count == 0;
@@ -297,8 +292,8 @@ public partial class RunScreen
 
     /// <summary>
     /// The run's shop. Modules on sale sit at the top: tap one, then fit it to
-    /// a ship below. Each ship card also offers repairs, wound and scar
-    /// treatment, and a refit once its pilot is ready.
+    /// a ship below. Each ship card also offers repairs, scar treatment,
+    /// and a refit once its pilot is ready.
     /// </summary>
     Control BuildDockPage()
     {
@@ -417,17 +412,6 @@ public partial class RunScreen
                 Render();
             };
             AddAction(repair);
-        }
-        if (pilot.IsWounded)
-        {
-            Button treat = TouchButton($"TREAT WOUND · {RunState.TreatWoundCost}", fontSize: FontCaption);
-            treat.Disabled = RunState.TreatWoundCost > Run.Salvage;
-            treat.Pressed += () =>
-            {
-                Run.TreatWound(pilot);
-                Render();
-            };
-            AddAction(treat);
         }
         if (pilot.CanRefit)
         {

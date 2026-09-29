@@ -170,7 +170,6 @@ public partial class RunScreen : Node2D
     static (string Label, ChipRole Role) StatusOf(Pilot pilot) => pilot.Condition switch
     {
         PilotCondition.KIA => ("KIA", ChipRole.Loss),
-        PilotCondition.Wounded => ("WOUNDED", ChipRole.Impaired),
         _ when pilot.HullDamage > 0 => ("DAMAGED", ChipRole.Impaired),
         _ => ("READY", ChipRole.Gain),
     };
@@ -201,8 +200,6 @@ public partial class RunScreen : Node2D
                 SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
             });
             string hull = $"HULL {pilot.Hull}/{pilot.MaxHull}";
-            if (pilot.IsWounded)
-                hull += " · SITS OUT NEXT STOP";
             if (trailingNote != null)
                 hull += " · " + trailingNote;
             hullRow.AddChild(Text(hull, FontMicro, Body, 1));

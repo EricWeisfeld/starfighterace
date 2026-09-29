@@ -30,16 +30,12 @@ public class Pilot
     /// <summary>Instincts and scars.</summary>
     public readonly List<Perk> Perks = new();
     public PilotCondition Condition = PilotCondition.Ready;
-    /// <summary>Run stops a wounded pilot still has to sit out.</summary>
-    public int RecoveryStops;
     /// <summary>Unrepaired hull points carried between battles. A ship always keeps at least 1 hull.</summary>
     public int HullDamage;
     public int Kills;
     public int Battles;
 
     public bool Alive => Condition != PilotCondition.KIA;
-    public bool CanDeploy => Condition == PilotCondition.Ready;
-    public bool IsWounded => Condition == PilotCondition.Wounded;
     public bool IsMaxLevel => Level >= MaxLevel;
     public ShipType BaseClass => ShipTypes.BaseClass(ClassId);
     public bool CanRefit => Level >= RefitLevel && Ship == BaseClass;
@@ -176,6 +172,7 @@ public class Pilot
 public enum PilotCondition
 {
     Ready,
+    /// <summary>Retired: only found in saves from before wounds were removed. Loads as Ready.</summary>
     Wounded,
     KIA,
 }
@@ -201,7 +198,7 @@ public class PilotResult
 
 /// <summary>
 /// Applies the consequences of a finished battle to the pilots who flew it:
-/// eject survival, permadeath, wounds, hull damage, wrecks and lost ships,
+/// eject survival, permadeath, hull damage, wrecks and lost ships,
 /// XP, level-ups and scar rolls. Call exactly once per battle.
 /// </summary>
 public static class BattleResolution
@@ -210,11 +207,6 @@ public static class BattleResolution
     public const int XpPerKill = 25;
     public const int XpWinBonus = 50;
     public const float LossEjectSurvival = 0.5f;
-    /// <summary>
-    /// Stops a newly wounded pilot waits out. The stop they were wounded on
-    /// counts as one, so this means "sits out the next stop".
-    /// </summary>
-    public const int WoundedRecoveryStops = 2;
 
     public static List<PilotResult> Resolve(IEnumerable<Fighter> playerFighters, bool won)
     {
@@ -232,13 +224,12 @@ public static class BattleResolution
             if (!r.Survived)
             {
                 f.Pilot.Condition = PilotCondition.KIA;
-                f.Pilot.RecoveryStops = 0;
                 f.Pilot.HullDamage = 0;
             }
             else
             {
-                f.Pilot.Condition = f.Ejected ? PilotCondition.Wounded : PilotCondition.Ready;
-                f.Pilot.RecoveryStops = f.Ejected ? WoundedRecoveryStops : 0;
+                // Being shot down costs the ship (and risks a scar); the
+                // pilot is fit to fly the next battle.
                 if (!f.Ejected)
                 {
                     // A ship that made it home keeps its damage.

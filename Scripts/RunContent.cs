@@ -218,7 +218,7 @@ public static class RunContent
         RunNodeKind.Skirmish => "Destroy an enemy patrol.",
         RunNodeKind.Strike => "Destroy a marked command ship. The rest of the wing can live.",
         RunNodeKind.Elite => "A veteran wing. Win it to open a module crate.",
-        RunNodeKind.Repair => "Buy modules and refits, repair hulls, treat wounds and scars.",
+        RunNodeKind.Repair => "Buy modules and refits, repair hulls and treat scars.",
         RunNodeKind.Recruit => "Hire a new pilot for the squadron.",
         RunNodeKind.Event => "An unknown signal. Could be salvage, could be trouble.",
         RunNodeKind.Boss => BossName(sector) + ". Win to leave the sector; lose and the run ends.",
@@ -580,15 +580,17 @@ public static class RunContent
                 },
                 new()
                 {
-                    Label = "WAIT IT OUT", Detail = "Wounded pilots recover.",
-                    Resolve = (run, _) =>
+                    Label = "WAIT IT OUT", Detail = "Rest while it passes. One pilot's scar fades.",
+                    Resolve = (run, rng) =>
                     {
-                        foreach (Pilot pilot in run.Living.Where(p => p.IsWounded))
-                        {
-                            pilot.Condition = PilotCondition.Ready;
-                            pilot.RecoveryStops = 0;
-                        }
-                        return new EventOutcome { Text = "The squadron rests while the storm passes." };
+                        Pilot[] scarred = run.Living.Where(p => p.Scars.Any()).ToArray();
+                        if (scarred.Length == 0)
+                            return new EventOutcome { Text = "The squadron rests while the storm passes." };
+                        Pilot pilot = scarred[rng.RandiRange(0, scarred.Length - 1)];
+                        Perk[] scars = pilot.Scars.ToArray();
+                        Perk scar = scars[rng.RandiRange(0, scars.Length - 1)];
+                        pilot.Perks.Remove(scar);
+                        return new EventOutcome { Text = $"The squadron rests while the storm passes. {pilot.Callsign} shakes off {scar.Name}." };
                     },
                 },
             },

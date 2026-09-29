@@ -13,7 +13,7 @@ public static class SignalUi
     //   Accent blue = interactive, progress, and pending player decisions
     //                 (decisions are the only things that pulse);
     //   Positive    = healthy / gained / player;
-    //   Warning     = impaired ONLY (wounds, hull damage, scars);
+    //   Warning     = impaired ONLY (hull damage, scars, ejections);
     //   Negative    = losses and the enemy;
     //   Instinct    = what a pilot has learned (instincts, masteries).
     public static readonly Color Bg = new(0.024f, 0.039f, 0.071f);
@@ -386,7 +386,7 @@ public enum ChipRole
     Decision,
     /// <summary>Healthy or gained: level-ups, new abilities, positive traits.</summary>
     Gain,
-    /// <summary>Impaired: wounds, hull damage, negative traits. Nothing else is amber.</summary>
+    /// <summary>Impaired: hull damage, scars, ejections. Nothing else is amber.</summary>
     Impaired,
     /// <summary>Lost: deaths, failed objectives.</summary>
     Loss,

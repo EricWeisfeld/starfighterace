@@ -160,11 +160,11 @@ public partial class BattleDebrief : CanvasLayer
         {
             { Survived: false, Ejected: true } => ("KIA", ChipRole.Loss, "Ejected, but lost in enemy space."),
             { Survived: false } => ("KIA", ChipRole.Loss, "Shot down. No ejection."),
-            { WreckRecovered: true } => ("WOUNDED", ChipRole.Impaired,
-                $"Ejected and recovered, and the wreck was towed home. Sits out the next stop, then flies on shields and 1 hull until repaired ({RunState.RepairCostPerHull * r.Pilot.HullDamage} salvage)."),
-            { ShipLost: true } => ("WOUNDED", ChipRole.Impaired,
-                $"Ejected and escaped, but the ship was left behind. Sits out the next stop, then flies a new {r.Pilot.Ship.DisplayName}."),
-            { Ejected: true } => ("WOUNDED", ChipRole.Impaired, "Ejected and recovered. Sits out the next stop."),
+            { WreckRecovered: true } => ("EJECTED", ChipRole.Impaired,
+                $"Ejected and recovered, and the wreck was towed home. It flies on shields and 1 hull until repaired ({RunState.RepairCostPerHull * r.Pilot.HullDamage} salvage)."),
+            { ShipLost: true } => ("EJECTED", ChipRole.Impaired,
+                $"Ejected and escaped, but the ship was left behind. Flies a new {r.Pilot.Ship.DisplayName} next time."),
+            { Ejected: true } => ("EJECTED", ChipRole.Impaired, "Ejected and recovered."),
             _ => ("RETURNED", ChipRole.Gain,
                 r.Pilot.HullDamage > 0 ? $"{r.Pilot.HullDamage} hull damage still to repair." : "Hull fully repaired."),
         };

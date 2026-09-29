@@ -66,7 +66,6 @@ public class PilotSave
     public int Xp { get; set; }
     public List<string> Perks { get; set; } = new();
     public PilotCondition Condition { get; set; }
-    public int RecoveryStops { get; set; }
     public int HullDamage { get; set; }
     public int Kills { get; set; }
     public int Battles { get; set; }
@@ -82,7 +81,6 @@ public class PilotSave
         Xp = pilot.Xp,
         Perks = pilot.Perks.Select(p => p.Id).ToList(),
         Condition = pilot.Condition,
-        RecoveryStops = pilot.RecoveryStops,
         HullDamage = pilot.HullDamage,
         Kills = pilot.Kills,
         Battles = pilot.Battles,
@@ -94,8 +92,8 @@ public class PilotSave
         {
             Level = Level,
             Xp = Xp,
-            Condition = Condition,
-            RecoveryStops = RecoveryStops,
+            // Wounds were retired; a pilot saved as wounded simply flies.
+            Condition = Condition == PilotCondition.Wounded ? PilotCondition.Ready : Condition,
             Kills = Kills,
             Battles = Battles,
         };
@@ -121,7 +119,7 @@ public class PilotSave
 
 /// <summary>
 /// A roguelite run: three sectors of branching stops, a squadron of up to
-/// five pilots, and salvage to spend. Hull damage, wounds, scars and deaths
+/// five pilots, and salvage to spend. Hull damage, lost ships, scars and deaths
 /// carry from stop to stop. Pilots grow through XP; ships grow through
 /// salvage spent at repair docks. The run saves after every change so a phone
 /// can close the app at any moment.
@@ -134,7 +132,6 @@ public class RunState
     public const int SquadLimit = 3;
     public const int StartingSalvage = 50;
     public const int RepairCostPerHull = 2;
-    public const int TreatWoundCost = 40;
     public const int TreatScarCost = 50;
     public const int RefitCost = 120;
     public const int DockStockSize = 3;
@@ -178,7 +175,6 @@ public class RunState
     [JsonIgnore] public List<Pilot> Pilots { get; private set; } = new();
     [JsonIgnore] public IEnumerable<Pilot> Living => Pilots.Where(p => p.Alive);
     [JsonIgnore] public IEnumerable<Pilot> Fallen => Pilots.Where(p => !p.Alive);
-    [JsonIgnore] public IEnumerable<Pilot> Ready => Living.Where(p => p.CanDeploy);
     [JsonIgnore] public string SectorName => RunContent.SectorNames[Mathf.Clamp(Sector, 1, RunContent.SectorCount) - 1];
     [JsonIgnore] public RunNode CurrentNode => Node(CurrentNodeId);
     [JsonIgnore] public RunNode ActiveNode => Node(ActiveNodeId);
@@ -299,12 +295,8 @@ public class RunState
     public BattleMission ActiveMission =>
         ActiveNode?.BattleKind is RunNodeKind kind ? RunContent.BuildMission(ActiveNode, Sector, kind) : null;
 
-    /// <summary>Pilots who can fly the next battle. If nobody is fit, the wounded fly anyway.</summary>
-    public List<Pilot> Deployable()
-    {
-        List<Pilot> ready = Ready.ToList();
-        return ready.Count > 0 ? ready : Living.ToList();
-    }
+    /// <summary>Pilots who can fly the next battle: every living pilot, whatever state their ship is in.</summary>
+    public List<Pilot> Deployable() => Living.ToList();
 
     /// <summary>
     /// Saves a checkpoint at the start of the battle, then hands the squad and
@@ -443,7 +435,7 @@ public class RunState
     public Pilot PilotFor(PendingPromotion promotion, PromotionCard card) =>
         Living.FirstOrDefault(p => p.Callsign == (promotion.IsCrate ? card.Callsign : promotion.Callsign));
 
-    /// <summary>Finishes the active stop: marks it visited and lets wounded pilots recover a step.</summary>
+    /// <summary>Finishes the active stop and moves the squadron on.</summary>
     public void CompleteActiveNode()
     {
         RunNode node = ActiveNode;
@@ -455,20 +447,14 @@ public class RunState
         RecruitOffers.Clear();
         DockStock.Clear();
         EventResult = null;
-        foreach (Pilot pilot in Living.Where(p => p.IsWounded))
-        {
-            pilot.RecoveryStops = Mathf.Max(0, pilot.RecoveryStops - 1);
-            if (pilot.RecoveryStops == 0)
-                pilot.Condition = PilotCondition.Ready;
-        }
         if (!Living.Any())
             Outcome = RunOutcome.Defeat;
         Save();
     }
 
     /// <summary>
-    /// Leaving a cleared sector: crews rest and every ship is patched halfway,
-    /// then a new map. Full repairs are bought at docks.
+    /// Leaving a cleared sector: every ship is patched halfway, then a new
+    /// map. Full repairs are bought at docks.
     /// </summary>
     void AdvanceSector()
     {
@@ -479,15 +465,11 @@ public class RunState
         }
         Sector++;
         foreach (Pilot pilot in Living)
-        {
             pilot.Repair(Mathf.CeilToInt(pilot.HullDamage * SectorPatchFraction));
-            pilot.Condition = PilotCondition.Ready;
-            pilot.RecoveryStops = 0;
-        }
         Nodes = RunContent.GenerateSector(Sector, Seed ^ (ulong)Sector * 0xD1B54A32D192ED03UL);
         CurrentNodeId = -1;
         ActiveNodeId = -1;
-        Notice = $"SECTOR {Sector} · {SectorName}. Crews rested, ships patched halfway. {RunContent.SectorBriefings[Sector - 1]}";
+        Notice = $"SECTOR {Sector} · {SectorName}. Ships patched halfway. {RunContent.SectorBriefings[Sector - 1]}";
     }
 
     // ------------------------------------------------------- repair dock
@@ -501,17 +483,6 @@ public class RunState
             return false;
         Salvage -= cost;
         pilot.HullDamage = 0;
-        Save();
-        return true;
-    }
-
-    public bool TreatWound(Pilot pilot)
-    {
-        if (!pilot.IsWounded || Salvage < TreatWoundCost)
-            return false;
-        Salvage -= TreatWoundCost;
-        pilot.Condition = PilotCondition.Ready;
-        pilot.RecoveryStops = 0;
         Save();
         return true;
     }

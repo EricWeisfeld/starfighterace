@@ -45,14 +45,14 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | Skirmish | Destroy the enemy patrol. |
 | Strike | Destroy a marked command ship; the rest of the wing can live. |
 | Elite wing | +2 threat. A win opens a module crate: pick one of three modules, each matched to a surviving ship, fitted free. |
-| Repair dock | The run's shop: three modules for sale, refits, repairs (2 per hull point), wounds (40) and scars (50). |
+| Repair dock | The run's shop: three modules for sale, refits, repairs (2 per hull point) and scar treatment (50). |
 | Recruit | Two candidates at the squadron's level minus one, already promoted to that level. |
 | Signal | One of six events. Some can turn into a fight. |
 | Boss | Sector 1: blockade command ship (strike). Sector 2: the convoy escort. Sector 3: the ace wing. |
 
 - **Threat** runs from 1 in the first sector to 9 at the last boss. It feeds the existing `EncounterDifficulty` curve.
 - **Enemy wings** draw from base hulls early and refit frames later.
-- **Sector transitions:** clearing a sector heals every wound and patches half of each ship's damage. Full repairs are bought.
+- **Sector transitions:** clearing a sector patches half of each ship's damage. Full repairs are bought.
 - **Losing** an ordinary battle spends the stop and earns nothing. Losing a boss, or losing every pilot, ends the run.
 
 ### Squadron (`Pilot`)
@@ -62,11 +62,10 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 - XP needed per level rises (100, 150, 200, 250, 300), with a cap at level 6.
 - Level-ups and the ship are described in Phase 4.
 - A pilot who is shot down without ejecting is killed, along with the ship.
-- A pilot who ejects is wounded (sits out the next stop). What happens to the ship depends on the result:
+- A pilot who ejects is fit to fly the next battle; being shot down costs the ship and risks a scar (Gun Shy or Rattled). There are no wounds. What happens to the ship depends on the result:
   - **Win:** the squadron holds the field and tows the wreck home. Frame and modules are intact, but the hull is down to 1. It can still fly, on full shields, until it is repaired at a dock (2 salvage per hull point), by the drones event, or by the half patch between sectors.
   - **Loss or retreat:** the wreck is left behind. The pilot comes home to a new, bare base frame of their class; the refit and every module are gone. Maneuvers, masteries, instincts and level stay, and a level-3 pilot can buy a refit again.
   - The pause menu's Retreat note names any wrecks a retreat would leave behind.
-- If nobody is fit to fly, the wounded fly anyway, so a run can never soft-lock.
 
 ### Saving
 
@@ -155,6 +154,6 @@ new run.
 ## Known issues and next steps
 
 - `EnemyAI` reads the player's queued maneuver when choosing its own, so enemies react to orders the player has not revealed yet. For a simultaneous-turn game this is worth reconsidering, together with difficulty.
-- Balance is untested with human play: salvage income versus module, refit and repair prices; threat per layer; wound, ejection and scar odds; and instinct strength.
+- Balance is untested with human play: salvage income versus module, refit and repair prices; threat per layer; ejection and scar odds; and instinct strength.
 - More battle maps would add variety; there are currently three regular maps plus the escort corridor.
 - An Android export preset and a device test pass are still to do.

@@ -1,0 +1,113 @@
+using Godot;
+
+/// <summary>A non-combatant dreadnought used by escort operations.</summary>
+public partial class ObjectiveShip : Fighter
+{
+    public bool Escaped { get; private set; }
+    public Vector2 Destination { get; private set; }
+    public float DestinationRadius { get; private set; }
+    public float DistanceRemaining => Mathf.Max(0f, Position.DistanceTo(Destination) - DestinationRadius);
+    public float EscapeProgress { get; private set; }
+    float _initialDistanceRemaining;
+
+    /// <summary>Configure the transport with the normal ship movement and visual systems.</summary>
+    public void Setup(Vector2 position, Vector2 destination, float destinationRadius)
+    {
+        Destination = destination;
+        DestinationRadius = destinationRadius;
+        _initialDistanceRemaining = Mathf.Max(0f, position.DistanceTo(destination) - destinationRadius);
+        EscapeProgress = 0f;
+        ApplyType(ShipTypes.CivilianDreadnought);
+        CanFire = false;
+        Setup(0, position, (destination - position).Angle(), Type.GetSkin(0));
+    }
+
+    /// <summary>
+    /// Prepare the transport's next leg toward the exit, bending only as much
+    /// as necessary to preserve a safe asteroid clearance.
+    /// </summary>
+    public void PlanEscapeMove(BattleManager battle)
+    {
+        ClearPlannedManeuver();
+        const float preferredClearance = 12f;
+        const int turnSamples = 70;
+        float distance = Position.DistanceTo(Destination);
+        if (distance <= DestinationRadius)
+        {
+            Escaped = true;
+            return;
+        }
+
+        float moveDistance = Mathf.Min(NormalMoveMaxDistance,
+            Mathf.Max(NormalMoveMinDistance, distance - DestinationRadius));
+        float maxTurn = Mathf.DegToRad(GetNormalTurnLimitDegrees(moveDistance));
+        float bestSafeScore = float.MinValue;
+        float bestSafeTurn = 0f;
+        float bestEmergencyClearance = float.NegativeInfinity;
+        float bestEmergencyTurn = 0f;
+
+        for (int i = 0; i <= turnSamples; i++)
+        {
+            float turn = Mathf.Lerp(-maxTurn, maxTurn, i / (float)turnSamples);
+            float clearance = battle.PathAsteroidClearance(this, ManeuverType.Normal, turn, moveDistance);
+
+            Fighter.ArcPoint(Position, Heading, turn, moveDistance, 1f, out Vector2 end, out _);
+
+            // Make progress toward the authored destination while choosing a
+            // safe arc around terrain instead of merely flying east.
+            float score = -end.DistanceTo(Destination) - Mathf.Abs(turn) * 12f;
+            if (clearance >= preferredClearance && score > bestSafeScore)
+            {
+                bestSafeScore = score;
+                bestSafeTurn = turn;
+            }
+            if (clearance > bestEmergencyClearance)
+            {
+                bestEmergencyClearance = clearance;
+                bestEmergencyTurn = turn;
+            }
+        }
+
+        PlannedTurnAngleRadians = bestSafeScore > float.MinValue ? bestSafeTurn : bestEmergencyTurn;
+        SetPlannedMoveDistance(moveDistance);
+    }
+
+    /// <summary>Complete the objective only when the actual movement path enters the jump zone.</summary>
+    public void UpdateDestinationProgress(Vector2 previousPosition)
+    {
+        if (!IsAlive || Escaped) return;
+        EscapeProgress = _initialDistanceRemaining <= 0f
+            ? 1f
+            : Mathf.Clamp(1f - DistanceRemaining / _initialDistanceRemaining, 0f, 1f);
+        if (DistanceToSegment(Destination, previousPosition, Position) <= DestinationRadius)
+        {
+            Escaped = true;
+            EscapeProgress = 1f;
+        }
+        QueueRedraw();
+    }
+
+    static float DistanceToSegment(Vector2 point, Vector2 from, Vector2 to)
+    {
+        Vector2 segment = to - from;
+        float lengthSquared = segment.LengthSquared();
+        if (lengthSquared < 0.0001f)
+            return point.DistanceTo(from);
+        float progress = Mathf.Clamp((point - from).Dot(segment) / lengthSquared, 0f, 1f);
+        return point.DistanceTo(from + segment * progress);
+    }
+
+    public override void _Process(double delta)
+    {
+        base._Process(delta);
+        QueueRedraw();
+    }
+
+    public override void _Draw()
+    {
+        Color hull = IsAlive ? new Color(0.72f, 0.9f, 1f) : new Color(0.35f, 0.12f, 0.12f);
+        DrawRect(new Rect2(-32, -32, 64, 5), new Color(0.02f, 0.04f, 0.08f, 0.9f));
+        DrawRect(new Rect2(-32, -32, 64 * Hp / (float)MaxHp, 5), new Color(0.4f, 1f, 0.7f));
+        DrawString(ThemeDB.FallbackFont, new Vector2(-68, -42), Escaped ? "JUMP ZONE REACHED" : $"TRANSPORT · {DistanceRemaining:0} TO JUMP", HorizontalAlignment.Center, 136, 10, hull);
+    }
+}

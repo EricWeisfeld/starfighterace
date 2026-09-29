@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MissionDefinitionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/MissionDefinitionResource.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+Id = "orion-vesper"
+PlanetId = "vesper"
+PlanetName = "VESPER"
+Briefing = "A Kla'ed patrol is coordinating raids from Vesper's nightside. Eliminate the hostile wing and break the raiding screen."
+PlanetTexture = "res://Assets/CelestialBodies/RockyPlanet1.png"
+MapPosition = Vector2(255, 373)
+Threat = 1
+Credits = 130
+Source = 1
+Objective = 0
+MapId = "broken-ring"
+EnemyShipIds = PackedStringArray("scout", "raptor")

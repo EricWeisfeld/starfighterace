@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="StoryMissionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/StoryMissionResource.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+Id = "orion"
+SystemName = "ORION SPUR"
+PlanetId = "aeris"
+PlanetName = "AERIS"
+Briefing = "Kla'ed scouts are probing the outer colonies. Drive them from Aeris before their fleet establishes a foothold."
+PlanetTexture = "res://Assets/CelestialBodies/WetPlanet1.png"
+MapPosition = Vector2(255, 373)
+Threat = 1
+Credits = 160
+Objective = 0
+MapId = "shard-run"
+EnemyShipIds = PackedStringArray("scout", "scout", "raptor")

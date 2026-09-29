@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CampaignSystemResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/CampaignSystemResource.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+Id = "orion-spur"
+DisplayName = "ORION SPUR"
+MapPosition = Vector2(255, 373)
+PlanetMissionPaths = PackedStringArray("res://Resources/CampaignMissions/orion_aeris.tres", "res://Resources/CampaignMissions/orion_vesper.tres", "res://Resources/CampaignMissions/orion_cinder.tres", "res://Resources/CampaignMissions/orion_khepri.tres", "res://Resources/CampaignMissions/orion_eos.tres")
+StoryMissionPath = "res://Resources/CampaignMissions/orion_escort.tres"

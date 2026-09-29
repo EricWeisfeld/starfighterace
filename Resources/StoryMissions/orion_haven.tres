@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="StoryMissionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/StoryMissionResource.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+Id = "orion-haven"
+SystemName = "ORION SPUR"
+PlanetId = "haven"
+PlanetName = "HAVEN"
+Briefing = "A surviving Kla'ed screen is harassing evacuation traffic on Haven. Keep the civilian transport alive until it reaches the jump lane."
+PlanetTexture = "res://Assets/CelestialBodies/BaronPlanet1.png"
+MapPosition = Vector2(255, 373)
+Threat = 2
+Credits = 190
+Objective = 2
+MapId = "escort-corridor"
+EnemyShipIds = PackedStringArray("scout", "scout", "scout")
+PrerequisiteIds = PackedStringArray("orion")

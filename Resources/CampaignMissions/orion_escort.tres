@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MissionDefinitionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/MissionDefinitionResource.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+Id = "orion-escort"
+PlanetName = "ORION SPUR"
+Briefing = "With the Orion worlds secured, Haven's evacuation convoy can finally make the jump. Hold the Kla'ed screen off long enough to deliver the civilian transport to safety."
+Threat = 2
+Credits = 250
+Objective = 2
+MapId = "escort-corridor"
+EnemyShipIds = PackedStringArray("scout", "scout", "scout")

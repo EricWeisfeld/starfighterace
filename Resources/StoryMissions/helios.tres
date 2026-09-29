@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="StoryMissionResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/StoryMissionResource.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+Id = "helios"
+SystemName = "HELIOS CROWN"
+PlanetId = "solaris"
+PlanetName = "SOLARIS"
+Briefing = "The Kla'ed command flotilla is holding position above Solaris. Win here to secure the sector for the Alliance."
+PlanetTexture = "res://Assets/CelestialBodies/Star2.png"
+MapPosition = Vector2(730, 300)
+Threat = 10
+Credits = 450
+Objective = 1
+MapId = "broken-ring"
+EnemyShipIds = PackedStringArray("r3_black_hawk", "r5_falcon", "zt_6")
+PrerequisiteIds = PackedStringArray("draco")

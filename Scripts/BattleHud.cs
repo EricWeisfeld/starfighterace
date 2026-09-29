@@ -17,6 +17,8 @@ public partial class BattleHud : CanvasLayer
     Label _turnLabel, _phaseLabel, _objectiveLabel;
     readonly List<SquadChip> _chips = new();
     Label _shipName, _shipStats, _summary;
+    /// <summary>The selected pilot's instincts and scars; run battles only.</summary>
+    Label _instincts, _scars;
     GridContainer _maneuverGrid;
     readonly List<ManeuverButton> _maneuverButtons = new();
     string _gridSignature;
@@ -122,6 +124,21 @@ public partial class BattleHud : CanvasLayer
         _shipStats.ClipText = true;
         identity.AddChild(_shipName);
         identity.AddChild(_shipStats);
+        if (!GameSetup.IsTestBattle)
+        {
+            // Always present, even when empty, so selecting ships never
+            // changes the bar's height and shifts the map.
+            HBoxContainer traits = Row(10);
+            traits.CustomMinimumSize = new Vector2(0, 26);
+            _instincts = Text("", FontMicro, Instinct, 1);
+            _instincts.ClipText = true;
+            _instincts.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            // Scars keep their full width; instincts clip first if space runs out.
+            _scars = Text("", FontMicro, Warning, 1);
+            traits.AddChild(_instincts);
+            traits.AddChild(_scars);
+            identity.AddChild(traits);
+        }
         row.AddChild(identity);
 
         _undo = TouchButton("UNDO", fontSize: FontCaption);
@@ -255,6 +272,7 @@ public partial class BattleHud : CanvasLayer
         {
             _shipName.Text = $"{BattleManager.CallsignOf(selected)} · {selected.Type.DisplayName.ToUpper()}";
             _shipStats.Text = $"HULL {Mathf.Max(0, selected.Hp)}/{selected.MaxHp} · SHIELD {selected.Shield}/{selected.MaxShield}";
+            RefreshTraits(selected);
             RefreshManeuvers(selected);
             RefreshSummary(selected);
         }
@@ -263,12 +281,23 @@ public partial class BattleHud : CanvasLayer
             int alive = Mgr.PlayerFighters.Count(f => f.IsAlive);
             _shipName.Text = "MANEUVERS EXECUTING";
             _shipStats.Text = $"{alive} OF {Mgr.PlayerFighters.Count} SHIPS FLYING";
+            RefreshTraits(null);
         }
 
         Mgr.Camera.InsetTop = _top.Size.Y;
         Mgr.Camera.InsetBottom = _bottom.Size.Y;
         if (_top.Size.Y > 0 && _bottom.Size.Y > 0)
             _framesLaidOut++;
+    }
+
+    void RefreshTraits(Fighter fighter)
+    {
+        if (_instincts == null)
+            return;
+        Pilot pilot = fighter?.Pilot;
+        _instincts.Text = pilot == null ? "" : string.Join(" · ", pilot.Instincts.Select(p => p.Name.ToUpper()));
+        _scars.Text = pilot == null || !pilot.Scars.Any() ? "" : string.Join(" · ", pilot.Scars.Select(p => p.Name.ToUpper()));
+        _scars.Visible = _scars.Text.Length > 0;
     }
 
     void RefreshManeuvers(Fighter fighter)
@@ -461,6 +490,11 @@ public partial class ManeuverButton : Button
         else if (Info.Action == ManeuverAction.HunterLock && fighter.HunterLockTarget != null && fighter.HunterLockTarget.IsAlive)
         {
             status = "LOCKED";
+        }
+        else if (Info.Ability is ShipAbility ability && fighter.HasMastered(ability))
+        {
+            status = "MASTERED";
+            statusColor = TraitCallout.InstinctColor;
         }
         _status.Text = status;
         _status.AddThemeColorOverride("font_color", statusColor);

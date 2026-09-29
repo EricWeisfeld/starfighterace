@@ -202,7 +202,7 @@ public partial class RunScreen
         }
         return node.Kind switch
         {
-            RunNodeKind.Repair => $"REPAIR {RunState.RepairCostPerHull} PER HULL · WOUNDS {RunState.TreatWoundCost}",
+            RunNodeKind.Repair => $"{RunState.DockStockSize} MODULES FOR SALE · REFITS · REPAIRS",
             RunNodeKind.Recruit => $"ROSTER {Run.Living.Count()}/{RunState.RosterLimit}",
             _ => "OUTCOME UNKNOWN",
         };

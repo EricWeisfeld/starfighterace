@@ -35,7 +35,10 @@ public partial class HomeScreen : Node2D
         foreach (Node child in _actions.GetChildren())
             child.QueueFree();
 
-        bool hasRun = RunState.HasSave;
+        // A save from an older version of the game can't be continued.
+        bool hasRun = RunState.HasSave && (RunState.Current ?? RunState.Load()) != null;
+        if (RunState.HasSave && !hasRun)
+            _actions.AddChild(Text("Your saved run is from an older version and can't be continued.", FontCaption, Warning, 0, wrap: true));
         if (hasRun)
         {
             Button resume = TouchButton("CONTINUE RUN", primary: true);

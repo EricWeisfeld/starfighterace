@@ -65,67 +65,70 @@ public static class ManeuverCatalog
         {
             Action = ManeuverAction.BreakTurn, Ability = ShipAbility.BreakTurn, Maneuver = ManeuverType.BreakTurn, Name = "BREAK TURN",
             Color = new Color(1f, 0.62f, 0.3f), Directional = true,
-            Summary = f => $"Swing through a wide 180° arc ({f.Type.BreakTurnMoveDistance:0}).",
+            Summary = f => $"Swing through a wide 180° arc ({f.Moves.BreakTurnMoveDistance:0}).",
         },
         new()
         {
             Action = ManeuverAction.SnapTurn, Ability = ShipAbility.SnapTurn, Maneuver = ManeuverType.SnapTurn, Name = "SNAP TURN",
             Color = new Color(0.95f, 0.55f, 1f), Directional = true,
-            Summary = f => $"Whip around {f.Type.SnapTurnAngleDegrees:0}° in a very short distance.",
+            Summary = f => $"Whip around {f.Moves.SnapTurnAngleDegrees:0}° in a very short distance.",
         },
         new()
         {
             Action = ManeuverAction.EvasiveDodge, Ability = ShipAbility.EvasiveDodge, Maneuver = ManeuverType.EvasiveDodge, Name = "DODGE",
             Color = new Color(0.35f, 0.9f, 1f), Directional = true,
-            Summary = f => $"Hard {f.Type.EvasiveDodgeAngleDegrees:0}° jink, then a short burst. +{f.Type.EvasiveDodgeEvasionBonus * 100:0}% evasion.",
+            Summary = f => $"Hard {f.Moves.EvasiveDodgeAngleDegrees:0}° jink, then a short burst. +{f.Moves.EvasiveDodgeEvasionBonus * 100:0}% evasion.",
         },
         new()
         {
             Action = ManeuverAction.EngineBoost, Ability = ShipAbility.EngineBoost, Maneuver = ManeuverType.EngineBoost, Name = "BOOST",
             Color = new Color(0.3f, 1f, 0.75f), Aimable = true,
-            Summary = f => $"Long burn ({f.Type.EngineBoostMoveDistance:0}) with up to {f.EngineBoostTurnLimitDegrees:0}° of turn.",
+            Summary = f => $"Long burn ({f.Moves.EngineBoostMoveDistance:0}) with up to {f.EngineBoostTurnLimitDegrees:0}° of turn.",
         },
         new()
         {
             Action = ManeuverAction.PursuitBurn, Ability = ShipAbility.PursuitBurn, Maneuver = ManeuverType.PursuitBurn, Name = "PURSUIT",
             Color = new Color(0.4f, 1f, 0.7f), Aimable = true,
-            Summary = f => $"Chase burn ({f.Type.PursuitBurnMoveDistance:0}) with up to {f.PursuitBurnTurnLimitDegrees:0}° of turn.",
+            Summary = f => $"Chase burn ({f.Moves.PursuitBurnMoveDistance:0}) with up to {f.PursuitBurnTurnLimitDegrees:0}° of turn.",
         },
         new()
         {
             Action = ManeuverAction.EmergencyThrusters, Ability = ShipAbility.EmergencyThrusters, Maneuver = ManeuverType.EmergencyThrusters, Name = "THRUSTERS",
             Color = new Color(1f, 0.36f, 0.3f), Aimable = true,
-            Summary = f => $"Emergency sprint ({f.Type.EmergencyThrustersMoveDistance:0}). -{f.Type.EmergencyThrustersEvasionPenalty * 100:0}% evasion.",
+            Summary = f => f.Moves.EmergencyThrustersEvasionPenalty > 0f
+                ? $"Emergency sprint ({f.Moves.EmergencyThrustersMoveDistance:0}). -{f.Moves.EmergencyThrustersEvasionPenalty * 100:0}% evasion."
+                : $"Emergency sprint ({f.Moves.EmergencyThrustersMoveDistance:0}) with no loss of evasion.",
         },
         new()
         {
             Action = ManeuverAction.EcmJink, Ability = ShipAbility.EcmJink, Maneuver = ManeuverType.EcmJink, Name = "ECM JINK",
             Color = new Color(0.45f, 0.7f, 1f), Aimable = true,
-            Summary = f => $"Jamming jink ({f.Type.EcmJinkMoveDistance:0}). +{f.Type.EcmJinkEvasionBonus * 100:0}% evasion.",
+            Summary = f => $"Jamming jink ({f.Moves.EcmJinkMoveDistance:0}). +{f.Moves.EcmJinkEvasionBonus * 100:0}% evasion.",
         },
         new()
         {
             Action = ManeuverAction.GhostRun, Ability = ShipAbility.GhostRun, Maneuver = ManeuverType.GhostRun, Name = "GHOST RUN",
             Color = new Color(0.6f, 0.95f, 1f), Aimable = true,
-            Summary = f => $"Stealthy run ({f.Type.GhostRunMoveDistance:0}). +{f.Type.GhostRunEvasionBonus * 100:0}% evasion.",
+            Summary = f => $"Stealthy run ({f.Moves.GhostRunMoveDistance:0}). +{f.Moves.GhostRunEvasionBonus * 100:0}% evasion.",
         },
         new()
         {
             Action = ManeuverAction.RotatingGuns, Ability = ShipAbility.RotatingGuns, Maneuver = ManeuverType.RotatingGuns, Name = "TURRET",
             Color = new Color(1f, 0.78f, 0.32f),
-            Summary = f => $"Creep forward while the guns sweep a {f.Type.RotatingGunsFireConeDeg * 2f:0}° arc.",
+            Summary = f => $"Creep forward while the guns sweep a {f.Moves.RotatingGunsFireConeDeg * 2f:0}° arc.",
         },
         new()
         {
             Action = ManeuverAction.HunterLock, Ability = ShipAbility.HunterLock, Name = "LOCK ON",
             Color = new Color(1f, 0.85f, 0.3f), TargetsEnemy = true,
-            Summary = f => $"Tap an enemy: +{f.Type.HunterLockAccuracyBonus * 100:0}% accuracy against it.",
+            Summary = f => $"Tap an enemy: +{f.Moves.HunterLockAccuracyBonus * 100:0}% accuracy against it.",
         },
         new()
         {
             Action = ManeuverAction.SensorScramble, Ability = ShipAbility.SensorScramble, Name = "SCRAMBLE",
             Color = new Color(0.75f, 0.55f, 1f), TargetsEnemy = true,
-            Summary = f => $"Tap an enemy: -{f.Type.SensorScrambleAccuracyPenalty * 100:0}% accuracy for {f.Type.SensorScrambleDurationTurns} turns.",
+            Summary = f => $"Tap an enemy: -{f.Moves.SensorScrambleAccuracyPenalty * 100:0}% accuracy for {f.Moves.SensorScrambleDurationTurns} turns" +
+                (f.HasMastered(ShipAbility.SensorScramble) ? ", and the nearest enemy to it." : "."),
         },
     };
 
@@ -330,5 +333,80 @@ public partial class ManeuverGlyph : Control
         float scale = Mathf.Min(box.Size.X / bounds.Size.X, box.Size.Y / bounds.Size.Y);
         Vector2 offset = box.GetCenter() - bounds.GetCenter() * scale;
         return path.Select(p => p * scale + offset).ToArray();
+    }
+}
+
+/// <summary>
+/// Maneuver masteries: a level-up can deepen a maneuver the pilot already
+/// knows instead of teaching a new one. A mastery only matters on the turns
+/// the pilot chooses that maneuver.
+/// </summary>
+public static class Masteries
+{
+    public const float SnapTurnAngleDegrees = 180f;
+    public const float EngineBoostTurnLimitDegrees = 90f;
+    public const float PursuitBurnTurnLimitDegrees = 45f;
+    public const float EvasionBonus = 0.15f;
+    public const float RotatingGunsFireConeDegrees = 65f;
+    public const float HunterLockAccuracyBonus = 0.25f;
+    public const float SuppressionMultiplier = 2f;
+    public const float ScrambleSplashRange = 300f;
+
+    /// <summary>A hull's maneuver profile with a pilot's masteries applied.</summary>
+    public static ShipManeuverProfile Apply(ShipManeuverProfile profile, ICollection<ShipAbility> mastered)
+    {
+        if (mastered.Count == 0)
+            return profile;
+        ShipManeuverProfile p = profile;
+        if (mastered.Contains(ShipAbility.SnapTurn))
+            p = p with { SnapTurnAngleDegrees = Mathf.Max(p.SnapTurnAngleDegrees, SnapTurnAngleDegrees) };
+        if (mastered.Contains(ShipAbility.EngineBoost))
+            p = p with { EngineBoostTurnLimitDegrees = Mathf.Max(p.EngineBoostTurnLimitDegrees, EngineBoostTurnLimitDegrees) };
+        if (mastered.Contains(ShipAbility.PursuitBurn))
+            p = p with { PursuitBurnTurnLimitDegrees = Mathf.Max(p.PursuitBurnTurnLimitDegrees, PursuitBurnTurnLimitDegrees) };
+        if (mastered.Contains(ShipAbility.EvasiveDodge))
+            p = p with { EvasiveDodgeEvasionBonus = p.EvasiveDodgeEvasionBonus + EvasionBonus };
+        if (mastered.Contains(ShipAbility.EcmJink))
+            p = p with { EcmJinkEvasionBonus = p.EcmJinkEvasionBonus + EvasionBonus };
+        if (mastered.Contains(ShipAbility.EmergencyThrusters))
+            p = p with { EmergencyThrustersEvasionPenalty = 0f };
+        if (mastered.Contains(ShipAbility.RotatingGuns))
+            p = p with { RotatingGunsFireConeDeg = Mathf.Max(p.RotatingGunsFireConeDeg, RotatingGunsFireConeDegrees) };
+        if (mastered.Contains(ShipAbility.HunterLock))
+            p = p with { HunterLockAccuracyBonus = Mathf.Max(p.HunterLockAccuracyBonus, HunterLockAccuracyBonus) };
+        if (mastered.Contains(ShipAbility.SuppressionFire))
+            p = p with { SuppressionTurnPenaltyDeg = p.SuppressionTurnPenaltyDeg * SuppressionMultiplier };
+        return p;
+    }
+
+    /// <summary>A mastered maneuver's cooldown, when mastery changes it.</summary>
+    public static int? CooldownOverride(ShipAbility ability) => ability switch
+    {
+        ShipAbility.UTurn or ShipAbility.BreakTurn => 0,
+        ShipAbility.GhostRun => Fighter.GhostRunCooldownRounds - 1,
+        _ => null,
+    };
+
+    /// <summary>One sentence saying what mastering a maneuver does on this hull.</summary>
+    public static string Describe(ShipAbility ability, ShipType hull)
+    {
+        ShipManeuverProfile m = hull.Maneuvers;
+        return ability switch
+        {
+            ShipAbility.UTurn => "U-Turn has no cooldown: reverse every turn if you need to.",
+            ShipAbility.BreakTurn => "Break Turn has no cooldown: swing around every turn if you need to.",
+            ShipAbility.SnapTurn => $"Snap Turn whips a full {SnapTurnAngleDegrees:0}° instead of {m.SnapTurnAngleDegrees:0}°.",
+            ShipAbility.EvasiveDodge => $"Evasive Dodge gives +{(m.EvasiveDodgeEvasionBonus + EvasionBonus) * 100:0}% evasion instead of +{m.EvasiveDodgeEvasionBonus * 100:0}%.",
+            ShipAbility.EngineBoost => $"Engine Boost can turn up to {EngineBoostTurnLimitDegrees:0}° instead of {m.EngineBoostTurnLimitDegrees:0}°.",
+            ShipAbility.PursuitBurn => $"Pursuit Burn can turn up to {PursuitBurnTurnLimitDegrees:0}° instead of {m.PursuitBurnTurnLimitDegrees:0}°.",
+            ShipAbility.EmergencyThrusters => "Emergency Thrusters no longer cost any evasion.",
+            ShipAbility.EcmJink => $"ECM Jink gives +{(m.EcmJinkEvasionBonus + EvasionBonus) * 100:0}% evasion instead of +{m.EcmJinkEvasionBonus * 100:0}%.",
+            ShipAbility.GhostRun => "Ghost Run is ready again a turn sooner.",
+            ShipAbility.RotatingGuns => $"Rotating Guns sweep a {RotatingGunsFireConeDegrees * 2:0}° arc instead of {m.RotatingGunsFireConeDeg * 2:0}°.",
+            ShipAbility.HunterLock => $"Hunter Lock gives +{HunterLockAccuracyBonus * 100:0}% accuracy instead of +{m.HunterLockAccuracyBonus * 100:0}%.",
+            ShipAbility.SensorScramble => "Sensor Scramble also jams the nearest enemy to your target.",
+            ShipAbility.SuppressionFire => "Suppression Fire slows enemy turning twice as much.",
+            _ => "",
+        };
     }
 }

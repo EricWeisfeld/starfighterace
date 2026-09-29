@@ -780,8 +780,10 @@ public partial class BattleManager : Node2D
             return;
         if (action == ManeuverAction.HunterLock && fighter.SetHunterLock(enemy))
             Announce($"LOCK ON · {CallsignOf(fighter)} LOCKED A {enemy.Type.DisplayName.ToUpper()}");
-        else if (action == ManeuverAction.SensorScramble && fighter.ApplySensorScramble(enemy))
-            Announce($"SCRAMBLE · {enemy.Type.DisplayName.ToUpper()} ACCURACY DOWN FOR {fighter.Type.SensorScrambleDurationTurns} TURNS");
+        else if (action == ManeuverAction.SensorScramble && fighter.ApplySensorScramble(enemy, out Fighter splash))
+            Announce(splash == null
+                ? $"SCRAMBLE · {enemy.Type.DisplayName.ToUpper()} ACCURACY DOWN FOR {fighter.Moves.SensorScrambleDurationTurns} TURNS"
+                : $"SCRAMBLE · 2 ENEMIES' ACCURACY DOWN FOR {fighter.Moves.SensorScrambleDurationTurns} TURNS");
     }
 
     public static string CallsignOf(Fighter fighter) =>
@@ -1170,7 +1172,7 @@ public partial class BattleManager : Node2D
             {
                 f.Cooldown = f.EffectiveFireCooldown;
                 f.BarrageTarget = target;
-                f.BarrageShotsLeft = GD.RandRange(f.BarrageMin, f.BarrageMax);
+                f.BarrageShotsLeft = f.StartVolley(target);
                 f.BarrageShotTimer = 0f;
                 f.PlayFireAnimation(f.BarrageShotsLeft * BarrageShotInterval);
             }
@@ -1196,13 +1198,12 @@ public partial class BattleManager : Node2D
         float terrainAccuracy = ShotPassesNebula(nose, target.Position) ? NebulaAccuracyMultiplier : 1f;
         float hitChance = Mathf.Clamp(shooter.EffectiveAccuracyAgainst(target) * terrainAccuracy * (1f - target.EffectiveEvasion), 0.05f, 0.95f);
         bool hits = GD.Randf() < hitChance;
-        // Hits from the outer edge of the envelope feed the Long Shot perk.
-        if (hits && shooter.Position.DistanceTo(target.Position) >= shooter.EffectiveFireRange * Perks.EdgeRangeFraction)
-            shooter.EdgeHits++;
+        shooter.NoteFiringTraits(target);
+        target.NoteDefendingTraits();
         if (hits)
         {
             if (shooter.HasAbility(ShipAbility.SuppressionFire))
-                target.ApplySuppression(shooter.Type.SuppressionTurnPenaltyDeg);
+                target.ApplySuppression(shooter.Moves.SuppressionTurnPenaltyDeg);
             dir = dir.Rotated((float)GD.RandRange(-1.0, 1.0) * Mathf.DegToRad(0.8f));
         }
         else
@@ -1214,7 +1215,8 @@ public partial class BattleManager : Node2D
 
         var b = new Bullet();
         Color col = shooter.Team == 0 ? new Color(0.45f, 0.9f, 1f) : new Color(1f, 0.4f, 0.32f);
-        b.Init(shooter, nose, dir * BulletSpeed, shooter.EffectiveFireRange * 1.4f, col, shooter.ShotDamage, hits);
+        b.Init(shooter, nose, dir * BulletSpeed, shooter.EffectiveFireRange * 1.4f, col, shooter.ShotDamage, hits,
+            shooter.FireTimeDamageMultiplier(target.Position));
         _bulletLayer.AddChild(b);
     }
 
@@ -1228,13 +1230,25 @@ public partial class BattleManager : Node2D
             dir = dir.Rotated((float)GD.RandRange(3.5, 7.0) * Mathf.DegToRad(GD.Randf() < 0.5f ? -1 : 1));
         var bullet = new Bullet();
         bullet.InitObjective(shooter, target, nose, dir * BulletSpeed, shooter.EffectiveFireRange * 1.4f,
-            new Color(1f, 0.4f, 0.32f), shooter.ShotDamage, hits);
+            new Color(1f, 0.4f, 0.32f), shooter.ShotDamage, hits, shooter.FireTimeDamageMultiplier(target.Position));
         _bulletLayer.AddChild(bullet);
     }
 
     public void SpawnFlash(Vector2 pos)
     {
         _bulletLayer.AddChild(new Flash { Position = pos });
+    }
+
+    /// <summary>Floats a trait's name up from a ship, readable at any zoom.</summary>
+    public void ShowCallout(Fighter fighter, string text, Color color)
+    {
+        if (_bulletLayer == null || fighter == null)
+            return;
+        // Each ship's callouts form a short feed: the newest sits just above
+        // the callsign and pushes older ones up.
+        foreach (TraitCallout older in _bulletLayer.GetChildren().OfType<TraitCallout>().Where(c => c.Anchor == fighter))
+            older.PushUp();
+        _bulletLayer.AddChild(new TraitCallout { Anchor = fighter, Text = text, Color = color, Position = fighter.Position });
     }
 
     void EndExecution()
@@ -1296,8 +1310,7 @@ public partial class BattleManager : Node2D
         };
         if (!GameSetup.IsTestBattle && RunState.Current != null)
         {
-            (report.Results, report.Run) = RunState.Current.ResolveBattle(won, PlayerFighters,
-                PlayerFighters.Concat(EnemyFighters).ToList());
+            (report.Results, report.Run) = RunState.Current.ResolveBattle(won, PlayerFighters);
         }
 
         _hud.Visible = false;

@@ -188,13 +188,30 @@ public partial class BattleDebrief : CanvasLayer
             advancement.AddThemeConstantOverride("v_separation", 8);
             if (r.LevelsGained > 0)
                 advancement.AddChild(Tag($"LEVEL {r.Pilot.Level}", ChipRole.Gain));
+            bool refitUnlocked = r.LevelsGained > 0 && r.Pilot.CanRefit && r.Pilot.Level - r.LevelsGained < Pilot.RefitLevel;
+            if (refitUnlocked)
+                advancement.AddChild(Tag("REFIT READY", ChipRole.Gain));
             if (advancement.GetChildCount() > 0)
                 stack.AddChild(advancement);
-            if (r.NewPerk != null)
+            if (refitUnlocked)
+                stack.AddChild(Text("Can now be refitted into a new frame at any repair dock.", FontCaption, Muted, 0, wrap: true));
+            if (r.NewScar != null)
             {
-                stack.AddChild(Tag(r.NewPerk.Name.ToUpper(), r.NewPerk.Positive ? ChipRole.Gain : ChipRole.Impaired));
-                stack.AddChild(Text(r.NewPerk.Description, FontCaption, Muted, 0, wrap: true));
+                stack.AddChild(Tag($"SCAR · {r.NewScar.Name.ToUpper()}", ChipRole.Impaired));
+                stack.AddChild(Text($"{r.NewScar.Description} Treat it at a repair dock.", FontCaption, Muted, 0, wrap: true));
             }
+        }
+
+        // The instincts and scars that made a difference this battle.
+        Fighter fighter = _report.Squad?.FirstOrDefault(f => f.Pilot == r.Pilot);
+        if (fighter != null && fighter.TraitTriggers.Count > 0)
+        {
+            string instincts = string.Join(" · ", fighter.TraitTriggers.Where(t => t.Key.Positive).Select(t => $"{t.Key.Name.ToUpper()} ×{t.Value}"));
+            string scars = string.Join(" · ", fighter.TraitTriggers.Where(t => t.Key.IsScar).Select(t => $"{t.Key.Name.ToUpper()} ×{t.Value}"));
+            if (instincts.Length > 0)
+                stack.AddChild(Text(instincts, FontMicro, TraitCallout.InstinctColor, 1, wrap: true));
+            if (scars.Length > 0)
+                stack.AddChild(Text(scars, FontMicro, TraitCallout.ScarColor, 1, wrap: true));
         }
         return card;
     }
@@ -207,10 +224,10 @@ public partial class BattleDebrief : CanvasLayer
             stack.AddChild(Text("PROMOTIONS", FontCaption, Muted, 4));
             foreach (string promotion in run.Promotions)
                 stack.AddChild(Text(promotion, FontBody, Accent, 1));
-            stack.AddChild(Text("You'll choose a card for each after this report.", FontCaption, Muted, 0, wrap: true));
+            stack.AddChild(Text("You'll make each choice after this report.", FontCaption, Muted, 0, wrap: true));
         }
         if (run.SectorCleared && run.Outcome == RunOutcome.InProgress)
-            stack.AddChild(Text("SECTOR CLEARED · SHIPS REPAIRED", FontBody, Positive, 2));
+            stack.AddChild(Text("SECTOR CLEARED · SHIPS PATCHED HALFWAY", FontBody, Positive, 2));
         if (run.Outcome == RunOutcome.Victory)
             stack.AddChild(Text("THE HELIOS GATE IS OPEN. RUN COMPLETE.", FontBody, Positive, 2));
         if (run.Outcome == RunOutcome.Defeat)

@@ -127,62 +127,62 @@ public static class EnemyAI
     {
         if (self.HasAbility(ShipAbility.UTurn) && self.IsManeuverReady(ManeuverType.UTurn))
         {
-            yield return new FlightPlan(ManeuverType.UTurn, -Mathf.Pi, self.Type.UTurnMoveDistance);
-            yield return new FlightPlan(ManeuverType.UTurn, Mathf.Pi, self.Type.UTurnMoveDistance);
+            yield return new FlightPlan(ManeuverType.UTurn, -Mathf.Pi, self.Moves.UTurnMoveDistance);
+            yield return new FlightPlan(ManeuverType.UTurn, Mathf.Pi, self.Moves.UTurnMoveDistance);
         }
 
         if (self.HasAbility(ShipAbility.BreakTurn) && self.IsManeuverReady(ManeuverType.BreakTurn))
         {
-            yield return new FlightPlan(ManeuverType.BreakTurn, -Mathf.Pi, self.Type.BreakTurnMoveDistance);
-            yield return new FlightPlan(ManeuverType.BreakTurn, Mathf.Pi, self.Type.BreakTurnMoveDistance);
+            yield return new FlightPlan(ManeuverType.BreakTurn, -Mathf.Pi, self.Moves.BreakTurnMoveDistance);
+            yield return new FlightPlan(ManeuverType.BreakTurn, Mathf.Pi, self.Moves.BreakTurnMoveDistance);
         }
 
 
         if (self.HasAbility(ShipAbility.SnapTurn) && self.IsManeuverReady(ManeuverType.SnapTurn))
         {
-            float snapTurn = Mathf.DegToRad(self.Type.SnapTurnAngleDegrees);
-            yield return new FlightPlan(ManeuverType.SnapTurn, -snapTurn, self.Type.SnapTurnMoveDistance);
-            yield return new FlightPlan(ManeuverType.SnapTurn, snapTurn, self.Type.SnapTurnMoveDistance);
+            float snapTurn = Mathf.DegToRad(self.Moves.SnapTurnAngleDegrees);
+            yield return new FlightPlan(ManeuverType.SnapTurn, -snapTurn, self.Moves.SnapTurnMoveDistance);
+            yield return new FlightPlan(ManeuverType.SnapTurn, snapTurn, self.Moves.SnapTurnMoveDistance);
         }
 
         if (self.HasAbility(ShipAbility.RotatingGuns) && self.IsManeuverReady(ManeuverType.RotatingGuns))
-            yield return new FlightPlan(ManeuverType.RotatingGuns, 0f, self.Type.RotatingGunsMoveDistance);
+            yield return new FlightPlan(ManeuverType.RotatingGuns, 0f, self.Moves.RotatingGunsMoveDistance);
 
         if (self.HasAbility(ShipAbility.EngineBoost) && self.IsManeuverReady(ManeuverType.EngineBoost))
         {
             foreach (float turn in TurnsFor(self.EngineBoostTurnLimitDegrees))
-                yield return new FlightPlan(ManeuverType.EngineBoost, turn, self.Type.EngineBoostMoveDistance);
+                yield return new FlightPlan(ManeuverType.EngineBoost, turn, self.Moves.EngineBoostMoveDistance);
         }
 
         if (self.HasAbility(ShipAbility.EmergencyThrusters) && self.IsManeuverReady(ManeuverType.EmergencyThrusters))
         {
             foreach (float turn in TurnsFor(self.EmergencyThrustersTurnLimitDegrees))
-                yield return new FlightPlan(ManeuverType.EmergencyThrusters, turn, self.Type.EmergencyThrustersMoveDistance);
+                yield return new FlightPlan(ManeuverType.EmergencyThrusters, turn, self.Moves.EmergencyThrustersMoveDistance);
         }
 
         if (self.HasAbility(ShipAbility.PursuitBurn) && self.IsManeuverReady(ManeuverType.PursuitBurn))
         {
             foreach (float turn in TurnsFor(self.PursuitBurnTurnLimitDegrees))
-                yield return new FlightPlan(ManeuverType.PursuitBurn, turn, self.Type.PursuitBurnMoveDistance);
+                yield return new FlightPlan(ManeuverType.PursuitBurn, turn, self.Moves.PursuitBurnMoveDistance);
         }
 
         if (self.HasAbility(ShipAbility.EcmJink) && self.IsManeuverReady(ManeuverType.EcmJink))
         {
             foreach (float turn in TurnsFor(self.EcmJinkTurnLimitDegrees))
-                yield return new FlightPlan(ManeuverType.EcmJink, turn, self.Type.EcmJinkMoveDistance);
+                yield return new FlightPlan(ManeuverType.EcmJink, turn, self.Moves.EcmJinkMoveDistance);
         }
 
         if (self.HasAbility(ShipAbility.GhostRun) && self.IsManeuverReady(ManeuverType.GhostRun))
         {
             foreach (float turn in TurnsFor(self.GhostRunTurnLimitDegrees))
-                yield return new FlightPlan(ManeuverType.GhostRun, turn, self.Type.GhostRunMoveDistance);
+                yield return new FlightPlan(ManeuverType.GhostRun, turn, self.Moves.GhostRunMoveDistance);
         }
 
         if (self.HasAbility(ShipAbility.EvasiveDodge) && self.IsManeuverReady(ManeuverType.EvasiveDodge))
         {
-            float dodgeTurn = Mathf.DegToRad(self.Type.EvasiveDodgeAngleDegrees);
-            yield return new FlightPlan(ManeuverType.EvasiveDodge, -dodgeTurn, self.Type.EvasiveDodgeMoveDistance);
-            yield return new FlightPlan(ManeuverType.EvasiveDodge, dodgeTurn, self.Type.EvasiveDodgeMoveDistance);
+            float dodgeTurn = Mathf.DegToRad(self.Moves.EvasiveDodgeAngleDegrees);
+            yield return new FlightPlan(ManeuverType.EvasiveDodge, -dodgeTurn, self.Moves.EvasiveDodgeMoveDistance);
+            yield return new FlightPlan(ManeuverType.EvasiveDodge, dodgeTurn, self.Moves.EvasiveDodgeMoveDistance);
         }
     }
 

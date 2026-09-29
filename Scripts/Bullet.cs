@@ -10,12 +10,15 @@ public partial class Bullet : Node2D
     int _team;
     Color _color;
     int _damage;
+    float _damageMultiplier = 1f; // fire-time bonuses, such as Long Shot
     bool _canHit; // misses are decided at fire time and just fly past
     ObjectiveShip _objectiveTarget;
 
-    public void Init(Fighter shooter, Vector2 pos, Vector2 vel, float maxDist, Color color, int damage, bool canHit)
+    public void Init(Fighter shooter, Vector2 pos, Vector2 vel, float maxDist, Color color, int damage, bool canHit,
+        float damageMultiplier = 1f)
     {
         _shooter = shooter;
+        _damageMultiplier = damageMultiplier;
         _team = shooter.Team;
         Position = pos;
         _vel = vel;
@@ -25,9 +28,10 @@ public partial class Bullet : Node2D
         _canHit = canHit;
     }
 
-    public void InitObjective(Fighter shooter, ObjectiveShip target, Vector2 pos, Vector2 vel, float maxDist, Color color, int damage, bool canHit)
+    public void InitObjective(Fighter shooter, ObjectiveShip target, Vector2 pos, Vector2 vel, float maxDist, Color color, int damage, bool canHit,
+        float damageMultiplier = 1f)
     {
-        Init(shooter, pos, vel, maxDist, color, damage, canHit);
+        Init(shooter, pos, vel, maxDist, color, damage, canHit, damageMultiplier);
         _objectiveTarget = target;
     }
 
@@ -50,7 +54,7 @@ public partial class Bullet : Node2D
         {
             if (_objectiveTarget != null && _objectiveTarget.IsAlive && Position.DistanceTo(_objectiveTarget.Position) < 24f)
             {
-                _objectiveTarget.TakeDamage(_shooter?.RollShotDamage() ?? _damage);
+                _objectiveTarget.TakeDamage(_shooter?.RollShotDamage(null, _damageMultiplier) ?? _damage);
                 _shooter?.RecordHit(false);
                 mgr.SpawnFlash(Position);
                 QueueFree();
@@ -60,7 +64,7 @@ public partial class Bullet : Node2D
             {
                 if (f.IsAlive && Position.DistanceTo(f.Position) < 16f)
                 {
-                    f.TakeDamage(_shooter?.RollShotDamage(f) ?? _damage);
+                    f.TakeDamage(_shooter?.RollShotDamage(f, _damageMultiplier) ?? _damage);
                     _shooter?.RecordHit(!f.IsAlive);
                     mgr.SpawnFlash(Position);
                     QueueFree();

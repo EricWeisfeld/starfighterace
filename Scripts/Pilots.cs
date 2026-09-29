@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>
-/// A squadron member for one run: flies one hull class, learns maneuvers and
-/// upgrades as they level, carries hull damage between battles, and can die
-/// for good.
+/// A squadron member for one run. The pilot and the ship grow separately:
+/// the pilot learns maneuvers, masteries and instincts by levelling up, while
+/// the ship's frame and modules are bought with salvage. Hull damage carries
+/// between battles, and a pilot can die for good.
 /// </summary>
 public class Pilot
 {
@@ -20,10 +21,13 @@ public class Pilot
     public string ClassId { get; }
     /// <summary>Maneuvers learned from this class's pool, at most <see cref="MaxManeuvers"/>.</summary>
     public readonly List<ShipAbility> Maneuvers = new();
-    /// <summary>Ship upgrades installed through promotions and field rewards; each at most once.</summary>
+    /// <summary>Modules fitted to the ship: at most one per slot the frame provides.</summary>
     public readonly List<ShipUpgrade> Upgrades = new();
+    /// <summary>Known maneuvers the pilot has mastered.</summary>
+    public readonly List<ShipAbility> Masteries = new();
     public int Level = 1;
     public int Xp;                          // progress within the current level
+    /// <summary>Instincts and scars.</summary>
     public readonly List<Perk> Perks = new();
     public PilotCondition Condition = PilotCondition.Ready;
     /// <summary>Run stops a wounded pilot still has to sit out.</summary>
@@ -39,11 +43,14 @@ public class Pilot
     public bool IsMaxLevel => Level >= MaxLevel;
     public ShipType BaseClass => ShipTypes.BaseClass(ClassId);
     public bool CanRefit => Level >= RefitLevel && Ship == BaseClass;
-    /// <summary>Maximum hull after traits.</summary>
-    public int MaxHull => global::Perks.EffectiveMaxHp(this, Ship.MaxHp);
+    /// <summary>Maximum hull: the frame's, plus armor plating.</summary>
+    public int MaxHull => Ship.MaxHp + (HasUpgrade(ShipUpgrade.ShieldsArmor) ? ShipUpgrades.ArmorHullBonus : 0);
     /// <summary>Hull the ship will launch with.</summary>
     public int Hull => Mathf.Clamp(MaxHull - HullDamage, 1, MaxHull);
     public IEnumerable<ShipAbility> UnlearnedManeuvers => Ship.ManeuverPool.Where(ability => !Maneuvers.Contains(ability));
+    public IEnumerable<ShipAbility> UnmasteredManeuvers => Maneuvers.Where(ability => !Masteries.Contains(ability));
+    public IEnumerable<Perk> Instincts => Perks.Where(perk => perk.Positive);
+    public IEnumerable<Perk> Scars => Perks.Where(perk => perk.IsScar);
     public string ClassDisplayName => ClassId switch { "raptor" => "Raptor", "zt" => "ZT", _ => "Scout" };
 
     public Pilot(string callsign, ShipType ship)
@@ -68,26 +75,53 @@ public class Pilot
         Maneuvers.Clear();
         foreach (ShipAbility ability in maneuvers.Where(Ship.OffersManeuver).Distinct().Take(MaxManeuvers))
             Maneuvers.Add(ability);
+        Masteries.RemoveAll(ability => !Maneuvers.Contains(ability));
     }
 
-    /// <summary>Moves the pilot into one of their class's refit frames.</summary>
+    public bool HasMastered(ShipAbility ability) => Masteries.Contains(ability);
+
+    public bool Master(ShipAbility ability)
+    {
+        if (!HasManeuver(ability) || HasMastered(ability))
+            return false;
+        Masteries.Add(ability);
+        return true;
+    }
+
+    /// <summary>
+    /// Moves the pilot into one of their class's refit frames. Modules move
+    /// across to the new frame when it has a slot for them.
+    /// </summary>
     public bool Refit(ShipType frame)
     {
         if (!CanRefit || !ShipTypes.HullBranches(ClassId).Contains(frame))
             return false;
         Ship = frame;
+        Upgrades.RemoveAll(upgrade => !HasSlot(ShipUpgrades.Get(upgrade).Slot));
         HullDamage = Mathf.Min(HullDamage, MaxHull - 1);
         RestoreManeuvers(Maneuvers.ToArray());
         return true;
     }
 
+    public bool HasSlot(ShipUpgradeSlot slot) => Ship.UpgradeSlots.Contains(slot);
     public bool HasUpgrade(ShipUpgrade upgrade) => Upgrades.Contains(upgrade);
 
+    /// <summary>The module in a slot, or null when it is empty.</summary>
+    public ShipUpgrade? ModuleIn(ShipUpgradeSlot slot) =>
+        Upgrades.Select(upgrade => (ShipUpgrade?)upgrade).FirstOrDefault(upgrade => ShipUpgrades.Get(upgrade.Value).Slot == slot);
+
+    /// <summary>True when the frame has the module's slot and the module is not already fitted.</summary>
+    public bool CanInstall(ShipUpgrade upgrade) => HasSlot(ShipUpgrades.Get(upgrade).Slot) && !HasUpgrade(upgrade);
+
+    /// <summary>Fits a module, replacing whatever was in its slot.</summary>
     public bool InstallUpgrade(ShipUpgrade upgrade)
     {
-        if (HasUpgrade(upgrade))
+        if (!CanInstall(upgrade))
             return false;
+        ShipUpgradeSlot slot = ShipUpgrades.Get(upgrade).Slot;
+        Upgrades.RemoveAll(existing => ShipUpgrades.Get(existing).Slot == slot);
         Upgrades.Add(upgrade);
+        HullDamage = Mathf.Min(HullDamage, MaxHull - 1);
         return true;
     }
 
@@ -131,12 +165,12 @@ public class PilotResult
     public int Kills;
     public int XpGained;
     public int LevelsGained;
-    public Perk NewPerk;
+    public Perk NewScar;
 }
 
 /// <summary>
 /// Applies the consequences of a finished battle to the pilots who flew it:
-/// eject survival, permadeath, wounds, hull damage, XP, level-ups and perk
+/// eject survival, permadeath, wounds, hull damage, XP, level-ups and scar
 /// rolls. Call exactly once per battle.
 /// </summary>
 public static class BattleResolution
@@ -151,14 +185,13 @@ public static class BattleResolution
     /// </summary>
     public const int WoundedRecoveryStops = 2;
 
-    public static List<PilotResult> Resolve(IEnumerable<Fighter> playerFighters, bool won,
-        IReadOnlyCollection<Fighter> combatants = null)
+    public static List<PilotResult> Resolve(IEnumerable<Fighter> playerFighters, bool won)
     {
         List<Fighter> fighters = playerFighters.Where(f => f.Pilot != null).ToList();
         var results = new List<PilotResult>();
         var resultsByFighter = new Dictionary<Fighter, PilotResult>();
 
-        // Resolve every fate first so surviving pilots' perk rolls can react to
+        // Resolve every fate first so surviving pilots' scar rolls can react to
         // the actual number of squadmates lost, including failed rescues.
         foreach (Fighter f in fighters)
         {
@@ -194,7 +227,7 @@ public static class BattleResolution
             r.XpGained = XpBase + XpPerKill * f.Kills + (won ? XpWinBonus : 0);
             r.LevelsGained = f.Pilot.GrantXp(r.XpGained);
             f.Pilot.Battles++;
-            r.NewPerk = Perks.Roll(f, won, combatants ?? fighters, squadDeaths);
+            r.NewScar = Perks.RollScar(f, won, squadDeaths);
         }
         return results;
     }

@@ -5,14 +5,20 @@ using System.Linq;
 
 public enum RunNodeKind { Skirmish, Strike, Elite, Repair, Recruit, Event, Boss }
 
-public enum CardKind { Maneuver, Upgrade, Frame, Trait }
+/// <summary>
+/// What a card offers. Level-ups offer pilot growth (maneuvers, masteries,
+/// instincts); module crates offer ship hardware.
+/// </summary>
+public enum CardKind { Maneuver, Mastery, Instinct, Module }
 
-/// <summary>One option in a promotion or field-upgrade choice.</summary>
+/// <summary>One option in a promotion or module-crate choice.</summary>
 public class PromotionCard
 {
     public CardKind Kind { get; set; }
-    /// <summary>A ShipAbility, ShipUpgrade, hull id or perk id, depending on <see cref="Kind"/>.</summary>
+    /// <summary>A ShipAbility (maneuver or mastery), perk id or ShipUpgrade, depending on <see cref="Kind"/>.</summary>
     public string Id { get; set; } = "";
+    /// <summary>For module cards: the pilot whose ship gets the module.</summary>
+    public string Callsign { get; set; }
 }
 
 /// <summary>A pilot offered for hire at a recruit stop.</summary>
@@ -211,8 +217,8 @@ public static class RunContent
     {
         RunNodeKind.Skirmish => "Destroy an enemy patrol.",
         RunNodeKind.Strike => "Destroy a marked command ship. The rest of the wing can live.",
-        RunNodeKind.Elite => "A veteran wing. Every survivor earns a field upgrade.",
-        RunNodeKind.Repair => "Spend salvage to repair ships and treat the wounded.",
+        RunNodeKind.Elite => "A veteran wing. Win it to open a module crate.",
+        RunNodeKind.Repair => "Buy modules and refits, repair hulls, treat wounds and scars.",
         RunNodeKind.Recruit => "Hire a new pilot for the squadron.",
         RunNodeKind.Event => "An unknown signal. Could be salvage, could be trouble.",
         RunNodeKind.Boss => BossName(sector) + ". Win to leave the sector; lose and the run ends.",
@@ -315,7 +321,8 @@ public static class RunContent
 
     /// <summary>
     /// A recruit arrives at a level just below the squadron's, having already
-    /// taken the promotions a pilot of that level would have.
+    /// taken the promotions a pilot of that level would have. Their ship is a
+    /// bare base frame: modules and refits are for the squadron to buy.
     /// </summary>
     public static Pilot NewRecruit(string callsign, ShipType baseClass, int level, RandomNumberGenerator rng)
     {
@@ -323,12 +330,10 @@ public static class RunContent
         for (int next = 2; next <= level; next++)
         {
             pilot.Level = next;
-            List<PromotionCard> cards = PromotionCards(pilot, rng, fieldUpgrade: false)
-                .Where(card => card.Kind != CardKind.Frame).ToList();
+            List<PromotionCard> cards = PromotionCards(pilot, rng);
             if (cards.Count > 0)
                 ApplyCard(pilot, cards[0]);
         }
-        Perks.RollRecruitmentTrait(pilot);
         return pilot;
     }
 
@@ -337,41 +342,73 @@ public static class RunContent
     // -------------------------------------------------------------- cards
 
     /// <summary>
-    /// Three distinct choices for a pilot. A level-up favours a new maneuver
-    /// and offers both refit frames once the pilot qualifies; a field upgrade
-    /// (the reward for beating an elite wing) offers only upgrades and traits.
+    /// Three distinct level-up choices for a pilot, all pilot growth: a new
+    /// maneuver while they have room for one, then instincts and masteries of
+    /// maneuvers they already fly. Ship hardware never appears here.
     /// </summary>
-    public static List<PromotionCard> PromotionCards(Pilot pilot, RandomNumberGenerator rng, bool fieldUpgrade)
+    public static List<PromotionCard> PromotionCards(Pilot pilot, RandomNumberGenerator rng)
     {
         var cards = new List<PromotionCard>();
-        if (!fieldUpgrade && pilot.CanRefit)
-            foreach (ShipType frame in ShipTypes.HullBranches(pilot.ClassId))
-                cards.Add(new PromotionCard { Kind = CardKind.Frame, Id = frame.Id });
-
         var maneuvers = new List<PromotionCard>();
-        if (!fieldUpgrade && pilot.Maneuvers.Count < Pilot.MaxManeuvers)
+        if (pilot.Maneuvers.Count < Pilot.MaxManeuvers)
             maneuvers.AddRange(pilot.UnlearnedManeuvers.Select(a => new PromotionCard { Kind = CardKind.Maneuver, Id = a.ToString() }));
-        var others = new List<PromotionCard>();
-        others.AddRange(ShipUpgrades.All.Where(u => !pilot.HasUpgrade(u.Id))
-            .Select(u => new PromotionCard { Kind = CardKind.Upgrade, Id = u.Id.ToString() }));
-        Perk[] traits = Perks.All.Where(p => p.Positive && !pilot.Perks.Contains(p)).ToArray();
-        if (traits.Length > 0)
-            others.Add(new PromotionCard { Kind = CardKind.Trait, Id = traits[rng.RandiRange(0, traits.Length - 1)].Id });
+        List<PromotionCard> instincts = Perks.Instincts.Where(p => !pilot.Perks.Contains(p))
+            .Select(p => new PromotionCard { Kind = CardKind.Instinct, Id = p.Id }).ToList();
+        List<PromotionCard> masteries = pilot.UnmasteredManeuvers
+            .Select(a => new PromotionCard { Kind = CardKind.Mastery, Id = a.ToString() }).ToList();
 
-        if (cards.Count < 3 && maneuvers.Count > 0)
+        if (maneuvers.Count > 0)
             cards.Add(TakeRandom(maneuvers, rng));
-        var rest = maneuvers.Concat(others).ToList();
+        if (instincts.Count > 0)
+            cards.Add(TakeRandom(instincts, rng));
+        var rest = maneuvers.Concat(instincts).Concat(masteries).ToList();
         while (cards.Count < 3 && rest.Count > 0)
             cards.Add(TakeRandom(rest, rng));
         return cards;
     }
 
-    static PromotionCard TakeRandom(List<PromotionCard> list, RandomNumberGenerator rng)
+    /// <summary>
+    /// An elite wing's reward: three modules, each already matched to a
+    /// surviving pilot's ship, one of which is fitted free. Empty slots are
+    /// favoured so the crate usually adds rather than swaps.
+    /// </summary>
+    public static List<PromotionCard> ModuleCrate(IEnumerable<Pilot> survivors, RandomNumberGenerator rng)
+    {
+        var options = survivors
+            .SelectMany(pilot => ShipUpgrades.All
+                .Where(module => pilot.CanInstall(module.Id))
+                .Select(module => (Pilot: pilot, Module: module, Empty: pilot.ModuleIn(module.Slot) == null)))
+            .ToList();
+        var cards = new List<PromotionCard>();
+        var usedPilots = new HashSet<string>();
+        var usedModules = new HashSet<ShipUpgrade>();
+        while (cards.Count < 3 && options.Count > 0)
+        {
+            // Spread the offer: a pilot and a module not yet on offer, an
+            // empty slot if possible, relaxing one preference at a time.
+            var pool = options.Where(o => !usedPilots.Contains(o.Pilot.Callsign) && !usedModules.Contains(o.Module.Id) && o.Empty).ToList();
+            if (pool.Count == 0)
+                pool = options.Where(o => !usedPilots.Contains(o.Pilot.Callsign) && !usedModules.Contains(o.Module.Id)).ToList();
+            if (pool.Count == 0)
+                pool = options.Where(o => !usedModules.Contains(o.Module.Id)).ToList();
+            if (pool.Count == 0)
+                pool = options;
+            var pick = pool[rng.RandiRange(0, pool.Count - 1)];
+            options.Remove(pick);
+            options.RemoveAll(o => o.Pilot == pick.Pilot && o.Module.Id == pick.Module.Id);
+            usedPilots.Add(pick.Pilot.Callsign);
+            usedModules.Add(pick.Module.Id);
+            cards.Add(new PromotionCard { Kind = CardKind.Module, Id = pick.Module.Id.ToString(), Callsign = pick.Pilot.Callsign });
+        }
+        return cards;
+    }
+
+    static T TakeRandom<T>(List<T> list, RandomNumberGenerator rng)
     {
         int index = rng.RandiRange(0, list.Count - 1);
-        PromotionCard card = list[index];
+        T item = list[index];
         list.RemoveAt(index);
-        return card;
+        return item;
     }
 
     public static void ApplyCard(Pilot pilot, PromotionCard card)
@@ -381,16 +418,16 @@ public static class RunContent
             case CardKind.Maneuver when Enum.TryParse(card.Id, out ShipAbility ability):
                 pilot.LearnManeuver(ability);
                 break;
-            case CardKind.Upgrade when ShipUpgrades.TryParse(card.Id, out ShipUpgrade upgrade):
-                pilot.InstallUpgrade(upgrade);
+            case CardKind.Mastery when Enum.TryParse(card.Id, out ShipAbility mastered):
+                pilot.Master(mastered);
                 break;
-            case CardKind.Frame:
-                pilot.Refit(ShipTypes.FromId(card.Id));
-                break;
-            case CardKind.Trait:
-                Perk perk = Perks.All.FirstOrDefault(p => p.Id == card.Id);
-                if (perk != null && !pilot.Perks.Contains(perk))
+            case CardKind.Instinct:
+                Perk perk = Perks.ById(card.Id);
+                if (perk != null && perk.Positive && !pilot.Perks.Contains(perk))
                     pilot.Perks.Add(perk);
+                break;
+            case CardKind.Module when ShipUpgrades.TryParse(card.Id, out ShipUpgrade module):
+                pilot.InstallUpgrade(module);
                 break;
         }
     }
@@ -402,21 +439,23 @@ public static class RunContent
         {
             case CardKind.Maneuver when Enum.TryParse(card.Id, out ShipAbility ability):
                 return (ManeuverCatalog.AbilityName(ability).ToUpper(), "NEW MANEUVER", ManeuverCatalog.Blurb(ability));
-            case CardKind.Upgrade when ShipUpgrades.TryParse(card.Id, out ShipUpgrade upgrade):
-                ShipUpgradeDefinition definition = ShipUpgrades.Get(upgrade);
-                return (definition.Name.ToUpper(), "SHIP UPGRADE", definition.Description + ".");
-            case CardKind.Frame:
-                ShipType frame = ShipTypes.FromId(card.Id);
-                return (frame.DisplayName.ToUpper(), "REFIT FRAME", FrameDelta(pilot.Ship, frame));
-            case CardKind.Trait:
-                Perk perk = Perks.All.FirstOrDefault(p => p.Id == card.Id);
-                return ((perk?.Name ?? card.Id).ToUpper(), "TRAIT", perk?.Description ?? "");
+            case CardKind.Mastery when Enum.TryParse(card.Id, out ShipAbility mastered):
+                return (ManeuverCatalog.AbilityName(mastered).ToUpper(), "MASTERY", Masteries.Describe(mastered, pilot.Ship));
+            case CardKind.Instinct:
+                Perk perk = Perks.ById(card.Id);
+                return ((perk?.Name ?? card.Id).ToUpper(), "INSTINCT", perk?.Description ?? "");
+            case CardKind.Module when ShipUpgrades.TryParse(card.Id, out ShipUpgrade module):
+                ShipUpgradeDefinition definition = ShipUpgrades.Get(module);
+                string text = definition.Description;
+                if (pilot.ModuleIn(definition.Slot) is ShipUpgrade replaced)
+                    text += $" Replaces {ShipUpgrades.Get(replaced).Name}.";
+                return (definition.Name.ToUpper(), $"{ShipUpgrades.SlotName(definition.Slot)} MODULE · {pilot.Callsign}", text);
         }
         return (card.Id, "", "");
     }
 
     /// <summary>How a refit frame differs from the pilot's current hull.</summary>
-    static string FrameDelta(ShipType from, ShipType to)
+    public static string FrameDelta(ShipType from, ShipType to)
     {
         var parts = new List<string>();
         void Add(string label, float delta, string unit = "")
@@ -500,13 +539,14 @@ public static class RunContent
             {
                 new()
                 {
-                    Label = "CRACK IT OPEN", Detail = "A pilot gets a free upgrade. It might go off.",
-                    Available = run => run.Living.Any(p => ShipUpgrades.All.Any(u => !p.HasUpgrade(u.Id))),
+                    Label = "CRACK IT OPEN", Detail = "A free module for an empty slot. It might go off.",
+                    Available = run => run.Living.Any(HasEmptySlot),
                     Resolve = (run, rng) =>
                     {
-                        Pilot[] candidates = run.Living.Where(p => ShipUpgrades.All.Any(u => !p.HasUpgrade(u.Id))).ToArray();
+                        Pilot[] candidates = run.Living.Where(HasEmptySlot).ToArray();
                         Pilot pilot = candidates[rng.RandiRange(0, candidates.Length - 1)];
-                        ShipUpgradeDefinition[] upgrades = ShipUpgrades.All.Where(u => !pilot.HasUpgrade(u.Id)).ToArray();
+                        ShipUpgradeDefinition[] upgrades = ShipUpgrades.All
+                            .Where(u => pilot.HasSlot(u.Slot) && pilot.ModuleIn(u.Slot) == null).ToArray();
                         ShipUpgradeDefinition upgrade = upgrades[rng.RandiRange(0, upgrades.Length - 1)];
                         pilot.InstallUpgrade(upgrade.Id);
                         string text = $"{pilot.Callsign} fits a {upgrade.Name}.";
@@ -568,6 +608,8 @@ public static class RunContent
             },
         },
     };
+
+    static bool HasEmptySlot(Pilot pilot) => pilot.Ship.UpgradeSlots.Any(slot => pilot.ModuleIn(slot) == null);
 
     static EventOutcome Salvage(RunState run, int amount, string text)
     {

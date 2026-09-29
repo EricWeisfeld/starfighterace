@@ -584,43 +584,43 @@ public partial class BattleOverlay : Node2D
 
         if (target.HasAbility(ShipAbility.UTurn) && target.IsManeuverReady(ManeuverType.UTurn))
         {
-            yield return new TargetPlan(ManeuverType.UTurn, -Mathf.Pi, target.Type.UTurnMoveDistance);
-            yield return new TargetPlan(ManeuverType.UTurn, Mathf.Pi, target.Type.UTurnMoveDistance);
+            yield return new TargetPlan(ManeuverType.UTurn, -Mathf.Pi, target.Moves.UTurnMoveDistance);
+            yield return new TargetPlan(ManeuverType.UTurn, Mathf.Pi, target.Moves.UTurnMoveDistance);
         }
         if (target.HasAbility(ShipAbility.BreakTurn) && target.IsManeuverReady(ManeuverType.BreakTurn))
         {
-            yield return new TargetPlan(ManeuverType.BreakTurn, -Mathf.Pi, target.Type.BreakTurnMoveDistance);
-            yield return new TargetPlan(ManeuverType.BreakTurn, Mathf.Pi, target.Type.BreakTurnMoveDistance);
+            yield return new TargetPlan(ManeuverType.BreakTurn, -Mathf.Pi, target.Moves.BreakTurnMoveDistance);
+            yield return new TargetPlan(ManeuverType.BreakTurn, Mathf.Pi, target.Moves.BreakTurnMoveDistance);
         }
         if (target.HasAbility(ShipAbility.SnapTurn) && target.IsManeuverReady(ManeuverType.SnapTurn))
         {
-            float turn = Mathf.DegToRad(target.Type.SnapTurnAngleDegrees);
-            yield return new TargetPlan(ManeuverType.SnapTurn, -turn, target.Type.SnapTurnMoveDistance);
-            yield return new TargetPlan(ManeuverType.SnapTurn, turn, target.Type.SnapTurnMoveDistance);
+            float turn = Mathf.DegToRad(target.Moves.SnapTurnAngleDegrees);
+            yield return new TargetPlan(ManeuverType.SnapTurn, -turn, target.Moves.SnapTurnMoveDistance);
+            yield return new TargetPlan(ManeuverType.SnapTurn, turn, target.Moves.SnapTurnMoveDistance);
         }
         if (target.HasAbility(ShipAbility.RotatingGuns) && target.IsManeuverReady(ManeuverType.RotatingGuns))
-            yield return new TargetPlan(ManeuverType.RotatingGuns, 0f, target.Type.RotatingGunsMoveDistance);
+            yield return new TargetPlan(ManeuverType.RotatingGuns, 0f, target.Moves.RotatingGunsMoveDistance);
 
         foreach (float turn in SampleTurns(target.EngineBoostTurnLimitDegrees))
             if (target.HasAbility(ShipAbility.EngineBoost) && target.IsManeuverReady(ManeuverType.EngineBoost))
-                yield return new TargetPlan(ManeuverType.EngineBoost, turn, target.Type.EngineBoostMoveDistance);
+                yield return new TargetPlan(ManeuverType.EngineBoost, turn, target.Moves.EngineBoostMoveDistance);
         foreach (float turn in SampleTurns(target.EmergencyThrustersTurnLimitDegrees))
             if (target.HasAbility(ShipAbility.EmergencyThrusters) && target.IsManeuverReady(ManeuverType.EmergencyThrusters))
-                yield return new TargetPlan(ManeuverType.EmergencyThrusters, turn, target.Type.EmergencyThrustersMoveDistance);
+                yield return new TargetPlan(ManeuverType.EmergencyThrusters, turn, target.Moves.EmergencyThrustersMoveDistance);
         foreach (float turn in SampleTurns(target.PursuitBurnTurnLimitDegrees))
             if (target.HasAbility(ShipAbility.PursuitBurn) && target.IsManeuverReady(ManeuverType.PursuitBurn))
-                yield return new TargetPlan(ManeuverType.PursuitBurn, turn, target.Type.PursuitBurnMoveDistance);
+                yield return new TargetPlan(ManeuverType.PursuitBurn, turn, target.Moves.PursuitBurnMoveDistance);
         foreach (float turn in SampleTurns(target.EcmJinkTurnLimitDegrees))
             if (target.HasAbility(ShipAbility.EcmJink) && target.IsManeuverReady(ManeuverType.EcmJink))
-                yield return new TargetPlan(ManeuverType.EcmJink, turn, target.Type.EcmJinkMoveDistance);
+                yield return new TargetPlan(ManeuverType.EcmJink, turn, target.Moves.EcmJinkMoveDistance);
         foreach (float turn in SampleTurns(target.GhostRunTurnLimitDegrees))
             if (target.HasAbility(ShipAbility.GhostRun) && target.IsManeuverReady(ManeuverType.GhostRun))
-                yield return new TargetPlan(ManeuverType.GhostRun, turn, target.Type.GhostRunMoveDistance);
+                yield return new TargetPlan(ManeuverType.GhostRun, turn, target.Moves.GhostRunMoveDistance);
         if (target.HasAbility(ShipAbility.EvasiveDodge) && target.IsManeuverReady(ManeuverType.EvasiveDodge))
         {
-            float turn = Mathf.DegToRad(target.Type.EvasiveDodgeAngleDegrees);
-            yield return new TargetPlan(ManeuverType.EvasiveDodge, -turn, target.Type.EvasiveDodgeMoveDistance);
-            yield return new TargetPlan(ManeuverType.EvasiveDodge, turn, target.Type.EvasiveDodgeMoveDistance);
+            float turn = Mathf.DegToRad(target.Moves.EvasiveDodgeAngleDegrees);
+            yield return new TargetPlan(ManeuverType.EvasiveDodge, -turn, target.Moves.EvasiveDodgeMoveDistance);
+            yield return new TargetPlan(ManeuverType.EvasiveDodge, turn, target.Moves.EvasiveDodgeMoveDistance);
         }
     }
 
@@ -674,5 +674,81 @@ public partial class BattleOverlay : Node2D
         if (f.Team == 0)
             DrawLabel(f.Position + new Vector2(0f, -26f - Px(12f)), BattleManager.CallsignOf(f), SignalUi.FontMicro,
                 new Color(SignalUi.Body.R, SignalUi.Body.G, SignalUi.Body.B, 0.85f));
+    }
+}
+
+/// <summary>
+/// A trait's name shown over the ship it just helped (or hurt), so the player
+/// can see an instinct or scar make a difference. Each ship's callouts stack
+/// into a short feed above its callsign. Drawn at a constant on-screen size
+/// and timed in real seconds, so fast-forward doesn't cut it short.
+/// </summary>
+public partial class TraitCallout : Node2D
+{
+    public static readonly Color InstinctColor = SignalUi.Instinct;
+    public static readonly Color ScarColor = SignalUi.Warning;
+    const float Life = 1.6f;
+    const int MaxRows = 3;
+    /// <summary>Screen pixels from the ship to the lowest callout: clear of the callsign label.</summary>
+    const float BaseOffset = 66f;
+    const float RowHeight = 26f;
+
+    public Fighter Anchor;
+    public string Text = "";
+    public Color Color = InstinctColor;
+    /// <summary>Place in the ship's feed; 0 is the newest, just above the callsign.</summary>
+    public int Row;
+
+    double _born = -1;
+    float _shownRow;
+
+    /// <summary>Seconds since the callout appeared.</summary>
+    public float Age => _born < 0 ? 0f : (float)(Time.GetTicksMsec() / 1000.0 - _born);
+
+    /// <summary>Moves this callout up the feed for a newer one. Callouts that fired together start apart.</summary>
+    public void PushUp()
+    {
+        Row++;
+        if (Age < 0.1f)
+            _shownRow = Row;
+    }
+
+    public override void _Ready()
+    {
+        _born = Time.GetTicksMsec() / 1000.0;
+        ZIndex = 20;
+    }
+
+    public override void _Process(double delta)
+    {
+        if (Age >= Life || Row >= MaxRows)
+        {
+            QueueFree();
+            return;
+        }
+        _shownRow = Mathf.MoveToward(_shownRow, Row, (float)delta * 8f);
+        if (IsInstanceValid(Anchor))
+            Position = Anchor.Position;
+        QueueRedraw();
+    }
+
+    public override void _Draw()
+    {
+        float s = BattleManager.Instance?.ScreenToWorldScale ?? 1f;
+        float t = Age / Life;
+        float alpha = (t < 0.75f ? 1f : 1f - (t - 0.75f) / 0.25f) * (1f - _shownRow * 0.2f);
+        float pop = Mathf.Clamp(Age / 0.12f, 0f, 1f); // a short rise into place
+        Font font = ThemeDB.FallbackFont;
+        int size = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontCaption * s));
+        Vector2 extent = font.GetStringSize(Text, HorizontalAlignment.Left, -1f, size);
+        var baseline = new Vector2(-extent.X / 2f, -(BaseOffset + _shownRow * RowHeight + 10f * pop) * s);
+        // Keep the text on screen when the ship flies near the edge of the view.
+        Transform2D toWorld = GetViewport().GetCanvasTransform().AffineInverse();
+        float margin = SignalUi.ScreenGutter / 2f;
+        float left = (toWorld * new Vector2(margin, 0f)).X - Position.X;
+        float right = (toWorld * new Vector2(GetViewportRect().Size.X - margin, 0f)).X - Position.X - extent.X;
+        baseline.X = Mathf.Clamp(baseline.X, left, Mathf.Max(left, right));
+        DrawString(font, baseline + new Vector2(2f, 2f) * s, Text, HorizontalAlignment.Left, -1f, size, new Color(0f, 0f, 0f, 0.75f * alpha));
+        DrawString(font, baseline, Text, HorizontalAlignment.Left, -1f, size, new Color(Color, alpha));
     }
 }

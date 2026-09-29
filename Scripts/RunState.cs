@@ -30,12 +30,19 @@ public class RunNode
     public RunNodeKind? BattleKind => EventBattle ?? (RunContent.IsBattleKind(Kind) ? Kind : null);
 }
 
-/// <summary>A choice of cards waiting for one pilot.</summary>
+/// <summary>
+/// A choice of cards waiting to be made: a level-up for one pilot, or a
+/// module crate for the squadron (no callsign; each card names its pilot).
+/// </summary>
 public class PendingPromotion
 {
+    public const string CrateReason = "MODULE CRATE";
+
     public string Callsign { get; set; } = "";
     public string Reason { get; set; } = "";
     public List<PromotionCard> Cards { get; set; } = new();
+
+    [JsonIgnore] public bool IsCrate => string.IsNullOrEmpty(Callsign);
 }
 
 /// <summary>Everything the debrief shows about a run battle's consequences.</summary>
@@ -54,6 +61,7 @@ public class PilotSave
     public string ShipId { get; set; } = "scout";
     public List<string> Maneuvers { get; set; } = new();
     public List<string> Upgrades { get; set; } = new();
+    public List<string> Masteries { get; set; } = new();
     public int Level { get; set; } = 1;
     public int Xp { get; set; }
     public List<string> Perks { get; set; } = new();
@@ -69,6 +77,7 @@ public class PilotSave
         ShipId = pilot.Ship.Id,
         Maneuvers = pilot.Maneuvers.Select(m => m.ToString()).ToList(),
         Upgrades = pilot.Upgrades.Select(u => u.ToString()).ToList(),
+        Masteries = pilot.Masteries.Select(m => m.ToString()).ToList(),
         Level = pilot.Level,
         Xp = pilot.Xp,
         Perks = pilot.Perks.Select(p => p.Id).ToList(),
@@ -93,13 +102,16 @@ public class PilotSave
         };
         pilot.RestoreManeuvers(Maneuvers.Select(m => Enum.TryParse(m, out ShipAbility a) ? (ShipAbility?)a : null)
             .Where(a => a.HasValue).Select(a => a.Value));
+        foreach (string id in Masteries)
+            if (Enum.TryParse(id, out ShipAbility ability))
+                pilot.Master(ability);
         foreach (string id in Upgrades)
             if (ShipUpgrades.TryParse(id, out ShipUpgrade upgrade))
                 pilot.InstallUpgrade(upgrade);
         foreach (string id in Perks)
         {
-            Perk perk = global::Perks.All.FirstOrDefault(p => p.Id == id);
-            if (perk != null)
+            Perk perk = global::Perks.ById(id);
+            if (perk != null && !pilot.Perks.Contains(perk))
                 pilot.Perks.Add(perk);
         }
         return pilot;
@@ -108,18 +120,25 @@ public class PilotSave
 
 /// <summary>
 /// A roguelite run: three sectors of branching stops, a squadron of up to
-/// five pilots, and salvage to spend. Hull damage, wounds and deaths carry
-/// from stop to stop. The run saves after every change so a phone can close
-/// the app at any moment.
+/// five pilots, and salvage to spend. Hull damage, wounds, scars and deaths
+/// carry from stop to stop. Pilots grow through XP; ships grow through
+/// salvage spent at repair docks. The run saves after every change so a phone
+/// can close the app at any moment.
 /// </summary>
 public class RunState
 {
-    public const int SaveVersion = 1;
+    /// <summary>Version 2: pilots and ships progress separately (modules, masteries, instincts, scars).</summary>
+    public const int SaveVersion = 2;
     public const int RosterLimit = 5;
     public const int SquadLimit = 3;
     public const int StartingSalvage = 50;
     public const int RepairCostPerHull = 2;
     public const int TreatWoundCost = 40;
+    public const int TreatScarCost = 50;
+    public const int RefitCost = 120;
+    public const int DockStockSize = 3;
+    /// <summary>Share of each ship's damage patched for free when a sector is cleared.</summary>
+    public const float SectorPatchFraction = 0.5f;
     const string SavePath = "user://ace-star-pilot-run.json";
 
     public static RunState Current { get; private set; }
@@ -142,6 +161,8 @@ public class RunState
     public List<string> BattleSquad { get; set; } = new();
     public List<PendingPromotion> Promotions { get; set; } = new();
     public List<RecruitOffer> RecruitOffers { get; set; } = new();
+    /// <summary>Modules for sale at the active repair dock; each sells once.</summary>
+    public List<ShipUpgrade> DockStock { get; set; } = new();
     /// <summary>The report of an event option already chosen at the active stop.</summary>
     public string EventResult { get; set; }
     public RunOutcome Outcome { get; set; }
@@ -264,8 +285,11 @@ public class RunState
         Notice = null;
         EventResult = null;
         RecruitOffers.Clear();
+        DockStock.Clear();
         if (node.Kind == RunNodeKind.Recruit)
             RollRecruits();
+        if (node.Kind == RunNodeKind.Repair)
+            RollDockStock(node);
         Save();
     }
 
@@ -326,12 +350,11 @@ public class RunState
     }
 
     /// <summary>Applies a finished battle to the run and saves.</summary>
-    public (List<PilotResult> Results, RunBattleReport Report) ResolveBattle(bool won,
-        IEnumerable<Fighter> playerFighters, IReadOnlyCollection<Fighter> combatants)
+    public (List<PilotResult> Results, RunBattleReport Report) ResolveBattle(bool won, IEnumerable<Fighter> playerFighters)
     {
         RunNode node = ActiveNode;
         RunNodeKind kind = node?.BattleKind ?? RunNodeKind.Skirmish;
-        List<PilotResult> results = BattleResolution.Resolve(playerFighters, won, combatants);
+        List<PilotResult> results = BattleResolution.Resolve(playerFighters, won);
         var report = new RunBattleReport();
         BattleInProgress = false;
         BattleSquad.Clear();
@@ -346,11 +369,16 @@ public class RunState
 
         RandomNumberGenerator rng = NextRng();
         foreach (PilotResult result in results.Where(r => r.Survived))
-        {
             for (int level = result.Pilot.Level - result.LevelsGained + 1; level <= result.Pilot.Level; level++)
-                QueuePromotion(result.Pilot, $"REACHED LEVEL {level}", rng, fieldUpgrade: false, report);
-            if (won && kind == RunNodeKind.Elite)
-                QueuePromotion(result.Pilot, "FIELD UPGRADE", rng, fieldUpgrade: true, report);
+                QueuePromotion(result.Pilot, $"REACHED LEVEL {level}", rng, report);
+        if (won && kind == RunNodeKind.Elite)
+        {
+            List<PromotionCard> crate = RunContent.ModuleCrate(results.Where(r => r.Survived).Select(r => r.Pilot), rng);
+            if (crate.Count > 0)
+            {
+                Promotions.Add(new PendingPromotion { Callsign = "", Reason = PendingPromotion.CrateReason, Cards = crate });
+                report.Promotions.Add("ELITE WING · MODULE CRATE");
+            }
         }
 
         if (kind == RunNodeKind.Boss)
@@ -377,12 +405,12 @@ public class RunState
         return (results, report);
     }
 
-    void QueuePromotion(Pilot pilot, string reason, RandomNumberGenerator rng, bool fieldUpgrade, RunBattleReport report)
+    void QueuePromotion(Pilot pilot, string reason, RandomNumberGenerator rng, RunBattleReport report)
     {
         // A pilot whose promotion would be generated before an earlier one is
-        // applied could be offered the same card twice; that is harmless, since
-        // applying a known card does nothing and the UI shows current state.
-        List<PromotionCard> cards = RunContent.PromotionCards(pilot, rng, fieldUpgrade);
+        // applied could be offered the same card twice; ChoosePromotion
+        // rerolls later choices once an earlier one is made.
+        List<PromotionCard> cards = RunContent.PromotionCards(pilot, rng);
         if (cards.Count == 0)
             return;
         Promotions.Add(new PendingPromotion { Callsign = pilot.Callsign, Reason = reason, Cards = cards });
@@ -395,18 +423,24 @@ public class RunState
         if (Promotions.Count == 0)
             return;
         PendingPromotion promotion = Promotions[0];
-        Pilot pilot = Pilots.FirstOrDefault(p => p.Callsign == promotion.Callsign);
-        if (pilot != null && cardIndex >= 0 && cardIndex < promotion.Cards.Count)
-            RunContent.ApplyCard(pilot, promotion.Cards[cardIndex]);
+        PromotionCard card = cardIndex >= 0 && cardIndex < promotion.Cards.Count ? promotion.Cards[cardIndex] : null;
+        Pilot pilot = card == null ? null : PilotFor(promotion, card);
+        if (pilot != null)
+            RunContent.ApplyCard(pilot, card);
         Promotions.RemoveAt(0);
-        // Later choices for the same pilot were rolled before this one; reroll
-        // them so they never offer something the pilot now already has.
+        // Later level-ups for the same pilot were rolled before this one;
+        // reroll them so they never offer something the pilot now already has.
         RandomNumberGenerator rng = NextRng();
-        foreach (PendingPromotion later in Promotions.Where(p => p.Callsign == promotion.Callsign && pilot != null))
-            later.Cards = RunContent.PromotionCards(pilot, rng, later.Reason == "FIELD UPGRADE");
+        if (pilot != null && !promotion.IsCrate)
+            foreach (PendingPromotion later in Promotions.Where(p => p.Callsign == promotion.Callsign))
+                later.Cards = RunContent.PromotionCards(pilot, rng);
         Promotions.RemoveAll(p => p.Cards.Count == 0);
         Save();
     }
+
+    /// <summary>The pilot a card applies to: the promoted pilot, or the pilot a crate card names.</summary>
+    public Pilot PilotFor(PendingPromotion promotion, PromotionCard card) =>
+        Living.FirstOrDefault(p => p.Callsign == (promotion.IsCrate ? card.Callsign : promotion.Callsign));
 
     /// <summary>Finishes the active stop: marks it visited and lets wounded pilots recover a step.</summary>
     public void CompleteActiveNode()
@@ -418,6 +452,7 @@ public class RunState
         CurrentNodeId = node.Id;
         ActiveNodeId = -1;
         RecruitOffers.Clear();
+        DockStock.Clear();
         EventResult = null;
         foreach (Pilot pilot in Living.Where(p => p.IsWounded))
         {
@@ -430,7 +465,10 @@ public class RunState
         Save();
     }
 
-    /// <summary>Leaving a cleared sector: a full resupply, then a new map.</summary>
+    /// <summary>
+    /// Leaving a cleared sector: crews rest and every ship is patched halfway,
+    /// then a new map. Full repairs are bought at docks.
+    /// </summary>
     void AdvanceSector()
     {
         if (Sector >= RunContent.SectorCount)
@@ -441,14 +479,14 @@ public class RunState
         Sector++;
         foreach (Pilot pilot in Living)
         {
-            pilot.HullDamage = 0;
+            pilot.Repair(Mathf.CeilToInt(pilot.HullDamage * SectorPatchFraction));
             pilot.Condition = PilotCondition.Ready;
             pilot.RecoveryStops = 0;
         }
         Nodes = RunContent.GenerateSector(Sector, Seed ^ (ulong)Sector * 0xD1B54A32D192ED03UL);
         CurrentNodeId = -1;
         ActiveNodeId = -1;
-        Notice = $"SECTOR {Sector} · {SectorName}. Ships repaired, crews rested. {RunContent.SectorBriefings[Sector - 1]}";
+        Notice = $"SECTOR {Sector} · {SectorName}. Crews rested, ships patched halfway. {RunContent.SectorBriefings[Sector - 1]}";
     }
 
     // ------------------------------------------------------- repair dock
@@ -475,6 +513,62 @@ public class RunState
         pilot.RecoveryStops = 0;
         Save();
         return true;
+    }
+
+    public bool TreatScar(Pilot pilot, Perk scar)
+    {
+        if (scar == null || !scar.IsScar || !pilot.Perks.Contains(scar) || Salvage < TreatScarCost)
+            return false;
+        Salvage -= TreatScarCost;
+        pilot.Perks.Remove(scar);
+        Save();
+        return true;
+    }
+
+    /// <summary>Fits a module from the dock's stock, replacing whatever was in its slot.</summary>
+    public bool BuyModule(Pilot pilot, ShipUpgrade module)
+    {
+        int cost = ShipUpgrades.Get(module).Cost;
+        if (!DockStock.Contains(module) || !pilot.CanInstall(module) || Salvage < cost)
+            return false;
+        Salvage -= cost;
+        pilot.InstallUpgrade(module);
+        DockStock.Remove(module);
+        Save();
+        return true;
+    }
+
+    public bool BuyRefit(Pilot pilot, ShipType frame)
+    {
+        if (!pilot.CanRefit || Salvage < RefitCost || !pilot.Refit(frame))
+            return false;
+        Salvage -= RefitCost;
+        Save();
+        return true;
+    }
+
+    /// <summary>
+    /// Stocks a dock with modules. At least one fits a slot someone in the
+    /// squadron has empty, when there is such a slot.
+    /// </summary>
+    void RollDockStock(RunNode node)
+    {
+        var rng = new RandomNumberGenerator { Seed = node.Seed ^ 0xA24BAED4963EE407UL };
+        List<ShipUpgrade> pool = ShipUpgrades.All.Select(module => module.Id).ToList();
+        List<ShipUpgrade> wanted = pool.Where(module => Living.Any(p => p.HasSlot(ShipUpgrades.Get(module).Slot) &&
+            p.ModuleIn(ShipUpgrades.Get(module).Slot) == null)).ToList();
+        if (wanted.Count > 0)
+        {
+            ShipUpgrade first = wanted[rng.RandiRange(0, wanted.Count - 1)];
+            DockStock.Add(first);
+            pool.Remove(first);
+        }
+        while (DockStock.Count < DockStockSize && pool.Count > 0)
+        {
+            int index = rng.RandiRange(0, pool.Count - 1);
+            DockStock.Add(pool[index]);
+            pool.RemoveAt(index);
+        }
     }
 
     // ------------------------------------------------------------ recruit

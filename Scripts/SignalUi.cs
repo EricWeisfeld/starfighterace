@@ -13,8 +13,9 @@ public static class SignalUi
     //   Accent blue = interactive, progress, and pending player decisions
     //                 (decisions are the only things that pulse);
     //   Positive    = healthy / gained / player;
-    //   Warning     = impaired ONLY (wounds, hull damage, negative traits);
-    //   Negative    = losses and the enemy.
+    //   Warning     = impaired ONLY (wounds, hull damage, scars);
+    //   Negative    = losses and the enemy;
+    //   Instinct    = what a pilot has learned (instincts, masteries).
     public static readonly Color Bg = new(0.024f, 0.039f, 0.071f);
     public static readonly Color TextBright = new(0.933f, 0.965f, 1f);
     public static readonly Color Body = new(0.788f, 0.839f, 0.886f);
@@ -24,6 +25,7 @@ public static class SignalUi
     public static readonly Color Positive = new(0.341f, 0.902f, 0.643f);
     public static readonly Color Warning = new(1f, 0.69f, 0.24f);
     public static readonly Color Negative = new(1f, 0.35f, 0.3f);
+    public static readonly Color Instinct = new(0.78f, 0.64f, 1f);
     public static readonly Color Hairline = new(0.47f, 0.71f, 0.9f, 0.22f);
     public static readonly Color CellBg = new(0.031f, 0.063f, 0.114f);
 
@@ -243,6 +245,7 @@ public static class SignalUi
         ChipRole.Gain => (new Color(Positive.R, Positive.G, Positive.B, 0.07f), new Color(Positive.R, Positive.G, Positive.B, 0.55f), Positive),
         ChipRole.Impaired => (new Color(Warning.R, Warning.G, Warning.B, 0.07f), new Color(Warning.R, Warning.G, Warning.B, 0.55f), Warning),
         ChipRole.Loss => (new Color(Negative.R, Negative.G, Negative.B, 0.07f), new Color(Negative.R, Negative.G, Negative.B, 0.55f), Negative),
+        ChipRole.Instinct => (new Color(Instinct.R, Instinct.G, Instinct.B, 0.07f), new Color(Instinct.R, Instinct.G, Instinct.B, 0.55f), Instinct),
         _ => (Colors.Transparent, Hairline, Muted),
     };
 
@@ -389,6 +392,8 @@ public enum ChipRole
     Loss,
     /// <summary>Dormant or informational: future unlocks, empty slots.</summary>
     Dormant,
+    /// <summary>Pilot learning: instincts and mastered maneuvers. Purple.</summary>
+    Instinct,
 }
 
 /// <summary>Slowly breathing dot; reserved for pending-decision markers.</summary>
@@ -526,11 +531,26 @@ public partial class TapCard : PanelContainer
         }
     }
 
+    /// <summary>Marks the card as the current choice: an accent border that stays until cleared.</summary>
+    public bool Selected
+    {
+        get => _selected;
+        set
+        {
+            _selected = value;
+            ApplyStyle();
+        }
+    }
+
+    bool _selected;
+    StyleBoxFlat _selectedStyle;
+
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Pass;
         _normal = SignalUi.Box(new Color(SignalUi.CellBg, 0.92f), SignalUi.Hairline, 2, 16, 12);
         _pressedStyle = SignalUi.Box(new Color(SignalUi.Accent, 0.16f), SignalUi.Accent, 2, 16, 12);
+        _selectedStyle = SignalUi.Box(new Color(SignalUi.Accent, 0.14f), SignalUi.Accent, 3, 16, 12);
         _disabledStyle = SignalUi.Box(new Color(SignalUi.CellBg, 0.5f), new Color(SignalUi.Hairline, 0.4f), 2, 16, 12);
         ApplyStyle();
     }
@@ -539,7 +559,7 @@ public partial class TapCard : PanelContainer
     {
         if (_normal == null)
             return;
-        AddThemeStyleboxOverride("panel", _disabled ? _disabledStyle : _pressed ? _pressedStyle : _normal);
+        AddThemeStyleboxOverride("panel", _disabled ? _disabledStyle : _pressed ? _pressedStyle : _selected ? _selectedStyle : _normal);
         Modulate = _disabled ? new Color(1, 1, 1, 0.55f) : Colors.White;
     }
 

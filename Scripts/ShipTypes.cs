@@ -47,9 +47,11 @@ public class SkinDef
 /// <summary>
 /// The complete configuration for a hull family's selectable maneuvers. Branch
 /// hulls normally share their base class's profile by reference; a branch can
-/// opt into a distinct profile when it gains a genuinely unique maneuver.
+/// opt into a distinct profile when it gains a genuinely unique maneuver. Each
+/// fighter flies a copy (<see cref="Fighter.Moves"/>) that its pilot's
+/// maneuver masteries adjust.
 /// </summary>
-public sealed class ShipManeuverProfile
+public sealed record ShipManeuverProfile
 {
     public static readonly ShipManeuverProfile None = new();
 

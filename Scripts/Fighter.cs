@@ -47,6 +47,8 @@ public partial class Fighter : Node2D
     public const int GhostRunCooldownRounds = 2;
     public const float FireRange = 280f;
     public const float FireConeDeg = 12f;     // half-angle of the forward cone
+    /// <summary>This ship's forward-cone half-angle; a wide gun mount widens it.</summary>
+    public float BaseFireConeDeg = FireConeDeg;
 
     // Normal-flight handling: maximum total heading change for one normal move.
     // Higher values permit tighter turns; turn radius is derived from path distance / turn angle.
@@ -75,6 +77,8 @@ public partial class Fighter : Node2D
     public bool CanFire = true;
 
     public ShipType Type;
+    /// <summary>The maneuver numbers this ship flies with: its hull's, adjusted by its pilot's masteries.</summary>
+    public ShipManeuverProfile Moves = ShipManeuverProfile.None;
     public Pilot Pilot;                       // persistent campaign pilot; null for enemies
     public Texture2D BaseTexture;             // for ghost previews
     public int Team;                          // 0 = player, 1 = enemy
@@ -86,20 +90,17 @@ public partial class Fighter : Node2D
     public Vector2 Velocity;
     public float Cooldown;
 
-    // Battle record, read by the perk system when the fight ends.
+    // Battle record, read by the debrief and the scar roll when the fight ends.
     public int TurnOneDamage;                 // hull lost during the first turn where anyone takes damage
-    public int EdgeHits;                      // hits landed from the edge of firing range
     public int ShotsFired;
     public int HitsLanded;
     public int Kills;
-    public int LowHullKills;
-    public int ShieldDamageTurns;
-    public int FullThrottleNormalMoveCount;
     public bool TookDamage;
-    public bool HullDamageTaken;
     public bool DroppedBelowQuarterHull;
     public bool HitAsteroid;
     public bool Ejected;
+    /// <summary>How many times each instinct or scar made a difference this battle.</summary>
+    public readonly Dictionary<Perk, int> TraitTriggers = new();
     public Fighter HunterLockTarget;
     public int HunterLockCooldownTurns;
     public int SensorScrambleCooldownTurns;
@@ -134,23 +135,58 @@ public partial class Fighter : Node2D
     float _execDist;
     float _execProgress;
     ManeuverType _execManeuver;
-    int _lastShieldDamageTurn = -1;
     float _damageCarry;
+    // Situational-trait state for the turn being flown.
+    int _volleysThisTurn;
+    int _hullDamageTurn = -1;
+    bool _aceResetThisTurn;
+    Fighter _lastVolleyTarget;
+    bool _volleySwitchedTarget;
+    readonly Dictionary<Perk, int> _calloutTurn = new();
 
     public bool HasPerk(Perk perk) => Pilot != null && Pilot.Perks.Contains(perk);
+    public bool HasMastered(ShipAbility ability) => Pilot != null && Pilot.HasMastered(ability);
+
+    // ------------------------------------------------ situational traits
+    // Each check below is true only in the moment its instinct or scar
+    // applies; the combat math reads them, and NoteTrait records and shows
+    // them as they make a difference.
+
     public bool SurvivorsGuiltActive => HasPerk(Perks.SurvivorsGuilt) &&
         BattleManager.Instance?.GetTeam(Team).Any(other => other != this && other.Pilot != null && !other.IsAlive) == true;
+    public bool HesitantActive => HasPerk(Perks.Hesitant) && HitsLanded == 0;
+    public bool PhantomActive => HasPerk(Perks.Phantom) && !TookDamage;
+    public bool CoolUnderFireActive => HasPerk(Perks.CoolUnderFire) && Hp < MaxHp * Perks.CoolUnderFireThreshold;
+    public bool RattledActive => HasPerk(Perks.Rattled) && Hp < MaxHp * Perks.RattledThreshold;
+    public bool WingmanActive => HasPerk(Perks.Wingman) &&
+        BattleManager.Instance?.GetTeam(Team).Any(other => other != this && other.IsAlive &&
+            other.Position.DistanceTo(Position) <= Perks.WingmanRange) == true;
+    public bool GunShyActive => HasPerk(Perks.GunShy) && _hullDamageTurn == (BattleManager.Instance?.TurnNumber ?? -2);
+    public bool TunnelVisionActive => HasPerk(Perks.TunnelVision) && _volleySwitchedTarget;
 
-    public float EffectiveFireRange => Perks.EffectiveFireRange(Pilot, FireRange, HitsLanded == 0);
-    public float EffectiveFireCooldown => FireCooldown /
-        ((HasPerk(Perks.RapidFire) ? 1f + Perks.RapidFireRateBonus : 1f) *
-         (HasPerk(Perks.GunShy) ? 1f - Perks.GunShyFireRatePenalty : 1f));
+    /// <summary>True when this ship is behind the target: the target is flying away from it.</summary>
+    public bool TailGunnerActiveAgainst(Fighter target)
+    {
+        if (!HasPerk(Perks.TailGunner) || target == null)
+            return false;
+        float bearing = (target.Position - Position).Angle();
+        return Mathf.Abs(Mathf.Wrap(target.Heading - bearing, -Mathf.Pi, Mathf.Pi)) <= Mathf.DegToRad(Perks.TailGunnerRearAngleDegrees);
+    }
+
+    public bool LongShotActiveAgainst(Vector2 targetPosition) =>
+        HasPerk(Perks.LongShot) && Position.DistanceTo(targetPosition) >= EffectiveFireRange * Perks.LongShotRangeFraction;
+
+    public bool FinisherActiveAgainst(Fighter target) =>
+        HasPerk(Perks.Finisher) && target != null && target.Hp < target.MaxHp * Perks.FinisherHullThreshold;
+
+    public float EffectiveFireRange => FireRange * (HesitantActive ? Perks.HesitantRangeMultiplier : 1f);
+    public float EffectiveFireCooldown => FireCooldown;
     public float EjectChance => Perks.BaseEjectChance + (HasPerk(Perks.Survivor) ? Perks.SurvivorEjectBonus : 0f);
-    public float EngineBoostTurnLimitDegrees => Mathf.Max(0f, Type.EngineBoostTurnLimitDegrees);
-    public float PursuitBurnTurnLimitDegrees => Mathf.Max(0f, Type.PursuitBurnTurnLimitDegrees);
-    public float EcmJinkTurnLimitDegrees => Mathf.Max(0f, Type.EcmJinkTurnLimitDegrees);
-    public float GhostRunTurnLimitDegrees => Mathf.Max(0f, Type.GhostRunTurnLimitDegrees);
-    public float EmergencyThrustersTurnLimitDegrees => Mathf.Max(0f, Type.EmergencyThrustersTurnLimitDegrees);
+    public float EngineBoostTurnLimitDegrees => Mathf.Max(0f, Moves.EngineBoostTurnLimitDegrees);
+    public float PursuitBurnTurnLimitDegrees => Mathf.Max(0f, Moves.PursuitBurnTurnLimitDegrees);
+    public float EcmJinkTurnLimitDegrees => Mathf.Max(0f, Moves.EcmJinkTurnLimitDegrees);
+    public float GhostRunTurnLimitDegrees => Mathf.Max(0f, Moves.GhostRunTurnLimitDegrees);
+    public float EmergencyThrustersTurnLimitDegrees => Mathf.Max(0f, Moves.EmergencyThrustersTurnLimitDegrees);
     /// <summary>Normal-flight maximum turn for the currently planned normal distance.</summary>
     public float PlannedNormalTurnLimitDegrees => GetNormalTurnLimitDegrees(PlannedPathDistance);
 
@@ -160,9 +196,10 @@ public partial class Fighter : Node2D
     /// </summary>
     public float GetNormalTurnLimitDegrees(float pathDistance)
     {
-        float turnLimitDegrees = Mathf.Max(25f,
-            Perks.ApplyNormalTurnLimitModifiers(Pilot, NormalTurnLimitDegrees - NormalTurnLimitPenaltyDegrees,
-                Mathf.IsEqualApprox(pathDistance, NormalMoveMaxDistance)));
+        float turnLimitDegrees = NormalTurnLimitDegrees - NormalTurnLimitPenaltyDegrees;
+        if (HasPerk(Perks.EngineShy) && Mathf.IsEqualApprox(pathDistance, NormalMoveMaxDistance))
+            turnLimitDegrees *= Perks.EngineShyFullThrottleTurnMultiplier;
+        turnLimitDegrees = Mathf.Max(25f, turnLimitDegrees);
         if (NormalMinimumTurnRadius > 0f)
         {
             // radius = path distance / turn angle (radians), therefore the
@@ -182,14 +219,15 @@ public partial class Fighter : Node2D
         ? _execManeuver : PlannedManeuver) == ManeuverType.GhostRun;
     public bool IsEvasiveDodgeActive => (BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing
         ? _execManeuver : PlannedManeuver) == ManeuverType.EvasiveDodge;
-    public float EffectiveFireConeDeg => IsRotatingGunsActive ? Type.RotatingGunsFireConeDeg : FireConeDeg;
+    public float EffectiveFireConeDeg => IsRotatingGunsActive ? Moves.RotatingGunsFireConeDeg : BaseFireConeDeg;
     public float EffectiveEvasion => Mathf.Clamp(Evasion
-        - (IsEmergencyThrustersActive ? Type.EmergencyThrustersEvasionPenalty : 0f)
-        + (IsEcmJinkActive ? Type.EcmJinkEvasionBonus : 0f)
-        + (IsGhostRunActive ? Type.GhostRunEvasionBonus : 0f)
-        + (IsEvasiveDodgeActive ? Type.EvasiveDodgeEvasionBonus : 0f)
-        + (HasPerk(Perks.Phantom) && !TookDamage ? Perks.PhantomEvasionBonus : 0f)
-        - (HasPerk(Perks.Rattled) ? Perks.RattledEvasionPenalty : 0f)
+        - (IsEmergencyThrustersActive ? Moves.EmergencyThrustersEvasionPenalty : 0f)
+        + (IsEcmJinkActive ? Moves.EcmJinkEvasionBonus : 0f)
+        + (IsGhostRunActive ? Moves.GhostRunEvasionBonus : 0f)
+        + (IsEvasiveDodgeActive ? Moves.EvasiveDodgeEvasionBonus : 0f)
+        + (PhantomActive ? Perks.PhantomEvasionBonus : 0f)
+        + (WingmanActive ? Perks.WingmanEvasionBonus : 0f)
+        - (RattledActive ? Perks.RattledEvasionPenalty : 0f)
         - (SurvivorsGuiltActive ? Perks.SurvivorsGuiltCombatPenalty : 0f), 0f, 0.95f);
     /// <summary>Move distance currently planned for this turn.</summary>
     public bool HasAbility(ShipAbility ability) =>
@@ -215,17 +253,33 @@ public partial class Fighter : Node2D
         }
     }
 
+    /// <summary>Turns a special maneuver is locked after use, after masteries.</summary>
+    public int CooldownRoundsFor(ManeuverType maneuver)
+    {
+        ShipAbility? ability = ManeuverCatalog.ForManeuver(maneuver).Ability;
+        if (ability is ShipAbility mastered && HasMastered(mastered) && Masteries.CooldownOverride(mastered) is int rounds)
+            return rounds;
+        return maneuver switch
+        {
+            ManeuverType.EngineBoost => EngineBoostCooldownRounds,
+            ManeuverType.GhostRun => GhostRunCooldownRounds,
+            _ => SpecialManeuverCooldownRounds,
+        };
+    }
+
     /// <summary>Starts the cooldown for the special maneuver completed this round.</summary>
     public void StartManeuverCooldown(ManeuverType maneuver)
     {
+        // An Ace kill this turn wipes the slate, including the maneuver that set it up.
+        if (_aceResetThisTurn)
+        {
+            _aceResetThisTurn = false;
+            return;
+        }
         ManeuverType key = ManeuverCooldownKey(maneuver);
-        if (key != ManeuverType.Normal)
-            _maneuverCooldownTurns[key] = key switch
-            {
-                ManeuverType.EngineBoost => EngineBoostCooldownRounds,
-                ManeuverType.GhostRun => GhostRunCooldownRounds,
-                _ => SpecialManeuverCooldownRounds,
-            };
+        int rounds = key == ManeuverType.Normal ? 0 : CooldownRoundsFor(key);
+        if (rounds > 0)
+            _maneuverCooldownTurns[key] = rounds;
     }
 
     static ManeuverType ManeuverCooldownKey(ManeuverType maneuver) => maneuver;
@@ -233,21 +287,22 @@ public partial class Fighter : Node2D
     public float EffectiveAccuracyAgainst(Fighter target)
     {
         float accuracy = Accuracy
-            + (HasPerk(Perks.Deadeye) ? Perks.DeadeyeAccuracyBonus : 0f)
-            + (HasPerk(Perks.Hotshot) ? Perks.HotshotAccuracyBonus : 0f)
-            - (HasPerk(Perks.ShakyHands) ? Perks.ShakyHandsAccuracyPenalty : 0f)
             - (SurvivorsGuiltActive ? Perks.SurvivorsGuiltCombatPenalty : 0f)
-            + (HasPerk(Perks.CoolUnderFire) && Hp < MaxHp * Perks.CoolUnderFireThreshold ? Perks.CoolUnderFireAccuracyBonus : 0f)
-            + (target != null && target == HunterLockTarget && HasAbility(ShipAbility.HunterLock) ? Type.HunterLockAccuracyBonus : 0f);
+            - (TunnelVisionActive ? Perks.TunnelVisionAccuracyPenalty : 0f)
+            + (CoolUnderFireActive ? Perks.CoolUnderFireAccuracyBonus : 0f)
+            + (TailGunnerActiveAgainst(target) ? Perks.TailGunnerAccuracyBonus : 0f)
+            + (target != null && target == HunterLockTarget && HasAbility(ShipAbility.HunterLock) ? Moves.HunterLockAccuracyBonus : 0f);
         accuracy *= 1f - SensorScrambleAccuracyPenalty;
-        if (HasPerk(Perks.RapidFire))
-            accuracy *= Perks.RapidFireAccuracyMultiplier;
         return Mathf.Clamp(accuracy, 0f, 1f);
     }
 
-    public int RollShotDamage(Fighter target = null)
+    /// <summary>Damage bonus fixed when a shot is fired: a long shot keeps its bonus in flight.</summary>
+    public float FireTimeDamageMultiplier(Vector2 targetPosition) =>
+        LongShotActiveAgainst(targetPosition) ? Perks.LongShotDamageMultiplier : 1f;
+
+    public int RollShotDamage(Fighter target = null, float fireTimeMultiplier = 1f)
     {
-        float multiplier = Perks.DamageMultiplierAgainst(Pilot, target);
+        float multiplier = fireTimeMultiplier * (FinisherActiveAgainst(target) ? Perks.FinisherDamageMultiplier : 1f);
         if (Mathf.IsEqualApprox(multiplier, 1f))
             return ShotDamage;
         float scaledDamage = ShotDamage * multiplier + _damageCarry;
@@ -262,8 +317,85 @@ public partial class Fighter : Node2D
         if (!killed)
             return;
         Kills++;
-        if (Hp < MaxHp * Perks.CoolUnderFireEarnThreshold)
-            LowHullKills++;
+        if (HasPerk(Perks.Ace) && IsAlive)
+        {
+            _maneuverCooldownTurns.Clear();
+            HunterLockCooldownTurns = 0;
+            SensorScrambleCooldownTurns = 0;
+            _aceResetThisTurn = true;
+            NoteTrait(Perks.Ace);
+        }
+    }
+
+    /// <summary>
+    /// Starts a volley at a target and returns how many shots it has, after
+    /// the pilot's volley instincts and scars.
+    /// </summary>
+    public int StartVolley(Fighter target)
+    {
+        _volleySwitchedTarget = _lastVolleyTarget != null && target != _lastVolleyTarget;
+        _lastVolleyTarget = target;
+        int shots = GD.RandRange(BarrageMin, BarrageMax);
+        if (_volleysThisTurn == 0 && HasPerk(Perks.TriggerHappy))
+        {
+            shots += Perks.TriggerHappyExtraShots;
+            NoteTrait(Perks.TriggerHappy);
+        }
+        if (GunShyActive)
+        {
+            shots -= Perks.GunShyLostShots;
+            NoteTrait(Perks.GunShy);
+        }
+        if (TunnelVisionActive)
+            NoteTrait(Perks.TunnelVision);
+        _volleysThisTurn++;
+        return Mathf.Max(1, shots);
+    }
+
+    /// <summary>Calls out the situational traits in play as this ship fires at a target.</summary>
+    public void NoteFiringTraits(Fighter target)
+    {
+        if (target == null)
+            return;
+        if (TailGunnerActiveAgainst(target))
+            NoteTrait(Perks.TailGunner);
+        if (CoolUnderFireActive)
+            NoteTrait(Perks.CoolUnderFire);
+        if (LongShotActiveAgainst(target.Position))
+            NoteTrait(Perks.LongShot);
+        if (FinisherActiveAgainst(target))
+            NoteTrait(Perks.Finisher);
+        if (SurvivorsGuiltActive)
+            NoteTrait(Perks.SurvivorsGuilt);
+        if (HesitantActive)
+            NoteTrait(Perks.Hesitant);
+    }
+
+    /// <summary>Calls out the situational traits in play as this ship is shot at.</summary>
+    public void NoteDefendingTraits()
+    {
+        if (PhantomActive)
+            NoteTrait(Perks.Phantom);
+        if (WingmanActive)
+            NoteTrait(Perks.Wingman);
+        if (RattledActive)
+            NoteTrait(Perks.Rattled);
+    }
+
+    /// <summary>
+    /// Records that a trait made a difference, and shows its name over the
+    /// ship the first time it does so each turn.
+    /// </summary>
+    public void NoteTrait(Perk perk)
+    {
+        if (!HasPerk(perk))
+            return;
+        TraitTriggers[perk] = TraitTriggers.GetValueOrDefault(perk) + 1;
+        int turn = BattleManager.Instance?.TurnNumber ?? 0;
+        if (_calloutTurn.TryGetValue(perk, out int shownTurn) && shownTurn == turn)
+            return;
+        _calloutTurn[perk] = turn;
+        BattleManager.Instance?.ShowCallout(this, perk.Name.ToUpper(), perk.Positive ? TraitCallout.InstinctColor : TraitCallout.ScarColor);
     }
 
     public void SetPlannedMoveDistance(float distance)
@@ -277,7 +409,7 @@ public partial class Fighter : Node2D
     public void PlanUTurn(float direction)
     {
         PlannedManeuver = ManeuverType.UTurn;
-        PlannedPathDistance = Type.UTurnMoveDistance;
+        PlannedPathDistance = Moves.UTurnMoveDistance;
         PlannedTurnAngleRadians = Mathf.Sign(direction) * Mathf.Pi;
     }
 
@@ -285,22 +417,22 @@ public partial class Fighter : Node2D
     public void PlanBreakTurn(float direction)
     {
         PlannedManeuver = ManeuverType.BreakTurn;
-        PlannedPathDistance = Type.BreakTurnMoveDistance;
+        PlannedPathDistance = Moves.BreakTurnMoveDistance;
         PlannedTurnAngleRadians = Mathf.Sign(direction) * Mathf.Pi;
     }
 
     public void PlanSnapTurn(float direction)
     {
         PlannedManeuver = ManeuverType.SnapTurn;
-        PlannedPathDistance = Type.SnapTurnMoveDistance;
-        PlannedTurnAngleRadians = Mathf.Sign(direction) * Mathf.DegToRad(Type.SnapTurnAngleDegrees);
+        PlannedPathDistance = Moves.SnapTurnMoveDistance;
+        PlannedTurnAngleRadians = Mathf.Sign(direction) * Mathf.DegToRad(Moves.SnapTurnAngleDegrees);
     }
 
     /// <summary>Prepare the class's long-range engine boost.</summary>
     public void PlanEngineBoost(float turn)
     {
         PlannedManeuver = ManeuverType.EngineBoost;
-        PlannedPathDistance = Type.EngineBoostMoveDistance;
+        PlannedPathDistance = Moves.EngineBoostMoveDistance;
         PlannedTurnAngleRadians = Mathf.Clamp(turn,
             -Mathf.DegToRad(EngineBoostTurnLimitDegrees),
             Mathf.DegToRad(EngineBoostTurnLimitDegrees));
@@ -309,7 +441,7 @@ public partial class Fighter : Node2D
     public void PlanPursuitBurn(float turn)
     {
         PlannedManeuver = ManeuverType.PursuitBurn;
-        PlannedPathDistance = Type.PursuitBurnMoveDistance;
+        PlannedPathDistance = Moves.PursuitBurnMoveDistance;
         PlannedTurnAngleRadians = Mathf.Clamp(turn,
             -Mathf.DegToRad(PursuitBurnTurnLimitDegrees),
             Mathf.DegToRad(PursuitBurnTurnLimitDegrees));
@@ -318,7 +450,7 @@ public partial class Fighter : Node2D
     public void PlanEcmJink(float turn)
     {
         PlannedManeuver = ManeuverType.EcmJink;
-        PlannedPathDistance = Type.EcmJinkMoveDistance;
+        PlannedPathDistance = Moves.EcmJinkMoveDistance;
         PlannedTurnAngleRadians = Mathf.Clamp(turn,
             -Mathf.DegToRad(EcmJinkTurnLimitDegrees),
             Mathf.DegToRad(EcmJinkTurnLimitDegrees));
@@ -327,7 +459,7 @@ public partial class Fighter : Node2D
     public void PlanGhostRun(float turn)
     {
         PlannedManeuver = ManeuverType.GhostRun;
-        PlannedPathDistance = Type.GhostRunMoveDistance;
+        PlannedPathDistance = Moves.GhostRunMoveDistance;
         PlannedTurnAngleRadians = Mathf.Clamp(turn,
             -Mathf.DegToRad(GhostRunTurnLimitDegrees),
             Mathf.DegToRad(GhostRunTurnLimitDegrees));
@@ -337,8 +469,8 @@ public partial class Fighter : Node2D
     public void PlanEvasiveDodge(float direction)
     {
         PlannedManeuver = ManeuverType.EvasiveDodge;
-        PlannedPathDistance = Type.EvasiveDodgeMoveDistance;
-        PlannedTurnAngleRadians = Mathf.Sign(direction) * Mathf.DegToRad(Type.EvasiveDodgeAngleDegrees);
+        PlannedPathDistance = Moves.EvasiveDodgeMoveDistance;
+        PlannedTurnAngleRadians = Mathf.Sign(direction) * Mathf.DegToRad(Moves.EvasiveDodgeAngleDegrees);
     }
 
     public bool SetHunterLock(Fighter target)
@@ -346,7 +478,7 @@ public partial class Fighter : Node2D
         if (!HasAbility(ShipAbility.HunterLock) || HunterLockCooldownTurns > 0 || target == null || !target.IsAlive || target.Team == Team)
             return false;
         HunterLockTarget = target;
-        HunterLockCooldownTurns = Type.HunterLockCooldownTurns;
+        HunterLockCooldownTurns = Moves.HunterLockCooldownTurns;
         return true;
     }
 
@@ -357,14 +489,33 @@ public partial class Fighter : Node2D
             HunterLockTarget = null;
     }
 
-    public bool ApplySensorScramble(Fighter target)
+    /// <summary>
+    /// Jams an enemy's sensors. With the maneuver mastered, the nearest other
+    /// enemy within range of the target is jammed too; returns that ship, if any.
+    /// </summary>
+    public bool ApplySensorScramble(Fighter target, out Fighter splash)
     {
+        splash = null;
         if (!HasAbility(ShipAbility.SensorScramble) || SensorScrambleCooldownTurns > 0 || target == null || !target.IsAlive || target.Team == Team)
             return false;
-        target.SensorScrambleTurns = Type.SensorScrambleDurationTurns;
-        target.SensorScrambleAccuracyPenalty = Mathf.Max(target.SensorScrambleAccuracyPenalty, Type.SensorScrambleAccuracyPenalty);
-        SensorScrambleCooldownTurns = Type.SensorScrambleCooldownTurns;
+        Scramble(target);
+        if (HasMastered(ShipAbility.SensorScramble))
+        {
+            splash = BattleManager.Instance?.GetTeam(target.Team)
+                .Where(other => other != target && other.IsAlive && other.Position.DistanceTo(target.Position) <= Masteries.ScrambleSplashRange)
+                .OrderBy(other => other.Position.DistanceSquaredTo(target.Position))
+                .FirstOrDefault();
+            if (splash != null)
+                Scramble(splash);
+        }
+        SensorScrambleCooldownTurns = Moves.SensorScrambleCooldownTurns;
         return true;
+    }
+
+    void Scramble(Fighter target)
+    {
+        target.SensorScrambleTurns = Moves.SensorScrambleDurationTurns;
+        target.SensorScrambleAccuracyPenalty = Mathf.Max(target.SensorScrambleAccuracyPenalty, Moves.SensorScrambleAccuracyPenalty);
     }
 
     public void AdvanceTacticalEffects()
@@ -379,7 +530,7 @@ public partial class Fighter : Node2D
     public void PlanRotatingGuns()
     {
         PlannedManeuver = ManeuverType.RotatingGuns;
-        PlannedPathDistance = Type.RotatingGunsMoveDistance;
+        PlannedPathDistance = Moves.RotatingGunsMoveDistance;
         PlannedTurnAngleRadians = 0f;
     }
 
@@ -387,7 +538,7 @@ public partial class Fighter : Node2D
     public void PlanEmergencyThrusters(float turn)
     {
         PlannedManeuver = ManeuverType.EmergencyThrusters;
-        PlannedPathDistance = Type.EmergencyThrustersMoveDistance;
+        PlannedPathDistance = Moves.EmergencyThrustersMoveDistance;
         PlannedTurnAngleRadians = Mathf.Clamp(turn,
             -Mathf.DegToRad(EmergencyThrustersTurnLimitDegrees),
             Mathf.DegToRad(EmergencyThrustersTurnLimitDegrees));
@@ -413,6 +564,8 @@ public partial class Fighter : Node2D
     public void ApplyType(ShipType type)
     {
         Type = type;
+        Moves = type.Maneuvers;
+        BaseFireConeDeg = FireConeDeg;
         MaxHp = type.MaxHp;
         MaxShield = type.MaxShield;
         ShieldRegenPerTurn = type.ShieldRegenPerTurn;
@@ -428,29 +581,39 @@ public partial class Fighter : Node2D
     }
 
     /// <summary>Attach the campaign pilot flying this hull. Call after ApplyType, before Setup.</summary>
+    /// <summary>
+    /// Attach the campaign pilot flying this hull. Call after ApplyType, before
+    /// Setup. The ship's modules change its numbers here; the pilot's
+    /// masteries change its maneuvers. Instincts and scars are not applied
+    /// here: they are checked in the moment they matter.
+    /// </summary>
     public void ApplyPilot(Pilot pilot)
     {
         Pilot = pilot;
         if (Pilot == null)
             return;
-        if (Pilot.HasUpgrade(ShipUpgrade.ShieldsCapacity))
-            MaxShield += ShipUpgrades.ShieldCapacityBonus;
-        if (Pilot.HasUpgrade(ShipUpgrade.ShieldsRegen))
-            ShieldRegenPerTurn += ShipUpgrades.ShieldRegenBonus;
-        if (Pilot.HasUpgrade(ShipUpgrade.EngineSpeed))
-            NormalMoveMaxDistance += ShipUpgrades.NormalMoveLimitBonus;
-        if (Pilot.HasUpgrade(ShipUpgrade.EngineTurn))
-            NormalTurnLimitDegrees += ShipUpgrades.NormalTurnLimitBonusDegrees;
-        if (Pilot.HasUpgrade(ShipUpgrade.GunsAccuracy))
-            Accuracy += ShipUpgrades.AccuracyBonus;
-        if (Pilot.HasUpgrade(ShipUpgrade.GunsExtraShot))
+        foreach (ShipUpgrade module in Pilot.Upgrades)
         {
-            BarrageMin += ShipUpgrades.ExtraShots;
-            BarrageMax += ShipUpgrades.ExtraShots;
+            switch (module)
+            {
+                case ShipUpgrade.EngineSpeed: NormalMoveMaxDistance += ShipUpgrades.NormalMoveLimitBonus; break;
+                case ShipUpgrade.EngineTurn: NormalTurnLimitDegrees += ShipUpgrades.NormalTurnLimitBonusDegrees; break;
+                case ShipUpgrade.EngineRetro: NormalMoveMinDistance -= ShipUpgrades.RetroMinMoveReduction; break;
+                case ShipUpgrade.GunsExtraShot:
+                    BarrageMin += ShipUpgrades.ExtraShots;
+                    BarrageMax += ShipUpgrades.ExtraShots;
+                    break;
+                case ShipUpgrade.GunsAccuracy: Accuracy += ShipUpgrades.AccuracyBonus; break;
+                case ShipUpgrade.GunsWideMount: BaseFireConeDeg += ShipUpgrades.WideMountConeBonusDegrees; break;
+                case ShipUpgrade.ShieldsCapacity: MaxShield += ShipUpgrades.ShieldCapacityBonus; break;
+                case ShipUpgrade.ShieldsRegen: ShieldRegenPerTurn += ShipUpgrades.ShieldRegenBonus; break;
+                case ShipUpgrade.ShieldsArmor:
+                    MaxHp += ShipUpgrades.ArmorHullBonus;
+                    NormalMoveMaxDistance -= ShipUpgrades.ArmorMoveLimitPenalty;
+                    break;
+            }
         }
-        MaxHp = Perks.EffectiveMaxHp(Pilot, MaxHp);
-        ShieldRegenPerTurn = Perks.EffectiveShieldRegen(Pilot, ShieldRegenPerTurn);
-        NormalMoveMaxDistance = Perks.ApplyNormalMoveLimitModifiers(Pilot, NormalMoveMaxDistance);
+        Moves = Masteries.Apply(Type.Maneuvers, Pilot.Masteries);
         SelectedNormalMoveDistance = NormalMoveMaxDistance;
         PlannedPathDistance = NormalMoveMaxDistance;
     }
@@ -594,8 +757,11 @@ public partial class Fighter : Node2D
             float maxTurn = Mathf.DegToRad(GetNormalTurnLimitDegrees(_execDist));
             _execTurn = Mathf.Clamp(_execTurn, -maxTurn, maxTurn);
         }
-        if (_execManeuver == ManeuverType.Normal && Mathf.IsEqualApprox(PlannedPathDistance, NormalMoveMaxDistance))
-            FullThrottleNormalMoveCount++;
+        if (_execManeuver == ManeuverType.Normal && Mathf.IsEqualApprox(PlannedPathDistance, NormalMoveMaxDistance) &&
+            Mathf.Abs(_execTurn) > Mathf.DegToRad(GetNormalTurnLimitDegrees(_execDist)) * 0.9f)
+            NoteTrait(Perks.EngineShy); // a hard turn at full throttle is where the scar bites
+        _volleysThisTurn = 0;
+        _aceResetThisTurn = false;
         Cooldown = (float)GD.RandRange(0.0, 0.15); // stagger opening barrages
         BarrageShotsLeft = 0;
         BarrageTarget = null;
@@ -704,12 +870,6 @@ public partial class Fighter : Node2D
         int shieldDamage = Mathf.Min(Shield, dmg);
         if (shieldDamage > 0)
         {
-            int turn = BattleManager.Instance?.TurnNumber ?? 0;
-            if (_lastShieldDamageTurn != turn)
-            {
-                _lastShieldDamageTurn = turn;
-                ShieldDamageTurns++;
-            }
             Shield -= shieldDamage;
             dmg -= shieldDamage;
             PlayShieldAnimation();
@@ -721,8 +881,8 @@ public partial class Fighter : Node2D
         Hp -= dmg;
         if (isOpeningDamageTurn)
             TurnOneDamage += hullDamage;
-        HullDamageTaken = true;
-        if (Hp < MaxHp * Perks.HardToKillEarnThreshold)
+        _hullDamageTurn = BattleManager.Instance?.TurnNumber ?? -1;
+        if (Hp < MaxHp * Perks.LowHullThreshold)
             DroppedBelowQuarterHull = true;
         if (Hp <= 0)
         {
@@ -739,11 +899,25 @@ public partial class Fighter : Node2D
             Hp = Mathf.Min(Hp + amount, MaxHp);
     }
 
-    /// <summary>Restore the ship's independent shield pool, up to its hull's configured limit.</summary>
+    /// <summary>
+    /// Restore the ship's independent shield pool, up to its hull's configured
+    /// limit. Call after the turn's flight: Steady pilots recover faster after
+    /// a turn of normal flight.
+    /// </summary>
     public void RegenerateShield()
     {
-        if (IsAlive && ShieldRegenPerTurn > 0)
-            Shield = Mathf.Min(Shield + ShieldRegenPerTurn, MaxShield);
+        if (!IsAlive)
+            return;
+        int regen = ShieldRegenPerTurn;
+        bool steady = HasPerk(Perks.Steady) && _execManeuver == ManeuverType.Normal && Shield < MaxShield;
+        if (steady)
+            regen += Perks.SteadyShieldRegenBonus;
+        if (regen <= 0)
+            return;
+        int before = Shield;
+        Shield = Mathf.Min(Shield + regen, MaxShield);
+        if (steady && Shield - before > ShieldRegenPerTurn)
+            NoteTrait(Perks.Steady);
     }
 
     void StartDestruction()

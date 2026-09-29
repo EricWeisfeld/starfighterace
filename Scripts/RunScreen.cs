@@ -40,8 +40,15 @@ public partial class RunScreen : Node2D
 
     public override void _Notification(int what)
     {
-        // Android's back gesture returns to the map from a sub-page.
-        if (what == NotificationWMGoBackRequest && _showSquadron)
+        // Android's back gesture returns from a sub-page.
+        if (what != NotificationWMGoBackRequest)
+            return;
+        if (_refitCallsign != null)
+        {
+            _refitCallsign = null;
+            Render();
+        }
+        else if (_showSquadron)
         {
             _showSquadron = false;
             Render();
@@ -86,7 +93,7 @@ public partial class RunScreen : Node2D
         else if (Run.ActiveNode is { } node)
             page = node.Kind switch
             {
-                RunNodeKind.Repair => BuildDockPage(),
+                RunNodeKind.Repair => _refitCallsign != null ? BuildRefitPage() : BuildDockPage(),
                 RunNodeKind.Recruit => BuildRecruitPage(),
                 // An event that turned into a fight shows its outcome first,
                 // then the briefing once the player moves on.

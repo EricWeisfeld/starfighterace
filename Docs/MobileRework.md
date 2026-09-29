@@ -12,7 +12,8 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | Between battles | Hull damage carries over; repair docks and retreat decisions matter. |
 | Between runs | Nothing carries over (pure roguelite). |
 | Currency | One: salvage. |
-| Fleet | Lean squadron: pilots with a class, a level, maneuvers, upgrades and traits. Level-ups are card choices. |
+| Fleet | Lean squadron: pilots with a class, a level, maneuvers, masteries and instincts, flying ships with a frame and modules. |
+| Progression | Pilots learn, ships are bought. XP grows the pilot; salvage grows the ship. See Phase 4. |
 
 ## Phase 1: battles on a phone (done)
 
@@ -43,15 +44,15 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | --- | --- |
 | Skirmish | Destroy the enemy patrol. |
 | Strike | Destroy a marked command ship; the rest of the wing can live. |
-| Elite wing | +2 threat. Every survivor earns a field upgrade (a card choice). |
-| Repair dock | Repairs cost 2 salvage per hull point; treating a wound costs 40. |
+| Elite wing | +2 threat. A win opens a module crate: pick one of three modules, each matched to a surviving ship, fitted free. |
+| Repair dock | The run's shop: three modules for sale, refits, repairs (2 per hull point), wounds (40) and scars (50). |
 | Recruit | Two candidates at the squadron's level minus one, already promoted to that level. |
 | Signal | One of six events. Some can turn into a fight. |
 | Boss | Sector 1: blockade command ship (strike). Sector 2: the convoy escort. Sector 3: the ace wing. |
 
 - **Threat** runs from 1 in the first sector to 9 at the last boss. It feeds the existing `EncounterDifficulty` curve.
 - **Enemy wings** draw from base hulls early and refit frames later.
-- **Sector transitions:** clearing a sector repairs every ship and heals every wound.
+- **Sector transitions:** clearing a sector heals every wound and patches half of each ship's damage. Full repairs are bought.
 - **Losing** an ordinary battle spends the stop and earns nothing. Losing a boss, or losing every pilot, ends the run.
 
 ### Squadron (`Pilot`)
@@ -59,10 +60,8 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 - The run starts with three level-1 pilots, one per class. Each knows their class's signature maneuver: Break Turn, U-Turn or Rotating Guns.
 - The roster holds up to 5 pilots, and up to 3 fly each battle.
 - XP needed per level rises (100, 150, 200, 250, 300), with a cap at level 6.
-- Each level-up offers three cards: a new class maneuver (up to three known), a ship upgrade, or a trait.
-  - From level 3, both refit frames for the pilot's class are offered until one is taken.
-  - Upgrades have no hardpoint limits; any pilot can take each once.
-- Ejection, wounds (sit out the next stop), permanent death and perks earned in battle are unchanged.
+- Level-ups and the ship are described in Phase 4.
+- Ejection, wounds (sit out the next stop) and permanent death are unchanged.
 - If nobody is fit to fly, the wounded fly anyway, so a run can never soft-lock.
 
 ### Saving
@@ -72,16 +71,86 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 
 ### Screens
 
-- `Run.tscn` / `RunScreen` shows one page chosen from run state: sector map, squadron, briefing, promotion cards, repair dock, recruit, signal, or run end.
+- `Run.tscn` / `RunScreen` shows one page chosen from run state: sector map, squadron, briefing, promotion or crate cards, repair dock (and its refit chooser), recruit, signal, or run end.
 - Home offers New Run, Continue Run and Quick Battle.
 
 ### Removed
 
 The old sector/system/planet campaign and fleet screens were replaced and deleted: campaign map, system view, squad select, flagship deck plan, hangar, pilot career, recruitment, shipyard, memorial, and their resources and debug scenes.
 
+## Phase 4: pilots learn, ships are bought (done)
+
+The rule that keeps the two tracks apart: **a ship's bonuses are always on; a
+pilot's only apply in a situation.** Anything true on turn 1 with no setup is
+hardware and costs salvage. Anything you have to fly a certain way to get is a
+pilot skill and comes from XP.
+
+### Ship track: salvage (`ShipUpgrades`, `RunState` dock)
+
+- **Frames** set the base numbers and the slots. Base frames (Kestrel, Raptor, ZT) have one slot; refit frames have two. A pilot at level 3 can buy a refit at any dock for 120; modules move across.
+- **Modules**, one per slot, three choices per slot:
+
+| Slot | Modules |
+| --- | --- |
+| Engine | Overdrive (+30 max move, 70) · Vector Nozzles (+15° turn, 70) · Retro Thrusters (-40 min move, 60) |
+| Guns | Burst Loader (+1 shot per volley, 90) · Targeting Array (+8% accuracy, 75) · Wide Mount (cone 24° → 32°, 80) |
+| Shields | Shield Capacitor (+8 shields, 70) · Flux Recycler (+1 regen, 75) · Armor Plating (+8 hull, -15 max move, 65) |
+
+- A dock stocks three modules, each sold once. At least one fits a slot someone has empty.
+- Buying a module for a filled slot replaces the old one.
+- Recruits arrive with bare ships.
+
+### Pilot track: XP (`RunContent.PromotionCards`, `Masteries`, `Perks`)
+
+A level-up offers three cards, never hardware:
+
+- **New maneuver** from the class pool, up to three.
+- **Mastery** of a maneuver the pilot knows. It only matters on turns that maneuver is flown: Snap Turn to 180°, Boost turns 90°, U-Turn and Break Turn lose their cooldown, Lock On +25%, Scramble jams a second enemy, and so on (`Masteries.Describe`).
+- **Instinct**, a situational bonus:
+
+| Instinct | When it applies |
+| --- | --- |
+| Phantom | +15% evasion until first hit each battle. |
+| Cool Under Fire | +20% accuracy below half hull. |
+| Finisher | +25% damage against enemies below 40% hull. |
+| Survivor | +25% eject chance. |
+| Tail Gunner | +20% accuracy against a target flying away from you. |
+| Long Shot | +50% damage from the outer third of range. |
+| Ace | A kill resets all maneuver cooldowns. |
+| Trigger Happy | First volley each turn has +2 shots. |
+| Steady | +2 shield regen after a turn of normal flight. |
+| Wingman | +15% evasion within 250 of a squadmate. |
+
+In battle, the HUD lists the selected pilot's instincts and scars, a trait's
+name floats above the ship when it makes a difference (`TraitCallout`), and the
+debrief counts how often each one fired.
+
+### Scars
+
+Scars are situational penalties from mishaps. After a battle, each surviving
+pilot at risk may pick up one (20% after a win, 40% after a loss). A dock
+treats a scar for 50 salvage.
+
+| Scar | Effect | Risked by |
+| --- | --- | --- |
+| Hesitant | -20% range until the first hit | Winning without a hit |
+| Survivor's Guilt | -15% accuracy and evasion once a squadmate is down | A squadmate dying |
+| Gun Shy | Volleys 2 shots shorter on a turn you took hull damage | Being shot down; a brutal first exchange |
+| Rattled | -15% evasion below half hull | Being shot down; ending below a quarter hull |
+| Tunnel Vision | -15% accuracy when switching targets | Missing most shots |
+| Engine Shy | 25% less turning at full throttle | Hitting an asteroid |
+
+Positive traits are never rolled after battles, and recruits carry no random
+traits.
+
+### Saving
+
+The save is version 2. Older saves can't be loaded; Home says so and offers a
+new run.
+
 ## Known issues and next steps
 
 - `EnemyAI` reads the player's queued maneuver when choosing its own, so enemies react to orders the player has not revealed yet. For a simultaneous-turn game this is worth reconsidering, together with difficulty.
-- Balance is untested with human play: salvage income versus costs, threat per layer, and wound and ejection odds.
+- Balance is untested with human play: salvage income versus module, refit and repair prices; threat per layer; wound, ejection and scar odds; and instinct strength.
 - More battle maps would add variety; there are currently three regular maps plus the escort corridor.
 - An Android export preset and a device test pass are still to do.

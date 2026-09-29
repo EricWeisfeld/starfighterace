@@ -164,9 +164,6 @@ public partial class Fighter : Node2D
         (BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing ? _execDist : PlannedPathDistance) >= NormalMoveMaxDistance - 0.5f;
     public bool CoolUnderFireActive => HasPerk(Perks.CoolUnderFire) && Hp < MaxHp * Perks.CoolUnderFireThreshold;
     public bool RattledActive => HasPerk(Perks.Rattled) && Hp < MaxHp * Perks.RattledThreshold;
-    public bool WingmanActive => HasPerk(Perks.Wingman) &&
-        BattleManager.Instance?.GetTeam(Team).Any(other => other != this && other.IsAlive &&
-            other.Position.DistanceTo(Position) <= Perks.WingmanRange) == true;
     public bool GunShyActive => HasPerk(Perks.GunShy) && _hullDamageTurn == (BattleManager.Instance?.TurnNumber ?? -2);
     public bool TunnelVisionActive => HasPerk(Perks.TunnelVision) && _volleySwitchedTarget;
 
@@ -235,7 +232,6 @@ public partial class Fighter : Node2D
         + (IsGhostRunActive ? Moves.GhostRunEvasionBonus : 0f)
         + (IsEvasiveDodgeActive ? Moves.EvasiveDodgeEvasionBonus : 0f)
         + (StalkerActive ? Perks.StalkerEvasionBonus : 0f)
-        + (WingmanActive ? Perks.WingmanEvasionBonus : 0f)
         + (DaredevilActive ? Perks.DaredevilEvasionBonus : 0f)
         - (RattledActive ? Perks.RattledEvasionPenalty : 0f)
         - (SurvivorsGuiltActive ? Perks.SurvivorsGuiltCombatPenalty : 0f), 0f, 0.95f);
@@ -388,8 +384,6 @@ public partial class Fighter : Node2D
     {
         if (StalkerActive)
             NoteTrait(Perks.Stalker);
-        if (WingmanActive)
-            NoteTrait(Perks.Wingman);
         if (DaredevilActive)
             NoteTrait(Perks.Daredevil);
         if (RattledActive)

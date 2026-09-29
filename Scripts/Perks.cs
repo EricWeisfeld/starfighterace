@@ -39,15 +39,13 @@ public static class Perks
     public const float TailGunnerAccuracyBonus = 0.20f;
     /// <summary>How far off the target's tail the shooter can be and still count as behind it.</summary>
     public const float TailGunnerRearAngleDegrees = 60f;
-    public const float LongShotDamageMultiplier = 1.5f;
+    public const float LongShotDamageMultiplier = 1.35f;
     /// <summary>Hits from beyond this fraction of weapon range count as long shots.</summary>
     public const float LongShotRangeFraction = 2f / 3f;
     public const int BrawlerExtraShots = 2;
     /// <summary>Volleys from within this fraction of weapon range count as close in.</summary>
     public const float BrawlerRangeFraction = 1f / 3f;
     public const int SteadyShieldRegenBonus = 2;
-    public const float WingmanEvasionBonus = 0.15f;
-    public const float WingmanRange = 250f;
     public const float DaredevilEvasionBonus = 0.15f;
 
     public const float HesitantRangeMultiplier = 0.80f;
@@ -110,11 +108,6 @@ public static class Perks
         Id = "steady", Name = "Steady", Positive = true,
         Description = $"+{SteadyShieldRegenBonus} shield regeneration after a turn flown without a special maneuver.",
     };
-    public static readonly Perk Wingman = new()
-    {
-        Id = "wingman", Name = "Wingman", Positive = true,
-        Description = $"+{WingmanEvasionBonus * 100:0}% evasion while flying close to a squadmate.",
-    };
     public static readonly Perk Daredevil = new()
     {
         Id = "daredevil", Name = "Daredevil", Positive = true,
@@ -160,16 +153,20 @@ public static class Perks
         EarnHint = "Risked by hitting an asteroid.",
     };
 
-    public static readonly Perk[] Instincts = { Stalker, CoolUnderFire, Finisher, SecondChance, TailGunner, LongShot, Ace, Brawler, Steady, Wingman, Daredevil };
+    public static readonly Perk[] Instincts = { Stalker, CoolUnderFire, Finisher, SecondChance, TailGunner, LongShot, Ace, Brawler, Steady, Daredevil };
     public static readonly Perk[] Scars = { Hesitant, SurvivorsGuilt, GunShy, Rattled, TunnelVision, EngineShy };
     public static readonly Perk[] All = Instincts.Concat(Scars).ToArray();
 
-    /// <summary>Instincts that were reworked under a new id; saves may still name the old one.</summary>
+    /// <summary>
+    /// Instincts that were reworked or retired. Saves may still name the old
+    /// id, which loads as its replacement or the closest current instinct.
+    /// </summary>
     static readonly Dictionary<string, string> RenamedIds = new()
     {
         ["phantom"] = "stalker",
         ["trigger-happy"] = "brawler",
         ["survivor"] = "second-chance",
+        ["wingman"] = "daredevil",
     };
 
     public static Perk ById(string id) =>

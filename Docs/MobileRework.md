@@ -145,19 +145,19 @@ matter in most battles, and never be a flat number (that is the ship's job):
 | Instinct | When it applies | What it asks of you |
 | --- | --- | --- |
 | Tail Gunner | +20% accuracy against a target flying away from you. | Get behind targets. |
-| Long Shot | +50% damage from the outer third of range. | Hold at the edge of range. |
+| Long Shot | +35% damage from the outer third of range. | Hold at the edge of range. |
 | Brawler | +2 shots on volleys from the inner third of range. | Close in. |
 | Finisher | +25% damage against enemies below 40% hull. | Pick off the wounded. |
 | Ace | A kill resets all maneuver cooldowns and refills shields. | Chase kills. |
 | Steady | +2 shield regen after a turn of normal flight. | Fly plain turns instead of maneuvers. |
 | Stalker | +20% evasion each turn until you open fire. | Hold fire, or fire late in the turn. |
 | Daredevil | +15% evasion on turns flown at full throttle or faster. | Fly flat out. |
-| Wingman | +15% evasion within 250 of a squadmate. | Fly in formation. |
 | Cool Under Fire | +20% accuracy below half hull. | Keep flying hurt; always on in a 1-hull wreck. |
 | Second Chance | Once per battle, a shot that would destroy you leaves you at 1 hull. | Take the risky pass. |
 
-Stalker, Brawler and Second Chance replaced Phantom, Trigger Happy and Survivor
-(old saves load them under the new names); Daredevil is new.
+Stalker, Brawler and Second Chance replaced Phantom, Trigger Happy and Survivor,
+and Wingman was removed (old saves load Wingman as Daredevil); Daredevil is new.
+The draft deals nine of the ten instincts, three to each pilot.
 
 In battle, the HUD lists the selected pilot's instincts and scars, a trait's
 name floats above the ship when it makes a difference (`TraitCallout`), and the

@@ -541,40 +541,38 @@ public static class ShipTypes
     };
 }
 
-/// <summary>Carries the chosen squad from the selection screen into the battle scene.</summary>
+public enum BattleMode { Quick, Run }
+
+/// <summary>Carries the chosen squad and mission into the battle scene.</summary>
 public static class GameSetup
 {
     public static List<Pilot> PlayerPilots = new();
-    public static bool IsTestBattle { get; private set; }
+    public static BattleMode Mode { get; private set; } = BattleMode.Quick;
+    public static bool IsTestBattle => Mode == BattleMode.Quick;
+    /// <summary>The run battle being fought; null in a quick battle.</summary>
+    public static BattleMission Mission { get; private set; }
     public static BattleMapDefinition TestBattleMap { get; private set; }
 
-    public static void StartCampaign()
-    {
-        IsTestBattle = false;
-        PlayerPilots.Clear();
-        TestBattleMap = null;
-        CampaignData.StartCampaign();
-    }
-
-    public static void StartNewCampaign()
-    {
-        IsTestBattle = false;
-        PlayerPilots.Clear();
-        TestBattleMap = null;
-        CampaignData.StartNewCampaign();
-    }
-
+    /// <summary>A disposable max-level squadron for a quick battle.</summary>
     public static void StartTestBattle(IEnumerable<ShipType> ships, BattleMapDefinition map)
     {
         string[] callsigns = { "ALPHA", "BRAVO", "CHARLIE" };
         PlayerPilots = ships.Select((ship, index) =>
         {
-            var pilot = new Pilot(callsigns[index], ship) { Level = PilotRoster.MaxLevel };
-            pilot.ChooseHull(ShipTypes.HullBranches(pilot.ClassId)[0]);
+            var pilot = new Pilot(callsigns[index], ship) { Level = Pilot.MaxLevel };
             pilot.RestoreManeuvers(pilot.Ship.ManeuverPool);
             return pilot;
         }).ToList();
-        IsTestBattle = true;
+        Mode = BattleMode.Quick;
+        Mission = null;
         TestBattleMap = map;
+    }
+
+    public static void StartRunBattle(List<Pilot> squad, BattleMission mission)
+    {
+        PlayerPilots = squad.ToList();
+        Mode = BattleMode.Run;
+        Mission = mission;
+        TestBattleMap = null;
     }
 }

@@ -9,10 +9,11 @@ public class BattleReport
     public bool Won;
     public string Headline;
     public Color HeadlineColor;
-    public CampaignMission Mission;
+    public BattleMission Mission;
     public string MapName;
-    public CampaignResolution Resolution;
-    /// <summary>Campaign pilot outcomes; empty for quick battles.</summary>
+    /// <summary>Run consequences; null for quick battles.</summary>
+    public RunBattleReport Run;
+    /// <summary>Run pilot outcomes; empty for quick battles.</summary>
     public List<PilotResult> Results = new();
     /// <summary>The player's fighters as they ended the battle.</summary>
     public List<Fighter> Squad = new();
@@ -52,8 +53,8 @@ public partial class BattleDebrief : CanvasLayer
         content.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         scroll.AddChild(content);
 
-        string place = (_report.Mission?.PlanetName ?? _report.MapName ?? "").ToUpper();
-        string context = IsQuickBattle ? $"QUICK BATTLE · {place}" : $"MISSION DEBRIEF · {place}";
+        string place = (_report.MapName ?? "").ToUpper();
+        string context = IsQuickBattle ? $"QUICK BATTLE · {place}" : $"{_report.Mission?.Name ?? "DEBRIEF"} · {place}";
         content.AddChild(Text(context, FontCaption, Muted, 3));
         content.AddChild(Text(_report.Headline, _report.Headline.Length > 10 ? FontHeading : FontDisplay, _report.HeadlineColor, 6));
         content.AddChild(BuildKpis());
@@ -70,26 +71,12 @@ public partial class BattleDebrief : CanvasLayer
                 content.AddChild(BuildShipCard(fighter));
         }
 
-        if (_report.Resolution is { } resolution &&
-            (resolution.ControlChanges.Count > 0 || resolution.CreditsAwarded > 0 || resolution.CapturedSystemName != null))
-            content.AddChild(BuildStrategic(resolution));
-
-        List<Pilot> decisions = IsQuickBattle
-            ? new List<Pilot>()
-            : PilotRoster.Living.Where(p => p.NeedsCareerChoice).ToList();
-        if (decisions.Count > 0)
-        {
-            string label = decisions.Count == 1
-                ? $"{decisions[0].Callsign.ToUpper()} HAS A DECISION WAITING"
-                : $"{decisions.Count} PILOT DECISIONS WAITING";
-            Button hangar = TouchButton(label + "  >", fontSize: FontCaption);
-            hangar.Pressed += () => GetTree().ChangeSceneToFile(HangarNavigation.ScenePath);
-            page.AddChild(hangar);
-        }
+        if (_report.Run is { } run)
+            content.AddChild(BuildRunSummary(run));
 
         Button next = TouchButton("CONTINUE", primary: true);
-        next.Pressed += () => GetTree().ChangeSceneToFile(
-            IsQuickBattle ? "res://Scenes/HomeScreen.tscn" : "res://Scenes/CampaignMap.tscn");
+        next.Pressed += () => ChangeScene(this, 
+            IsQuickBattle ? "res://Scenes/HomeScreen.tscn" : "res://Scenes/Run.tscn");
         page.AddChild(next);
     }
 
@@ -104,9 +91,9 @@ public partial class BattleDebrief : CanvasLayer
             AddKpi(grid, $"+{_report.Results.Sum(r => r.XpGained)}", "SQUAD XP", TextBright);
         else
             AddKpi(grid, _report.Turns.ToString(), "TURNS", TextBright);
-        int credits = _report.Resolution?.CreditsAwarded ?? 0;
-        if (credits > 0)
-            AddKpi(grid, $"+{credits}", "CREDITS", Positive);
+        int salvage = _report.Run?.Salvage ?? 0;
+        if (salvage > 0)
+            AddKpi(grid, $"+{salvage}", "SALVAGE", Positive);
         AddKpi(grid, lost.ToString(), "LOST", lost > 0 ? Negative : Muted);
         return grid;
     }
@@ -158,7 +145,7 @@ public partial class BattleDebrief : CanvasLayer
         stack.AddChild(CardHeader(fighter.Type, BattleManager.CallsignOf(fighter), alive,
             alive ? "RETURNED" : fighter.Ejected ? "EJECTED" : "LOST", alive ? ChipRole.Gain : fighter.Ejected ? ChipRole.Impaired : ChipRole.Loss));
         string hull = alive ? $"HULL {fighter.Hp}/{fighter.MaxHp}" : "SHOT DOWN";
-        stack.AddChild(Text($"{fighter.Kills} KILLS · {fighter.HitsLanded}/{fighter.ShotsFired} HITS · {hull}", FontCaption, Body, 1));
+        stack.AddChild(Text($"{Plural(fighter.Kills, "KILL")} · {fighter.HitsLanded}/{fighter.ShotsFired} HITS · {hull}", FontCaption, Body, 1));
         return card;
     }
 
@@ -173,7 +160,7 @@ public partial class BattleDebrief : CanvasLayer
             { Survived: false, Ejected: true } => ("KIA", ChipRole.Loss, "Ejected, but lost in enemy space."),
             { Survived: false } => ("KIA", ChipRole.Loss, "Shot down. No ejection."),
             { Ejected: true } => ("WOUNDED", ChipRole.Impaired,
-                $"Ejected and {(_report.Won ? "recovered" : "escaped")}. Out for {r.Pilot.RecoveryMissionsRemaining} missions."),
+                $"Ejected and {(_report.Won ? "recovered" : "escaped")}. Sits out the next stop in a new ship."),
             _ => ("RETURNED", ChipRole.Gain,
                 r.Pilot.HullDamage > 0 ? $"{r.Pilot.HullDamage} hull damage still to repair." : "Hull fully repaired."),
         };
@@ -183,9 +170,9 @@ public partial class BattleDebrief : CanvasLayer
         if (r.Survived)
         {
             HBoxContainer xpRow = Row(16);
-            xpRow.AddChild(Text($"{r.Kills} KILLS", FontCaption, Body, 2));
+            xpRow.AddChild(Text($"{Plural(r.Kills, "KILL")}", FontCaption, Body, 2));
             xpRow.AddChild(Text($"+{r.XpGained} XP", FontCaption, r.LevelsGained > 0 ? Positive : Body, 2));
-            int xpToNext = PilotRoster.XpToNext(r.Pilot.Level);
+            int xpToNext = Pilot.XpToNext(r.Pilot.Level);
             xpRow.AddChild(new XpTrack
             {
                 Ratio = xpToNext > 0 ? (float)r.Pilot.Xp / xpToNext : 1f,
@@ -201,8 +188,6 @@ public partial class BattleDebrief : CanvasLayer
             advancement.AddThemeConstantOverride("v_separation", 8);
             if (r.LevelsGained > 0)
                 advancement.AddChild(Tag($"LEVEL {r.Pilot.Level}", ChipRole.Gain));
-            if (r.ManeuverSlotsGained > 0)
-                advancement.AddChild(Tag($"+{r.ManeuverSlotsGained} MANEUVER SLOT", ChipRole.Gain));
             if (advancement.GetChildCount() > 0)
                 stack.AddChild(advancement);
             if (r.NewPerk != null)
@@ -214,19 +199,22 @@ public partial class BattleDebrief : CanvasLayer
         return card;
     }
 
-    static Control BuildStrategic(CampaignResolution resolution)
+    static Control BuildRunSummary(RunBattleReport run)
     {
         VBoxContainer stack = Stack(8);
-        stack.AddChild(Text("STRATEGIC", FontCaption, Muted, 4));
-        foreach (ControlChange change in resolution.ControlChanges)
+        if (run.Promotions.Count > 0)
         {
-            bool secured = change.After == PlanetControl.Alliance;
-            stack.AddChild(Text($"{change.PlanetName.ToUpper()} NOW {change.After.ToString().ToUpper()}", FontBody, secured ? Positive : Negative, 1));
+            stack.AddChild(Text("PROMOTIONS", FontCaption, Muted, 4));
+            foreach (string promotion in run.Promotions)
+                stack.AddChild(Text(promotion, FontBody, Accent, 1));
+            stack.AddChild(Text("You'll choose a card for each after this report.", FontCaption, Muted, 0, wrap: true));
         }
-        if (resolution.CreditsAwarded > 0)
-            stack.AddChild(Text($"+{resolution.CreditsAwarded} CREDITS", FontBody, Positive, 1));
-        if (resolution.CapturedSystemName != null)
-            stack.AddChild(Text($"{resolution.CapturedSystemName.ToUpper()} CAPTURED · +{CampaignData.SystemCaptureCredits} CREDITS", FontBody, Positive, 1));
+        if (run.SectorCleared && run.Outcome == RunOutcome.InProgress)
+            stack.AddChild(Text("SECTOR CLEARED · SHIPS REPAIRED", FontBody, Positive, 2));
+        if (run.Outcome == RunOutcome.Victory)
+            stack.AddChild(Text("THE HELIOS GATE IS OPEN. RUN COMPLETE.", FontBody, Positive, 2));
+        if (run.Outcome == RunOutcome.Defeat)
+            stack.AddChild(Text("THE SQUADRON IS FINISHED. RUN OVER.", FontBody, Negative, 2));
         return stack;
     }
 }

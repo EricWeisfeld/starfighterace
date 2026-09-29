@@ -200,6 +200,17 @@ public static class SignalUi
         return panel;
     }
 
+    /// <summary>
+    /// Changes scene once the current input has finished processing. Changing
+    /// scene removes the old one from the tree at once, so doing it directly
+    /// from a button's press handler strands the touch release that follows.
+    /// </summary>
+    public static void ChangeScene(Node from, string path) =>
+        from.GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, path);
+
+    /// <summary>"1 KILL", "3 KILLS": a count with its noun in the right number.</summary>
+    public static string Plural(int count, string noun) => $"{count} {noun}{(count == 1 ? "" : "S")}";
+
     /// <summary>Readable status tag for portrait screens, coloured by its <see cref="ChipRole"/>.</summary>
     public static Control Tag(string label, ChipRole role)
     {
@@ -433,158 +444,6 @@ public partial class AttentionStrip : PanelContainer
     {
         if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
             Pressed?.Invoke();
-    }
-}
-
-/// <summary>
-/// Side-elevation cutaway of the flagship, sectioned into boardable decks.
-/// Full size it is interactive (hover highlights a deck, click boards it);
-/// Mini renders a stretched locator strip for sub-scene headers.
-/// </summary>
-public partial class DeckSchematic : Control
-{
-    // Design-space geometry (640x300), nose to the right. Deck x-ranges run
-    // bow to stern in AthenaDecks order: hangar, crew, shipyard, memorial.
-    static readonly (float X1, float X2)[] DeckSpans = { (410, 540), (280, 410), (150, 280), (60, 150) };
-    static readonly Vector2[] HullOutline =
-    {
-        new(620, 150), new(540, 100), new(150, 82), new(60, 116),
-        new(34, 150), new(60, 184), new(150, 218), new(540, 200),
-    };
-
-    public bool Mini;
-    public int Highlight = -1;
-    public string[] Labels;   // full mode only; "01 HANGAR BAY" etc, indexed like DeckSpans
-
-    public event System.Action<int> DeckHovered;
-    public event System.Action<int> DeckSelected;
-
-    static float TopY(float x) =>
-        x >= 540 ? Mathf.Lerp(100, 150, (x - 540) / 80f) :
-        x >= 150 ? Mathf.Lerp(82, 100, (x - 150) / 390f) :
-        x >= 60 ? Mathf.Lerp(116, 82, (x - 60) / 90f) :
-        Mathf.Lerp(150, 116, (x - 34) / 26f);
-
-    static float BottomY(float x) =>
-        x >= 540 ? Mathf.Lerp(200, 150, (x - 540) / 80f) :
-        x >= 150 ? Mathf.Lerp(218, 200, (x - 150) / 390f) :
-        x >= 60 ? Mathf.Lerp(184, 218, (x - 60) / 90f) :
-        Mathf.Lerp(150, 184, (x - 34) / 26f);
-
-    (float Sx, float Sy, Vector2 Off) Transform()
-    {
-        if (Mini)
-            return (Size.X / 640f, Size.Y / 300f, Vector2.Zero);
-        float scale = Mathf.Min(Size.X / 640f, Size.Y / 300f);
-        return (scale, scale, (Size - new Vector2(640, 300) * scale) * 0.5f);
-    }
-
-    public override void _Draw()
-    {
-        (float sx, float sy, Vector2 off) = Transform();
-        Vector2 Map(float x, float y) => off + new Vector2(x * sx, y * sy);
-
-        if (!Mini)
-        {
-            // Faint orbit ellipse behind the hull.
-            var orbit = new Vector2[41];
-            for (int i = 0; i <= 40; i++)
-            {
-                float angle = Mathf.Tau * i / 40f;
-                orbit[i] = Map(320 + 300 * Mathf.Cos(angle), 150 + 120 * Mathf.Sin(angle));
-            }
-            DrawPolyline(orbit, new Color(0.47f, 0.71f, 0.9f, 0.09f), 1, true);
-        }
-
-        var hull = new Vector2[HullOutline.Length + 1];
-        for (int i = 0; i < HullOutline.Length; i++)
-            hull[i] = Map(HullOutline[i].X, HullOutline[i].Y);
-        hull[^1] = hull[0];
-        DrawColoredPolygon(hull[..^1], new Color(SignalUi.CellBg.R, SignalUi.CellBg.G, SignalUi.CellBg.B, 0.85f));
-
-        // Engine wash aft of the hull.
-        Color engine = new(SignalUi.Accent.R, SignalUi.Accent.G, SignalUi.Accent.B, 0.7f);
-        float engineWidth = Mini ? 1f : 2f;
-        DrawLine(Map(18, 136), Map(40, 136), engine, engineWidth);
-        DrawLine(Map(12, 150), Map(36, 150), new Color(engine.R, engine.G, engine.B, 0.45f), engineWidth);
-        DrawLine(Map(18, 164), Map(40, 164), engine, engineWidth);
-
-        if (Highlight >= 0 && Highlight < DeckSpans.Length)
-        {
-            (float x1, float x2) = DeckSpans[Highlight];
-            var quad = new[] { Map(x1, TopY(x1)), Map(x2, TopY(x2)), Map(x2, BottomY(x2)), Map(x1, BottomY(x1)) };
-            DrawColoredPolygon(quad, new Color(SignalUi.Accent.R, SignalUi.Accent.G, SignalUi.Accent.B, Mini ? 0.35f : 0.14f));
-            if (!Mini)
-            {
-                var edge = new Vector2[5];
-                quad.CopyTo(edge, 0);
-                edge[4] = quad[0];
-                DrawPolyline(edge, new Color(SignalUi.Accent.R, SignalUi.Accent.G, SignalUi.Accent.B, 0.7f), 1, true);
-            }
-        }
-
-        DrawPolyline(hull, new Color(0.47f, 0.71f, 0.9f, 0.45f), 1, true);
-        var divider = new Color(0.47f, 0.71f, 0.9f, 0.3f);
-        foreach (float x in new[] { 150f, 280f, 410f, 540f })
-            DrawLine(Map(x, TopY(x)), Map(x, BottomY(x)), divider, 1);
-
-        if (Mini || Labels == null)
-            return;
-
-        Font font = SignalUi.Tracked(3);
-        int fontSize = Mathf.Max(8, Mathf.RoundToInt(11 * sx));
-        for (int i = 0; i < DeckSpans.Length && i < Labels.Length; i++)
-        {
-            (float x1, float x2) = DeckSpans[i];
-            float cx = (x1 + x2) / 2f;
-            bool above = i == 0 || i == 2;   // hangar + shipyard label above, others below
-            bool active = i == Highlight;
-            Color leader = active
-                ? new Color(SignalUi.Accent.R, SignalUi.Accent.G, SignalUi.Accent.B, 0.6f)
-                : new Color(0.47f, 0.71f, 0.9f, 0.35f);
-            if (above)
-                DrawLine(Map(cx, TopY(cx)), Map(cx, 44), leader, 1);
-            else
-                DrawLine(Map(cx, BottomY(cx)), Map(cx, 256), leader, 1);
-            DrawString(font, Map(cx - 110, above ? 36 : 274), Labels[i],
-                HorizontalAlignment.Center, 220 * sx, fontSize, active ? SignalUi.Accent : SignalUi.Muted);
-        }
-    }
-
-    int DeckAt(Vector2 local)
-    {
-        (float sx, float sy, Vector2 off) = Transform();
-        float x = (local.X - off.X) / sx;
-        float y = (local.Y - off.Y) / sy;
-        for (int i = 0; i < DeckSpans.Length; i++)
-        {
-            if (x >= DeckSpans[i].X1 && x <= DeckSpans[i].X2 && y >= TopY(x) - 3 && y <= BottomY(x) + 3)
-                return i;
-        }
-        return -1;
-    }
-
-    public override void _GuiInput(InputEvent @event)
-    {
-        if (Mini)
-            return;
-        if (@event is InputEventMouseMotion motion)
-        {
-            int deck = DeckAt(motion.Position);
-            MouseDefaultCursorShape = deck >= 0 ? CursorShape.PointingHand : CursorShape.Arrow;
-            if (deck >= 0 && deck != Highlight)
-            {
-                Highlight = deck;
-                QueueRedraw();
-                DeckHovered?.Invoke(deck);
-            }
-        }
-        else if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } click)
-        {
-            int deck = DeckAt(click.Position);
-            if (deck >= 0)
-                DeckSelected?.Invoke(deck);
-        }
     }
 }
 

@@ -43,7 +43,7 @@ public partial class BattleManager : Node2D
     public ObjectiveShip EscortShip { get; private set; }
     Fighter _priorityTarget;
     public Fighter PriorityTarget => _priorityTarget;
-    CampaignMission CurrentMission => CampaignData.SelectedMission;
+    BattleMission CurrentMission => GameSetup.Mission;
 
     // Planning state (read by the overlay and HUD for drawing).
     public Fighter Selected { get; private set; }
@@ -350,16 +350,14 @@ public partial class BattleManager : Node2D
         AddChild(_bulletLayer);
         AddChild(new BattleOverlay());
 
-        // Player pilots come from the selection screen; campaign missions
-        // provide a curated enemy wing rather than a random encounter.
-        List<Pilot> squad = GameSetup.PlayerPilots.Count >= 1 && GameSetup.PlayerPilots.All(p => p.CanDeploy)
-            ? GameSetup.PlayerPilots
-            : PilotRoster.Living.Where(p => p.CanDeploy).Take(3).ToList();
+        // Pilots come from the quick-battle setup or the run's briefing; run
+        // missions supply the enemy wing.
+        List<Pilot> squad = GameSetup.PlayerPilots.Where(p => p.Alive).Take(Map.PlayerSpawns.Length).ToList();
         if (squad.Count < 1)
         {
-            GD.PushError("A battle requires at least one ready pilot.");
+            GD.PushError("A battle requires at least one pilot.");
             GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile,
-                GameSetup.IsTestBattle ? "res://Scenes/TestBattleSelect.tscn" : "res://Scenes/SelectScreen.tscn");
+                GameSetup.IsTestBattle ? "res://Scenes/TestBattleSelect.tscn" : "res://Scenes/Run.tscn");
             return;
         }
         for (int i = 0; i < squad.Count; i++)
@@ -407,8 +405,6 @@ public partial class BattleManager : Node2D
         var f = new Fighter();
         f.ApplyType(type);
         f.ApplyPilot(pilot);
-        if (team == 0 && !GameSetup.IsTestBattle)
-            f.MaxHp += CampaignData.SquadronLevel * 3;
         if (team == 1)
             f.ApplyCombatStatMultiplier(statMultiplier);
         f.Setup(team, pos, heading, type.GetSkin(team));
@@ -1277,34 +1273,32 @@ public partial class BattleManager : Node2D
         BeginPlanningPhase();
     }
 
-    /// <summary>Resolves campaign consequences once and replaces the HUD with the debrief.</summary>
+    /// <summary>Resolves the battle's consequences once and replaces the HUD with the debrief.</summary>
     void FinishBattle(bool won, string headline, Color headlineColor)
     {
         Engine.TimeScale = 1f;
         CurrentPhase = Phase.GameOver;
         Selected = null;
         _camera.StopFollowing();
-        CampaignMission mission = CurrentMission;
-        CampaignResolution resolution = GameSetup.IsTestBattle ? null : CampaignData.ResolveSelectedMission(won);
-        List<PilotResult> results = GameSetup.IsTestBattle
-            ? new List<PilotResult>()
-            : BattleResolution.Resolve(PlayerFighters, won, PlayerFighters.Concat(EnemyFighters).ToList());
-        if (!GameSetup.IsTestBattle)
-            CampaignData.SaveCampaign();
 
-        _hud.Visible = false;
-        AddChild(new BattleDebrief(new BattleReport
+        var report = new BattleReport
         {
             Won = won,
             Headline = headline,
             HeadlineColor = headlineColor,
-            Mission = mission,
+            Mission = CurrentMission,
             MapName = Map.DisplayName,
-            Resolution = resolution,
-            Results = results,
             Squad = PlayerFighters.ToList(),
             Turns = _turn,
-        }));
+        };
+        if (!GameSetup.IsTestBattle && RunState.Current != null)
+        {
+            (report.Results, report.Run) = RunState.Current.ResolveBattle(won, PlayerFighters,
+                PlayerFighters.Concat(EnemyFighters).ToList());
+        }
+
+        _hud.Visible = false;
+        AddChild(new BattleDebrief(report));
     }
 
     public override void _Draw()

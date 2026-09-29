@@ -2,11 +2,14 @@ using Godot;
 using static SignalUi;
 
 /// <summary>
-/// The game's portrait launch screen. Quick Battle is the playable mode while
-/// the campaign is rebuilt as roguelite runs.
+/// The game's portrait launch screen: start or continue a roguelite run, or
+/// jump into a quick battle.
 /// </summary>
 public partial class HomeScreen : Node2D
 {
+    bool _confirmNewRun;
+    VBoxContainer _actions;
+
     public override void _Ready()
     {
         RenderingServer.SetDefaultClearColor(Bg);
@@ -22,17 +25,49 @@ public partial class HomeScreen : Node2D
 
         page.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Ignore });
 
-        Button quick = TouchButton("QUICK BATTLE", primary: true);
-        quick.Pressed += () => GetTree().ChangeSceneToFile("res://Scenes/TestBattleSelect.tscn");
-        page.AddChild(quick);
-        page.AddChild(Text("Pick up to three ships and a battlefield, then fight.", FontCaption, Muted, 0, wrap: true));
+        _actions = Stack(12);
+        page.AddChild(_actions);
+        BuildActions();
+    }
 
-        page.AddChild(new Control { CustomMinimumSize = new Vector2(0, 12), MouseFilter = Control.MouseFilterEnum.Ignore });
+    void BuildActions()
+    {
+        foreach (Node child in _actions.GetChildren())
+            child.QueueFree();
 
-        Button campaign = TouchButton("CAMPAIGN");
-        campaign.Disabled = true;
-        page.AddChild(campaign);
-        page.AddChild(Text("Being rebuilt as short roguelite runs.", FontCaption, Muted, 0, wrap: true));
+        bool hasRun = RunState.HasSave;
+        if (hasRun)
+        {
+            Button resume = TouchButton("CONTINUE RUN", primary: true);
+            resume.Pressed += () =>
+            {
+                if (RunState.Load() != null)
+                    ChangeScene(this, "res://Scenes/Run.tscn");
+            };
+            _actions.AddChild(resume);
+        }
+
+        Button newRun = TouchButton(_confirmNewRun ? "TAP AGAIN TO ABANDON YOUR RUN" : "NEW RUN", primary: !hasRun);
+        newRun.Pressed += () =>
+        {
+            if (hasRun && !_confirmNewRun)
+            {
+                _confirmNewRun = true;
+                BuildActions();
+                return;
+            }
+            RunState.EndAndDelete();
+            RunState.StartNew();
+            ChangeScene(this, "res://Scenes/Run.tscn");
+        };
+        _actions.AddChild(newRun);
+        _actions.AddChild(Text("Three sectors, one squadron. Pilots who die stay dead.", FontCaption, Muted, 0, wrap: true));
+
+        _actions.AddChild(new Control { CustomMinimumSize = new Vector2(0, 12), MouseFilter = Control.MouseFilterEnum.Ignore });
+        Button quick = TouchButton("QUICK BATTLE");
+        quick.Pressed += () => ChangeScene(this, "res://Scenes/TestBattleSelect.tscn");
+        _actions.AddChild(quick);
+        _actions.AddChild(Text("Pick up to three max-level ships and a battlefield.", FontCaption, Muted, 0, wrap: true));
     }
 
     public override void _Draw()

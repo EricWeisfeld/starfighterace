@@ -221,14 +221,16 @@ public static class BattleMaps
         if (GameSetup.IsTestBattle)
             return GameSetup.TestBattleMap ?? ShardRun;
 
-        return CampaignData.SelectedMission?.MapId switch
-        {
-            "shard-run" => ShardRun,
-            "cobalt-veil" => CobaltVeil,
-            EscortCorridorId => EscortCorridor,
-            _ => BrokenRing,
-        };
+        return ById(GameSetup.Mission?.MapId);
     }
+
+    public static BattleMapDefinition ById(string id) => id switch
+    {
+        "shard-run" => ShardRun,
+        "cobalt-veil" => CobaltVeil,
+        EscortCorridorId => EscortCorridor,
+        _ => BrokenRing,
+    };
 }
 
 /// <summary>Draws authored terrain below ships without requiring scene-node assets.</summary>

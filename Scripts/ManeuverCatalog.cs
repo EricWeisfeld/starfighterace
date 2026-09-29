@@ -149,6 +149,25 @@ public static class ManeuverCatalog
         _ => info.Maneuver is ManeuverType maneuver ? fighter.GetManeuverCooldownTurns(maneuver) : 0,
     };
 
+    /// <summary>One stat-free sentence describing an ability, for promotion cards.</summary>
+    public static string Blurb(ShipAbility ability) => ability switch
+    {
+        ShipAbility.UTurn => "Flip to face the way you came in a short, sharp reversal.",
+        ShipAbility.BreakTurn => "Swing through a wide 180° arc.",
+        ShipAbility.EngineBoost => "A long burn that covers ground fast.",
+        ShipAbility.RotatingGuns => "Creep forward while the guns sweep a wide arc.",
+        ShipAbility.SuppressionFire => "Always on: your hits make the target turn less sharply.",
+        ShipAbility.EmergencyThrusters => "A fast escape sprint, at the cost of some evasion.",
+        ShipAbility.SnapTurn => "Whip around 145° in a very short distance.",
+        ShipAbility.HunterLock => "Lock an enemy for extra accuracy against it.",
+        ShipAbility.PursuitBurn => "A long, straight chase burn.",
+        ShipAbility.EcmJink => "A jamming jink that is hard to hit.",
+        ShipAbility.SensorScramble => "Scramble an enemy's sensors to spoil its aim.",
+        ShipAbility.GhostRun => "A stealthy run that is hard to hit.",
+        ShipAbility.EvasiveDodge => "A hard jink and a short burst that is hard to hit.",
+        _ => "",
+    };
+
     /// <summary>Title-case ability name for lists and cards.</summary>
     public static string AbilityName(ShipAbility ability) => ability switch
     {

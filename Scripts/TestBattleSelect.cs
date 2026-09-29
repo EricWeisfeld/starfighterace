@@ -35,12 +35,12 @@ public partial class TestBattleSelect : Node2D
         HBoxContainer header = Row(16);
         Button back = TouchButton("<", fontSize: FontTitle);
         back.CustomMinimumSize = new Vector2(TouchTarget, TouchTarget);
-        back.Pressed += () => GetTree().ChangeSceneToFile("res://Scenes/HomeScreen.tscn");
+        back.Pressed += () => ChangeScene(this, "res://Scenes/HomeScreen.tscn");
         header.AddChild(back);
         VBoxContainer titleBlock = Stack(0);
         titleBlock.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         titleBlock.AddChild(Text("QUICK BATTLE", FontTitle, TextBright, 4));
-        titleBlock.AddChild(Text($"MAX-LEVEL PILOTS · LEVEL {PilotRoster.MaxLevel}", FontCaption, Muted, 2));
+        titleBlock.AddChild(Text($"MAX-LEVEL PILOTS · LEVEL {Pilot.MaxLevel}", FontCaption, Muted, 2));
         header.AddChild(titleBlock);
         page.AddChild(header);
 
@@ -189,7 +189,7 @@ public partial class TestBattleSelect : Node2D
     void Launch()
     {
         GameSetup.StartTestBattle(_squad, BattleMaps.All[_mapIndex]);
-        GetTree().ChangeSceneToFile("res://Scenes/Battle.tscn");
+        ChangeScene(this, "res://Scenes/Battle.tscn");
     }
 
     public override void _Draw()

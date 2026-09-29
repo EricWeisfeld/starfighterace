@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>
-/// A squadron member for one run. The pilot and the ship grow separately:
-/// the pilot learns maneuvers, masteries and instincts by levelling up, while
-/// the ship's frame and modules are bought with salvage. Hull damage carries
-/// between battles, and a pilot can die for good.
+/// A squadron member for one run. Levelling up grows both the pilot
+/// (maneuvers, masteries, instincts) and their ship (modules, a refit frame).
+/// Hull damage carries between battles, and a pilot can die for good.
 /// </summary>
 public class Pilot
 {

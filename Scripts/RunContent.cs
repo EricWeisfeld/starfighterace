@@ -6,18 +6,19 @@ using System.Linq;
 public enum RunNodeKind { Skirmish, Strike, Elite, Repair, Recruit, Event, Boss }
 
 /// <summary>
-/// What a card offers. Level-ups offer pilot growth (maneuvers, masteries,
-/// instincts); module crates offer ship hardware.
+/// What a card offers. Level-ups offer everything: maneuvers, masteries and
+/// instincts for the pilot, modules and refit frames for the ship. Module
+/// crates offer modules only.
 /// </summary>
-public enum CardKind { Maneuver, Mastery, Instinct, Module }
+public enum CardKind { Maneuver, Mastery, Instinct, Module, Frame }
 
 /// <summary>One option in a promotion or module-crate choice.</summary>
 public class PromotionCard
 {
     public CardKind Kind { get; set; }
-    /// <summary>A ShipAbility (maneuver or mastery), perk id or ShipUpgrade, depending on <see cref="Kind"/>.</summary>
+    /// <summary>A ShipAbility (maneuver or mastery), perk id, ShipUpgrade or frame id, depending on <see cref="Kind"/>.</summary>
     public string Id { get; set; } = "";
-    /// <summary>For module cards: the pilot whose ship gets the module.</summary>
+    /// <summary>For crate cards: the pilot whose ship gets the module.</summary>
     public string Callsign { get; set; }
 }
 
@@ -25,7 +26,6 @@ public class PromotionCard
 public class RecruitOffer
 {
     public PilotSave Pilot { get; set; }
-    public int Cost { get; set; }
 }
 
 /// <summary>What a chosen event option did, for the event page to report.</summary>
@@ -34,7 +34,8 @@ public class EventOutcome
     public string Text = "";
     /// <summary>Set when the option leads into a fight at this stop.</summary>
     public RunNodeKind? Battle;
-    public int BonusSalvage;
+    /// <summary>For a fight: the reason on the module crate a win opens, or null for none.</summary>
+    public string CrateReward;
 }
 
 /// <summary>A choice offered by a distress-signal stop.</summary>
@@ -218,9 +219,9 @@ public static class RunContent
         RunNodeKind.Skirmish => "Destroy an enemy patrol.",
         RunNodeKind.Strike => "Destroy a marked command ship. The rest of the wing can live.",
         RunNodeKind.Elite => "A veteran wing. Win it to open a module crate.",
-        RunNodeKind.Repair => "Buy modules and refits, repair hulls and treat scars.",
-        RunNodeKind.Recruit => "Hire a new pilot for the squadron.",
-        RunNodeKind.Event => "An unknown signal. Could be salvage, could be trouble.",
+        RunNodeKind.Repair => "Every ship repaired to full, and a medic who can treat one scar.",
+        RunNodeKind.Recruit => "Pilots looking for a squadron. One can join.",
+        RunNodeKind.Event => "An unknown signal. Could be a prize, could be trouble.",
         RunNodeKind.Boss => BossName(sector) + ". Win to leave the sector; lose and the run ends.",
         _ => "",
     };
@@ -243,14 +244,6 @@ public static class RunContent
             _ => threat,
         };
     }
-
-    public static int SalvageReward(RunNodeKind kind, int sector) => kind switch
-    {
-        RunNodeKind.Strike => 65 + 20 * (sector - 1),
-        RunNodeKind.Elite => 90 + 25 * (sector - 1),
-        RunNodeKind.Boss => 120 + 30 * (sector - 1),
-        _ => 45 + 15 * (sector - 1),
-    };
 
     static string[] EnemyPool(int tier) => tier switch
     {
@@ -321,8 +314,7 @@ public static class RunContent
 
     /// <summary>
     /// A recruit arrives at a level just below the squadron's, having already
-    /// taken the promotions a pilot of that level would have. Their ship is a
-    /// bare base frame: modules and refits are for the squadron to buy.
+    /// taken a level-up card for each level, ship cards included.
     /// </summary>
     public static Pilot NewRecruit(string callsign, ShipType baseClass, int level, RandomNumberGenerator rng)
     {
@@ -332,45 +324,52 @@ public static class RunContent
             pilot.Level = next;
             List<PromotionCard> cards = PromotionCards(pilot, rng);
             if (cards.Count > 0)
-                ApplyCard(pilot, cards[0]);
+                ApplyCard(pilot, cards[rng.RandiRange(0, cards.Count - 1)]);
         }
         return pilot;
     }
 
-    public static int RecruitCost(int level) => 40 + 30 * level;
-
     // -------------------------------------------------------------- cards
 
     /// <summary>
-    /// Three distinct level-up choices for a pilot, all pilot growth: a new
-    /// maneuver while they have room for one, then instincts and masteries of
-    /// maneuvers they already fly. Ship hardware never appears here.
+    /// Three distinct level-up choices. Pilot and ship both grow here. A
+    /// pilot ready for a refit is offered both frames. Otherwise the choices
+    /// lean toward a new maneuver and a module for an empty slot, then fill
+    /// from instincts, masteries and module swaps.
     /// </summary>
     public static List<PromotionCard> PromotionCards(Pilot pilot, RandomNumberGenerator rng)
     {
         var cards = new List<PromotionCard>();
+        if (pilot.CanRefit)
+            cards.AddRange(ShipTypes.HullBranches(pilot.ClassId).Select(frame => new PromotionCard { Kind = CardKind.Frame, Id = frame.Id }));
+
         var maneuvers = new List<PromotionCard>();
         if (pilot.Maneuvers.Count < Pilot.MaxManeuvers)
             maneuvers.AddRange(pilot.UnlearnedManeuvers.Select(a => new PromotionCard { Kind = CardKind.Maneuver, Id = a.ToString() }));
+        List<PromotionCard> ModuleCards(bool emptySlot) => ShipUpgrades.All
+            .Where(module => pilot.CanInstall(module.Id) && (pilot.ModuleIn(module.Slot) == null) == emptySlot)
+            .Select(module => new PromotionCard { Kind = CardKind.Module, Id = module.Id.ToString() }).ToList();
+        List<PromotionCard> fits = ModuleCards(emptySlot: true);
+        List<PromotionCard> swaps = ModuleCards(emptySlot: false);
         List<PromotionCard> instincts = Perks.Instincts.Where(p => !pilot.Perks.Contains(p))
             .Select(p => new PromotionCard { Kind = CardKind.Instinct, Id = p.Id }).ToList();
         List<PromotionCard> masteries = pilot.UnmasteredManeuvers
             .Select(a => new PromotionCard { Kind = CardKind.Mastery, Id = a.ToString() }).ToList();
 
-        if (maneuvers.Count > 0)
+        if (cards.Count < 3 && maneuvers.Count > 0)
             cards.Add(TakeRandom(maneuvers, rng));
-        if (instincts.Count > 0)
-            cards.Add(TakeRandom(instincts, rng));
-        var rest = maneuvers.Concat(instincts).Concat(masteries).ToList();
+        if (cards.Count < 3 && fits.Count > 0)
+            cards.Add(TakeRandom(fits, rng));
+        var rest = maneuvers.Concat(fits).Concat(instincts).Concat(masteries).Concat(swaps).ToList();
         while (cards.Count < 3 && rest.Count > 0)
             cards.Add(TakeRandom(rest, rng));
         return cards;
     }
 
     /// <summary>
-    /// An elite wing's reward: three modules, each already matched to a
-    /// surviving pilot's ship, one of which is fitted free. Empty slots are
-    /// favoured so the crate usually adds rather than swaps.
+    /// A bonus reward (an elite win, some signals): three modules, each
+    /// already matched to a pilot's ship, one of which is fitted. Empty slots
+    /// are favoured so the crate usually adds rather than swaps.
     /// </summary>
     public static List<PromotionCard> ModuleCrate(IEnumerable<Pilot> survivors, RandomNumberGenerator rng)
     {
@@ -429,6 +428,9 @@ public static class RunContent
             case CardKind.Module when ShipUpgrades.TryParse(card.Id, out ShipUpgrade module):
                 pilot.InstallUpgrade(module);
                 break;
+            case CardKind.Frame:
+                pilot.Refit(ShipTypes.FromId(card.Id));
+                break;
         }
     }
 
@@ -449,7 +451,17 @@ public static class RunContent
                 string text = definition.Description;
                 if (pilot.ModuleIn(definition.Slot) is ShipUpgrade replaced)
                     text += $" Replaces {ShipUpgrades.Get(replaced).Name}.";
-                return (definition.Name.ToUpper(), $"{ShipUpgrades.SlotName(definition.Slot)} MODULE · {pilot.Callsign}", text);
+                string category = $"{ShipUpgrades.SlotName(definition.Slot)} MODULE";
+                if (!string.IsNullOrEmpty(card.Callsign))
+                    category += $" · {card.Callsign}";
+                return (definition.Name.ToUpper(), category, text);
+            case CardKind.Frame:
+                ShipType frame = ShipTypes.FromId(card.Id);
+                string delta = FrameDelta(pilot.Ship, frame);
+                string[] added = frame.UpgradeSlots.Where(slot => !pilot.HasSlot(slot)).Select(ShipUpgrades.SlotName).ToArray();
+                if (added.Length > 0)
+                    delta += $" Adds a {string.Join(" and ", added)} slot.";
+                return (frame.DisplayName.ToUpper(), "NEW FRAME", delta);
         }
         return (card.Id, "", "");
     }
@@ -485,10 +497,10 @@ public static class RunContent
             {
                 new()
                 {
-                    Label = "SALVAGE IT", Detail = "+60 salvage. Someone else may want it too.",
+                    Label = "SEARCH THE HOLDS", Detail = "A module crate. Someone else may want it too.",
                     Resolve = (run, rng) => rng.Randf() < 0.35f
-                        ? new EventOutcome { Text = "Kla'ed raiders were waiting in the freighter's shadow.", Battle = RunNodeKind.Skirmish, BonusSalvage = 60 }
-                        : Salvage(run, 60, "The holds were full. +60 salvage."),
+                        ? new EventOutcome { Text = "Kla'ed raiders were waiting in the freighter's shadow. Win and the cargo is yours.", Battle = RunNodeKind.Skirmish, CrateReward = "DERELICT CARGO" }
+                        : Crate(run, "DERELICT CARGO", rng, "The holds are intact. Open the crate."),
                 },
                 new() { Label = "MOVE ON", Detail = "Leave it drifting.", Resolve = (_, _) => new EventOutcome { Text = "You leave the wreck behind." } },
             },
@@ -509,7 +521,11 @@ public static class RunContent
                         return new EventOutcome { Text = $"{pilot.Callsign} flies a {pilot.Ship.DisplayName} and is glad of the ride." };
                     },
                 },
-                new() { Label = "STRIP THE POD", Detail = "+30 salvage.", Resolve = (run, _) => Salvage(run, 30, "You take what you can use. +30 salvage.") },
+                new()
+                {
+                    Label = "CALL A RESCUE SHIP", Detail = $"The pilot shares their combat logs while they wait. +{EventXpSmall} XP for every pilot.",
+                    Resolve = (run, rng) => SquadXp(run, EventXpSmall, rng, "A rescue ship is on its way. The squadron studies the pilot's logs."),
+                },
             },
         },
         new()
@@ -528,7 +544,11 @@ public static class RunContent
                         return new EventOutcome { Text = "The drones patch every hull they can reach." };
                     },
                 },
-                new() { Label = "SCRAP THEM", Detail = "+50 salvage.", Resolve = (run, _) => Salvage(run, 50, "The swarm makes good scrap. +50 salvage.") },
+                new()
+                {
+                    Label = "STRIP THEM FOR PARTS", Detail = "A module crate, but no repairs.",
+                    Resolve = (run, rng) => Crate(run, "DRONE PARTS", rng, "The swarm makes good spares."),
+                },
             },
         },
         new()
@@ -570,12 +590,12 @@ public static class RunContent
             {
                 new()
                 {
-                    Label = "PUSH THROUGH", Detail = "Every ship takes 6 hull damage. +40 salvage from wrecks inside.",
-                    Resolve = (run, _) =>
+                    Label = "PUSH THROUGH", Detail = $"Every ship takes 6 hull damage. Hard flying: +{EventXpLarge} XP for every pilot.",
+                    Resolve = (run, rng) =>
                     {
                         foreach (Pilot pilot in run.Living)
                             pilot.TakeHullDamage(6);
-                        return Salvage(run, 40, "Rough going, but the storm hid some prizes. +40 salvage.");
+                        return SquadXp(run, EventXpLarge, rng, "Rough going, but every pilot comes out sharper.");
                     },
                 },
                 new()
@@ -603,21 +623,36 @@ public static class RunContent
             {
                 new()
                 {
-                    Label = "ANSWER THE CALL", Detail = "Fight a strike mission. +40 bonus salvage if you win.",
-                    Resolve = (_, _) => new EventOutcome { Text = "You turn toward the convoy.", Battle = RunNodeKind.Strike, BonusSalvage = 40 },
+                    Label = "ANSWER THE CALL", Detail = "Fight a strike mission. Win and the convoy hands over a module crate.",
+                    Resolve = (_, _) => new EventOutcome { Text = "You turn toward the convoy.", Battle = RunNodeKind.Strike, CrateReward = "CONVOY'S THANKS" },
                 },
                 new() { Label = "KEEP COURSE", Detail = "Someone else will have to help.", Resolve = (_, _) => new EventOutcome { Text = "The signal fades behind you." } },
             },
         },
     };
 
+    const int EventXpSmall = 50;
+    const int EventXpLarge = 70;
+
     static bool HasEmptySlot(Pilot pilot) => pilot.Ship.UpgradeSlots.Any(slot => pilot.ModuleIn(slot) == null);
 
-    static EventOutcome Salvage(RunState run, int amount, string text)
+    /// <summary>XP for every living pilot; the text names anyone who levels up.</summary>
+    static EventOutcome SquadXp(RunState run, int amount, RandomNumberGenerator rng, string text)
     {
-        run.Salvage += amount;
+        List<string> promoted = run.Living.ToList().Where(pilot => run.GrantXp(pilot, amount, rng) > 0).Select(pilot => pilot.Callsign).ToList();
+        text += $" +{amount} XP each.";
+        if (promoted.Count > 0)
+            text += $" {JoinNames(promoted)} {(promoted.Count == 1 ? "levels" : "level")} up.";
         return new EventOutcome { Text = text };
     }
+
+    static EventOutcome Crate(RunState run, string reason, RandomNumberGenerator rng, string text) => new()
+    {
+        Text = run.QueueCrate(reason, run.Living, rng) ? text : "There's nothing in it the squadron's ships can use.",
+    };
+
+    static string JoinNames(List<string> names) =>
+        names.Count == 1 ? names[0] : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
 
     public static RunEvent EventById(string id) => Events.FirstOrDefault(e => e.Id == id) ?? Events[0];
 }

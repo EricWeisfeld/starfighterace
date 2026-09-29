@@ -82,7 +82,7 @@ public partial class BattleDebrief : CanvasLayer
 
     Control BuildKpis()
     {
-        var grid = new GridContainer { Columns = 4, MouseFilter = Control.MouseFilterEnum.Ignore };
+        var grid = new GridContainer { Columns = 3, MouseFilter = Control.MouseFilterEnum.Ignore };
         grid.AddThemeConstantOverride("h_separation", 12);
         int kills = _report.Squad.Sum(f => f.Kills);
         int downed = _report.Squad.Count(f => !f.IsAlive);
@@ -91,9 +91,6 @@ public partial class BattleDebrief : CanvasLayer
             AddKpi(grid, $"+{_report.Results.Sum(r => r.XpGained)}", "SQUAD XP", TextBright);
         else
             AddKpi(grid, _report.Turns.ToString(), "TURNS", TextBright);
-        int salvage = _report.Run?.Salvage ?? 0;
-        if (salvage > 0)
-            AddKpi(grid, $"+{salvage}", "SALVAGE", Positive);
         // Shot down is not the same as lost: a win tows the wrecks home.
         AddKpi(grid, downed.ToString(), "SHOT DOWN", downed > 0 ? Negative : Muted);
         return grid;
@@ -161,12 +158,12 @@ public partial class BattleDebrief : CanvasLayer
             { Survived: false, Ejected: true } => ("KIA", ChipRole.Loss, "Ejected, but lost in enemy space."),
             { Survived: false } => ("KIA", ChipRole.Loss, "Shot down. No ejection."),
             { WreckRecovered: true } => ("EJECTED", ChipRole.Impaired,
-                $"Ejected and recovered, and the wreck was towed home. It flies on shields and 1 hull until repaired ({RunState.RepairCostPerHull * r.Pilot.HullDamage} salvage)."),
+                "Ejected and recovered, and the wreck was towed home. It flies on shields and 1 hull until repaired at a dock."),
             { ShipLost: true } => ("EJECTED", ChipRole.Impaired,
                 $"Ejected and escaped, but the ship was left behind. Flies a new {r.Pilot.Ship.DisplayName} next time."),
             { Ejected: true } => ("EJECTED", ChipRole.Impaired, "Ejected and recovered."),
             _ => ("RETURNED", ChipRole.Gain,
-                r.Pilot.HullDamage > 0 ? $"{r.Pilot.HullDamage} hull damage still to repair." : "Hull fully repaired."),
+                r.Pilot.HullDamage > 0 ? $"{r.Pilot.HullDamage} hull damage to repair at a dock." : "No hull damage."),
         };
         stack.AddChild(CardHeader(r.LostFrame ?? r.Pilot.Ship, r.Pilot.Callsign.ToUpper(), r.Survived, fate, fateRole));
         stack.AddChild(Text(fateNote, FontCaption, Muted, 0, wrap: true));

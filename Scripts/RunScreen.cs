@@ -43,12 +43,7 @@ public partial class RunScreen : Node2D
         // Android's back gesture returns from a sub-page.
         if (what != NotificationWMGoBackRequest)
             return;
-        if (_refitCallsign != null)
-        {
-            _refitCallsign = null;
-            Render();
-        }
-        else if (_showSquadron)
+        if (_showSquadron)
         {
             _showSquadron = false;
             Render();
@@ -86,6 +81,10 @@ public partial class RunScreen : Node2D
         Control page;
         if (Run.Outcome != RunOutcome.InProgress)
             page = BuildEndPage();
+        // An event's outcome is read before any crate or level-up it brought.
+        else if (Run.ActiveNode is { Kind: RunNodeKind.Event } signal && Run.EventResult != null &&
+                 (signal.EventBattle == null || !_eventBattleAcknowledged))
+            page = BuildEventPage();
         else if (Run.Promotions.Count > 0)
             page = BuildPromotionPage();
         else if (_showSquadron)
@@ -93,7 +92,7 @@ public partial class RunScreen : Node2D
         else if (Run.ActiveNode is { } node)
             page = node.Kind switch
             {
-                RunNodeKind.Repair => _refitCallsign != null ? BuildRefitPage() : BuildDockPage(),
+                RunNodeKind.Repair => BuildDockPage(),
                 RunNodeKind.Recruit => BuildRecruitPage(),
                 // An event that turned into a fight shows its outcome first,
                 // then the briefing once the player moves on.
@@ -139,20 +138,6 @@ public partial class RunScreen : Node2D
         if (trailing != null)
             row.AddChild(trailing);
         return row;
-    }
-
-    /// <summary>Right-aligned salvage readout for page headers.</summary>
-    Control SalvageBadge()
-    {
-        VBoxContainer box = Stack(0);
-        box.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        Label key = Text("SALVAGE", FontMicro, Muted, 3);
-        key.HorizontalAlignment = HorizontalAlignment.Right;
-        Label value = Text(Run.Salvage.ToString(), FontTitle, Warning, 2);
-        value.HorizontalAlignment = HorizontalAlignment.Right;
-        box.AddChild(key);
-        box.AddChild(value);
-        return box;
     }
 
     static TextureRect ShipIcon(ShipType ship, float size = 88f, int team = 0, bool faded = false) => new()

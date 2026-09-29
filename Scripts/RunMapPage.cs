@@ -7,7 +7,7 @@ using static SignalUi;
 public partial class RunScreen
 {
     /// <summary>
-    /// The sector map: header with salvage, the branching route from the
+    /// The sector map: header with the menu, the branching route from the
     /// entrance (bottom) to the boss (top), the squadron at a glance, and a
     /// sheet describing the tapped stop with a Go button.
     /// </summary>
@@ -27,7 +27,6 @@ public partial class RunScreen
         Control title = Header($"SECTOR {Run.Sector} OF {RunContent.SectorCount}", Run.SectorName);
         title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         header.AddChild(title);
-        header.AddChild(SalvageBadge());
         header.AddChild(menu);
         page.AddChild(header);
 
@@ -192,17 +191,18 @@ public partial class RunScreen
         return holder;
     }
 
-    /// <summary>One line of numbers about a stop: the fight's size and reward, or what it offers.</summary>
+    /// <summary>One line of numbers about a stop: the fight's size and any bonus, or what it offers.</summary>
     string StopDetail(RunNode node)
     {
         if (node.BattleKind is RunNodeKind kind)
         {
             BattleMission mission = RunContent.BuildMission(node, Run.Sector, kind);
-            return $"THREAT {mission.Threat} · {Plural(mission.EnemySquad.Length, "HOSTILE")} · +{RunContent.SalvageReward(kind, Run.Sector)} SALVAGE";
+            string detail = $"THREAT {mission.Threat} · {Plural(mission.EnemySquad.Length, "HOSTILE")}";
+            return kind == RunNodeKind.Elite ? detail + " · MODULE CRATE" : detail;
         }
         return node.Kind switch
         {
-            RunNodeKind.Repair => $"{RunState.DockStockSize} MODULES FOR SALE · REFITS · REPAIRS",
+            RunNodeKind.Repair => "FULL REPAIRS · TREAT ONE SCAR",
             RunNodeKind.Recruit => $"ROSTER {Run.Living.Count()}/{RunState.RosterLimit}",
             _ => "OUTCOME UNKNOWN",
         };

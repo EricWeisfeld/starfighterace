@@ -23,7 +23,8 @@ public class RunNode
     public string EventId { get; set; }
     /// <summary>Set when an event at this stop turned into a fight.</summary>
     public RunNodeKind? EventBattle { get; set; }
-    public int BonusSalvage { get; set; }
+    /// <summary>For an event's fight: the reason on the module crate a win opens, or null for none.</summary>
+    public string CrateReward { get; set; }
 
     /// <summary>The kind of fight at this stop, or null when there is none.</summary>
     [JsonIgnore]
@@ -36,8 +37,6 @@ public class RunNode
 /// </summary>
 public class PendingPromotion
 {
-    public const string CrateReason = "MODULE CRATE";
-
     public string Callsign { get; set; } = "";
     public string Reason { get; set; } = "";
     public List<PromotionCard> Cards { get; set; } = new();
@@ -48,7 +47,6 @@ public class PendingPromotion
 /// <summary>Everything the debrief shows about a run battle's consequences.</summary>
 public class RunBattleReport
 {
-    public int Salvage;
     public List<string> Promotions = new();
     public bool SectorCleared;
     public RunOutcome Outcome;
@@ -118,11 +116,11 @@ public class PilotSave
 }
 
 /// <summary>
-/// A roguelite run: three sectors of branching stops, a squadron of up to
-/// five pilots, and salvage to spend. Hull damage, lost ships, scars and deaths
-/// carry from stop to stop. Pilots grow through XP; ships grow through
-/// salvage spent at repair docks. The run saves after every change so a phone
-/// can close the app at any moment.
+/// A roguelite run: three sectors of branching stops and a squadron of up to
+/// five pilots. Hull damage, lost ships, scars and deaths carry from stop to
+/// stop. There is no currency: pilots and their ships grow through level-ups,
+/// with module crates as bonus rewards. The run saves after every change so a
+/// phone can close the app at any moment.
 /// </summary>
 public class RunState
 {
@@ -130,12 +128,7 @@ public class RunState
     public const int SaveVersion = 2;
     public const int RosterLimit = 5;
     public const int SquadLimit = 3;
-    public const int StartingSalvage = 50;
-    public const int RepairCostPerHull = 2;
-    public const int TreatScarCost = 50;
-    public const int RefitCost = 120;
-    public const int DockStockSize = 3;
-    /// <summary>Share of each ship's damage patched for free when a sector is cleared.</summary>
+    /// <summary>Share of each ship's damage patched when a sector is cleared.</summary>
     public const float SectorPatchFraction = 0.5f;
     const string SavePath = "user://ace-star-pilot-run.json";
 
@@ -144,7 +137,6 @@ public class RunState
     public int Version { get; set; } = SaveVersion;
     public ulong Seed { get; set; }
     public int Sector { get; set; } = 1;
-    public int Salvage { get; set; }
     public List<RunNode> Nodes { get; set; } = new();
     /// <summary>The last stop completed in this sector, or -1 at the sector entrance.</summary>
     public int CurrentNodeId { get; set; } = -1;
@@ -159,8 +151,8 @@ public class RunState
     public List<string> BattleSquad { get; set; } = new();
     public List<PendingPromotion> Promotions { get; set; } = new();
     public List<RecruitOffer> RecruitOffers { get; set; } = new();
-    /// <summary>Modules for sale at the active repair dock; each sells once.</summary>
-    public List<ShipUpgrade> DockStock { get; set; } = new();
+    /// <summary>True once the active repair dock's medic has treated a scar; one per visit.</summary>
+    public bool ScarTreated { get; set; }
     /// <summary>The report of an event option already chosen at the active stop.</summary>
     public string EventResult { get; set; }
     public RunOutcome Outcome { get; set; }
@@ -199,7 +191,6 @@ public class RunState
         var run = new RunState
         {
             Seed = seed ?? (((ulong)GD.Randi() << 32) | GD.Randi()),
-            Salvage = StartingSalvage,
         };
         foreach (ShipType shipClass in ShipTypes.RecruitableClasses)
             run.Pilots.Add(RunContent.NewPilot(run.TakeCallsign(), shipClass));
@@ -273,7 +264,10 @@ public class RunState
 
     // --------------------------------------------------------------- stops
 
-    /// <summary>Travels to a stop. Recruit stops roll their candidates on arrival.</summary>
+    /// <summary>
+    /// Travels to a stop. Recruit stops roll their candidates on arrival;
+    /// repair docks fix every hull on arrival.
+    /// </summary>
     public void EnterNode(RunNode node)
     {
         if (!Reachable.Contains(node) || ActiveNodeId >= 0)
@@ -282,11 +276,12 @@ public class RunState
         Notice = null;
         EventResult = null;
         RecruitOffers.Clear();
-        DockStock.Clear();
+        ScarTreated = false;
         if (node.Kind == RunNodeKind.Recruit)
             RollRecruits();
         if (node.Kind == RunNodeKind.Repair)
-            RollDockStock(node);
+            foreach (Pilot pilot in Living)
+                pilot.HullDamage = 0;
         Save();
     }
 
@@ -354,25 +349,17 @@ public class RunState
 
         TotalKills += results.Sum(r => r.Kills);
         if (won)
-        {
             BattlesWon++;
-            report.Salvage = RunContent.SalvageReward(kind, Sector) + (node?.BonusSalvage ?? 0);
-            Salvage += report.Salvage;
-        }
 
         RandomNumberGenerator rng = NextRng();
+        // A crate comes before the level-ups, which are rerolled around
+        // whatever module it fits.
+        string crateReason = kind == RunNodeKind.Elite ? "ELITE WING" : node?.CrateReward;
+        if (won && crateReason != null && QueueCrate(crateReason, results.Where(r => r.Survived).Select(r => r.Pilot), rng))
+            report.Promotions.Add($"{crateReason} · MODULE CRATE");
         foreach (PilotResult result in results.Where(r => r.Survived))
             for (int level = result.Pilot.Level - result.LevelsGained + 1; level <= result.Pilot.Level; level++)
                 QueuePromotion(result.Pilot, $"REACHED LEVEL {level}", rng, report);
-        if (won && kind == RunNodeKind.Elite)
-        {
-            List<PromotionCard> crate = RunContent.ModuleCrate(results.Where(r => r.Survived).Select(r => r.Pilot), rng);
-            if (crate.Count > 0)
-            {
-                Promotions.Add(new PendingPromotion { Callsign = "", Reason = PendingPromotion.CrateReason, Cards = crate });
-                report.Promotions.Add("ELITE WING · MODULE CRATE");
-            }
-        }
 
         if (kind == RunNodeKind.Boss)
         {
@@ -398,7 +385,7 @@ public class RunState
         return (results, report);
     }
 
-    void QueuePromotion(Pilot pilot, string reason, RandomNumberGenerator rng, RunBattleReport report)
+    void QueuePromotion(Pilot pilot, string reason, RandomNumberGenerator rng, RunBattleReport report = null)
     {
         // A pilot whose promotion would be generated before an earlier one is
         // applied could be offered the same card twice; ChoosePromotion
@@ -407,7 +394,29 @@ public class RunState
         if (cards.Count == 0)
             return;
         Promotions.Add(new PendingPromotion { Callsign = pilot.Callsign, Reason = reason, Cards = cards });
-        report.Promotions.Add($"{pilot.Callsign} · {reason}");
+        report?.Promotions.Add($"{pilot.Callsign} · {reason}");
+    }
+
+    /// <summary>XP from outside a battle. Returns the levels gained; each queues a level-up.</summary>
+    public int GrantXp(Pilot pilot, int amount, RandomNumberGenerator rng)
+    {
+        int gained = pilot.GrantXp(amount);
+        for (int level = pilot.Level - gained + 1; level <= pilot.Level; level++)
+            QueuePromotion(pilot, $"REACHED LEVEL {level}", rng);
+        return gained;
+    }
+
+    /// <summary>
+    /// Queues a module crate matched to these pilots' ships. The reason names
+    /// where it came from. Returns false when no module fits any of them.
+    /// </summary>
+    public bool QueueCrate(string reason, IEnumerable<Pilot> pilots, RandomNumberGenerator rng)
+    {
+        List<PromotionCard> crate = RunContent.ModuleCrate(pilots, rng);
+        if (crate.Count == 0)
+            return false;
+        Promotions.Add(new PendingPromotion { Callsign = "", Reason = reason, Cards = crate });
+        return true;
     }
 
     /// <summary>Applies the chosen card to the first waiting promotion.</summary>
@@ -424,8 +433,8 @@ public class RunState
         // Later level-ups for the same pilot were rolled before this one;
         // reroll them so they never offer something the pilot now already has.
         RandomNumberGenerator rng = NextRng();
-        if (pilot != null && !promotion.IsCrate)
-            foreach (PendingPromotion later in Promotions.Where(p => p.Callsign == promotion.Callsign))
+        if (pilot != null)
+            foreach (PendingPromotion later in Promotions.Where(p => !p.IsCrate && p.Callsign == pilot.Callsign))
                 later.Cards = RunContent.PromotionCards(pilot, rng);
         Promotions.RemoveAll(p => p.Cards.Count == 0);
         Save();
@@ -445,7 +454,6 @@ public class RunState
         CurrentNodeId = node.Id;
         ActiveNodeId = -1;
         RecruitOffers.Clear();
-        DockStock.Clear();
         EventResult = null;
         if (!Living.Any())
             Outcome = RunOutcome.Defeat;
@@ -454,7 +462,7 @@ public class RunState
 
     /// <summary>
     /// Leaving a cleared sector: every ship is patched halfway, then a new
-    /// map. Full repairs are bought at docks.
+    /// map. Full repairs are at docks.
     /// </summary>
     void AdvanceSector()
     {
@@ -474,73 +482,15 @@ public class RunState
 
     // ------------------------------------------------------- repair dock
 
-    public int RepairCost(Pilot pilot) => pilot.HullDamage * RepairCostPerHull;
-
-    public bool Repair(Pilot pilot)
-    {
-        int cost = RepairCost(pilot);
-        if (cost <= 0 || cost > Salvage)
-            return false;
-        Salvage -= cost;
-        pilot.HullDamage = 0;
-        Save();
-        return true;
-    }
-
+    /// <summary>The dock's medic treats one scar per visit.</summary>
     public bool TreatScar(Pilot pilot, Perk scar)
     {
-        if (scar == null || !scar.IsScar || !pilot.Perks.Contains(scar) || Salvage < TreatScarCost)
+        if (ActiveNode?.Kind != RunNodeKind.Repair || ScarTreated || scar == null || !scar.IsScar || !pilot.Perks.Contains(scar))
             return false;
-        Salvage -= TreatScarCost;
         pilot.Perks.Remove(scar);
+        ScarTreated = true;
         Save();
         return true;
-    }
-
-    /// <summary>Fits a module from the dock's stock, replacing whatever was in its slot.</summary>
-    public bool BuyModule(Pilot pilot, ShipUpgrade module)
-    {
-        int cost = ShipUpgrades.Get(module).Cost;
-        if (!DockStock.Contains(module) || !pilot.CanInstall(module) || Salvage < cost)
-            return false;
-        Salvage -= cost;
-        pilot.InstallUpgrade(module);
-        DockStock.Remove(module);
-        Save();
-        return true;
-    }
-
-    public bool BuyRefit(Pilot pilot, ShipType frame)
-    {
-        if (!pilot.CanRefit || Salvage < RefitCost || !pilot.Refit(frame))
-            return false;
-        Salvage -= RefitCost;
-        Save();
-        return true;
-    }
-
-    /// <summary>
-    /// Stocks a dock with modules. At least one fits a slot someone in the
-    /// squadron has empty, when there is such a slot.
-    /// </summary>
-    void RollDockStock(RunNode node)
-    {
-        var rng = new RandomNumberGenerator { Seed = node.Seed ^ 0xA24BAED4963EE407UL };
-        List<ShipUpgrade> pool = ShipUpgrades.All.Select(module => module.Id).ToList();
-        List<ShipUpgrade> wanted = pool.Where(module => Living.Any(p => p.HasSlot(ShipUpgrades.Get(module).Slot) &&
-            p.ModuleIn(ShipUpgrades.Get(module).Slot) == null)).ToList();
-        if (wanted.Count > 0)
-        {
-            ShipUpgrade first = wanted[rng.RandiRange(0, wanted.Count - 1)];
-            DockStock.Add(first);
-            pool.Remove(first);
-        }
-        while (DockStock.Count < DockStockSize && pool.Count > 0)
-        {
-            int index = rng.RandiRange(0, pool.Count - 1);
-            DockStock.Add(pool[index]);
-            pool.RemoveAt(index);
-        }
     }
 
     // ------------------------------------------------------------ recruit
@@ -553,17 +503,19 @@ public class RunState
         foreach (ShipType shipClass in classes)
         {
             Pilot recruit = RunContent.NewRecruit(TakeCallsign(), shipClass, level, rng);
-            RecruitOffers.Add(new RecruitOffer { Pilot = PilotSave.From(recruit), Cost = RunContent.RecruitCost(level) });
+            RecruitOffers.Add(new RecruitOffer { Pilot = PilotSave.From(recruit) });
         }
     }
 
+    /// <summary>One candidate joins, which finishes the stop.</summary>
     public bool Hire(RecruitOffer offer)
     {
-        if (!RecruitOffers.Contains(offer) || Salvage < offer.Cost || Living.Count() >= RosterLimit)
+        if (!RecruitOffers.Contains(offer) || Living.Count() >= RosterLimit)
             return false;
-        Salvage -= offer.Cost;
-        Pilots.Add(offer.Pilot.ToPilot());
-        RecruitOffers.Remove(offer);
+        Pilot pilot = offer.Pilot.ToPilot();
+        Pilots.Add(pilot);
+        CompleteActiveNode();
+        Notice = $"{pilot.Callsign} joins the squadron.";
         Save();
         return true;
     }
@@ -593,7 +545,7 @@ public class RunState
         if (outcome.Battle is RunNodeKind battle)
         {
             ActiveNode.EventBattle = battle;
-            ActiveNode.BonusSalvage = outcome.BonusSalvage;
+            ActiveNode.CrateReward = outcome.CrateReward;
         }
         EventResult = outcome.Text;
         Save();

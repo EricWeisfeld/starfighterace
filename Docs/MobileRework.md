@@ -73,6 +73,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 ### Screens
 
 - `Run.tscn` / `RunScreen` shows one page chosen from run state: the starting draft (and its ship picker), sector map, squadron, briefing, promotion or crate cards, repair dock, recruit, signal, or run end. A signal's outcome is shown before any crate or level-up it brought.
+- **Pilot page** (`RunPilotPage`): tap a pilot on the squadron page, the pilot at the top of a level-up, or STATS on a recruit. It shows the ship's numbers with modules fitted (and what each module adds), the three slots, maneuvers and masteries (including what an unmastered one would gain), the instinct, scars and the pilot's record. It opens over the current page and Back returns to it. The numbers come from `ShipStats`, the same frame-plus-modules calculation the fighter uses in battle.
 - Home offers New Run, Continue Run and Quick Battle.
 
 ### Removed

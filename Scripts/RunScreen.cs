@@ -5,9 +5,9 @@ using static SignalUi;
 
 /// <summary>
 /// The run's home between battles. It shows exactly one page, chosen from the
-/// run's state: the end of the run, the starting draft, a waiting promotion,
-/// the stop the squadron is at, or the sector map. Every action saves and
-/// re-renders.
+/// run's state: the end of the run, the starting draft, an open pilot page, a
+/// waiting promotion, the stop the squadron is at, or the sector map. Every
+/// action saves and re-renders.
 /// </summary>
 public partial class RunScreen : Node2D
 {
@@ -44,7 +44,12 @@ public partial class RunScreen : Node2D
         // Android's back gesture returns from a sub-page.
         if (what != NotificationWMGoBackRequest)
             return;
-        if (_shipPickerSlot != null)
+        if (_detailPilot != null)
+        {
+            _detailPilot = null;
+            Render();
+        }
+        else if (_shipPickerSlot != null)
         {
             _shipPickerSlot = null;
             Render();
@@ -89,6 +94,9 @@ public partial class RunScreen : Node2D
             page = BuildEndPage();
         else if (Run.Drafting)
             page = _shipPickerSlot is int slot && slot < Run.Draft.Count ? BuildShipPickerPage(slot) : BuildDraftPage();
+        // A pilot's page opens over whatever was showing and closes back to it.
+        else if (_detailPilot != null)
+            page = BuildPilotPage();
         // An event's outcome is read before any crate or level-up it brought.
         else if (Run.ActiveNode is { Kind: RunNodeKind.Event } signal && Run.EventResult != null &&
                  (signal.EventBattle == null || !_eventBattleAcknowledged))

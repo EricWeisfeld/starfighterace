@@ -8,7 +8,7 @@ public partial class RunScreen
 {
     // ---------------------------------------------------------- squadron
 
-    /// <summary>Every pilot's full record: hull, maneuvers, upgrades and traits, then the fallen.</summary>
+    /// <summary>Every pilot at a glance, each opening their full page; then the fallen.</summary>
     Control BuildSquadronPage()
     {
         VBoxContainer page = Stack(16);
@@ -31,12 +31,13 @@ public partial class RunScreen
         return page;
     }
 
-    static Control PilotRecord(Pilot pilot)
+    Control PilotRecord(Pilot pilot)
     {
-        PanelContainer card = Card();
+        var card = new TapCard();
+        card.Tapped += () => OpenPilot(pilot);
         VBoxContainer stack = Stack(12);
         card.AddChild(stack);
-        stack.AddChild(PilotSummary(pilot));
+        stack.AddChild(PilotSummary(pilot, "TAP FOR STATS"));
 
         int xpToNext = Pilot.XpToNext(pilot.Level);
         HBoxContainer xpRow = Row(12);
@@ -56,8 +57,6 @@ public partial class RunScreen
         stack.AddChild(ShipLoadout(pilot));
         stack.AddChild(Text("PILOT", FontMicro, Muted, 3));
         stack.AddChild(PilotSkills(pilot));
-        foreach (Perk perk in pilot.Perks)
-            stack.AddChild(Text($"{perk.Name}: {perk.Description}", FontMicro, perk.Positive ? Muted : Warning, 0, wrap: true));
         return card;
     }
 
@@ -204,7 +203,10 @@ public partial class RunScreen
         {
             Pilot pilot = Run.Pilots.First(p => p.Callsign == promotion.Callsign);
             page.AddChild(Header($"PROMOTION{waiting}", $"{pilot.Callsign} {promotion.Reason}"));
-            page.AddChild(PilotSummary(pilot));
+            var summary = new TapCard();
+            summary.Tapped += () => OpenPilot(pilot);
+            summary.AddChild(PilotSummary(pilot, "TAP FOR STATS"));
+            page.AddChild(summary);
             page.AddChild(Text("CHOOSE ONE · PILOT OR SHIP", FontCaption, Muted, 4));
         }
 
@@ -369,7 +371,13 @@ public partial class RunScreen
                 Run.Hire(offer);
                 Render();
             };
-            stack.AddChild(hire);
+            Button stats = TouchButton("STATS", fontSize: FontCaption);
+            stats.Pressed += () => OpenPilot(recruit);
+            HBoxContainer buttons = Row(12);
+            hire.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            buttons.AddChild(hire);
+            buttons.AddChild(stats);
+            stack.AddChild(buttons);
             content.AddChild(card);
         }
         Button leave = TouchButton("MOVE ON", primary: true);

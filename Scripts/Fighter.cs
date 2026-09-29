@@ -72,8 +72,8 @@ public partial class Fighter : Node2D
     public float Accuracy = 0.85f;            // base chance each shot connects
     public float Evasion = 0.25f;             // reduces attackers' hit chance
     public float FireCooldown = 0.6f;         // delay between barrages
-    public int BarrageMin = 3;                // shots per barrage
-    public int BarrageMax = 5;
+    public int BarrageMin = ShipStats.BaseShotsMin;   // shots per barrage
+    public int BarrageMax = ShipStats.BaseShotsMax;
     public bool CanFire = true;
 
     public ShipType Type;
@@ -600,27 +600,19 @@ public partial class Fighter : Node2D
         Pilot = pilot;
         if (Pilot == null)
             return;
-        foreach (ShipUpgrade module in Pilot.Upgrades)
-        {
-            switch (module)
-            {
-                case ShipUpgrade.EngineSpeed: NormalMoveMaxDistance += ShipUpgrades.NormalMoveLimitBonus; break;
-                case ShipUpgrade.EngineTurn: NormalTurnLimitDegrees += ShipUpgrades.NormalTurnLimitBonusDegrees; break;
-                case ShipUpgrade.EngineRetro: NormalMoveMinDistance -= ShipUpgrades.RetroMinMoveReduction; break;
-                case ShipUpgrade.GunsExtraShot:
-                    BarrageMin += ShipUpgrades.ExtraShots;
-                    BarrageMax += ShipUpgrades.ExtraShots;
-                    break;
-                case ShipUpgrade.GunsAccuracy: Accuracy += ShipUpgrades.AccuracyBonus; break;
-                case ShipUpgrade.GunsWideMount: BaseFireConeDeg += ShipUpgrades.WideMountConeBonusDegrees; break;
-                case ShipUpgrade.ShieldsCapacity: MaxShield += ShipUpgrades.ShieldCapacityBonus; break;
-                case ShipUpgrade.ShieldsRegen: ShieldRegenPerTurn += ShipUpgrades.ShieldRegenBonus; break;
-                case ShipUpgrade.ShieldsArmor:
-                    MaxHp += ShipUpgrades.ArmorHullBonus;
-                    NormalMoveMaxDistance -= ShipUpgrades.ArmorMoveLimitPenalty;
-                    break;
-            }
-        }
+        ShipStats stats = Pilot.Stats;
+        MaxHp = stats.MaxHull;
+        MaxShield = stats.MaxShield;
+        ShieldRegenPerTurn = stats.ShieldRegen;
+        ShotDamage = stats.ShotDamage;
+        BarrageMin = stats.ShotsMin;
+        BarrageMax = stats.ShotsMax;
+        Accuracy = stats.Accuracy;
+        Evasion = stats.Evasion;
+        BaseFireConeDeg = stats.FireConeDeg;
+        NormalTurnLimitDegrees = stats.TurnDeg;
+        NormalMoveMinDistance = stats.MinMove;
+        NormalMoveMaxDistance = stats.MaxMove;
         Moves = Masteries.Apply(Type.Maneuvers, Pilot.Masteries);
         SelectedNormalMoveDistance = NormalMoveMaxDistance;
         PlannedPathDistance = NormalMoveMaxDistance;

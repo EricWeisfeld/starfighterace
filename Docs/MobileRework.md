@@ -135,7 +135,7 @@ empty slot and a mastery while there are any, then any of those or a module
 swap. Frames and instincts never appear.
 
 - **Module** (ship): for an empty slot, or a swap for a filled one.
-- **New maneuver** from the class pool, up to three.
+- **New maneuver** from the class pool, up to three. The ZT line's **Suppression Fire** is always on: each hit takes 8° (16° mastered) off the target's normal-flight turning, felt in full on its next turn. Under continued fire, older suppression halves each turn; a turn without being suppressed clears it. It never takes a ship below 25°, and maneuvers keep their own angles. Enemy ZT-line ships have it too. A suppressed ship shows "SUPPRESSED −X°" under its bars, and the HUD hint says so.
 - **Mastery** of a maneuver the pilot knows. It only matters on turns that maneuver is flown: Snap Turn to 180°, Boost turns 90°, U-Turn and Break Turn lose their cooldown, Lock On +25%, Scramble jams a second enemy, and so on (`Masteries.Describe`).
 
 

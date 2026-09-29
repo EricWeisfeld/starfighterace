@@ -652,7 +652,8 @@ public partial class BattleOverlay : Node2D
     /// <summary>
     /// Shield and hull bars under each ship, drawn at a constant screen size
     /// so they stay legible when the camera pulls back. Player ships also
-    /// carry a callsign above them.
+    /// carry a callsign above them, and a suppressed ship of either side says
+    /// so under its bars.
     /// </summary>
     void DrawHpBar(Fighter f, Color color)
     {
@@ -674,6 +675,11 @@ public partial class BattleOverlay : Node2D
         if (f.Team == 0)
             DrawLabel(f.Position + new Vector2(0f, -26f - Px(12f)), BattleManager.CallsignOf(f), SignalUi.FontMicro,
                 new Color(SignalUi.Body.R, SignalUi.Body.G, SignalUi.Body.B, 0.85f));
+
+        // Suppression Fire slows a ship's turning until it gets out of the fire.
+        if (f.IsSuppressed)
+            DrawLabel(hullTopLeft + new Vector2(width / 2f, hullHeight + Px(12f)),
+                $"SUPPRESSED −{f.NormalTurnLimitPenaltyDegrees:0}°", SignalUi.FontMicro, SignalUi.Warning);
     }
 }
 

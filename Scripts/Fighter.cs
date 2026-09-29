@@ -106,7 +106,13 @@ public partial class Fighter : Node2D
     public int SensorScrambleCooldownTurns;
     public int SensorScrambleTurns;
     public float SensorScrambleAccuracyPenalty;
+    /// <summary>Degrees taken off normal-flight turning by enemy Suppression Fire.</summary>
     public float NormalTurnLimitPenaltyDegrees;
+    /// <summary>The part of the suppression penalty added during the turn being flown.</summary>
+    float _suppressionThisTurn;
+    /// <summary>Share of older suppression that lingers each turn while the ship stays under fire.</summary>
+    public const float SuppressionLinger = 0.5f;
+    public bool IsSuppressed => NormalTurnLimitPenaltyDegrees >= 0.5f;
 
     // In-progress barrage state, driven by BattleManager during execution.
     public int BarrageShotsLeft;
@@ -529,6 +535,7 @@ public partial class Fighter : Node2D
 
     public void AdvanceTacticalEffects()
     {
+        RecoverFromSuppression();
         AdvanceHunterLockCooldown();
         SensorScrambleCooldownTurns = Mathf.Max(0, SensorScrambleCooldownTurns - 1);
         if (SensorScrambleTurns > 0 && --SensorScrambleTurns == 0)
@@ -553,11 +560,28 @@ public partial class Fighter : Node2D
             Mathf.DegToRad(EmergencyThrustersTurnLimitDegrees));
     }
 
-    /// <summary>Applies a persistent maneuvering penalty, capped so a ship can still turn.</summary>
+    /// <summary>
+    /// A suppressing hit: takes degrees off normal-flight turning, capped so
+    /// the ship can always turn a little. Maneuvers keep their own angles.
+    /// </summary>
     public void ApplySuppression(float penalty)
     {
+        float before = NormalTurnLimitPenaltyDegrees;
         NormalTurnLimitPenaltyDegrees = Mathf.Min(NormalTurnLimitDegrees - 25f,
             NormalTurnLimitPenaltyDegrees + penalty);
+        _suppressionThisTurn += NormalTurnLimitPenaltyDegrees - before;
+    }
+
+    /// <summary>
+    /// End of turn. This turn's suppressing hits count in full for the next
+    /// turn; older suppression halves. A turn without being suppressed clears
+    /// it all, so it never lingers once the ship is out of the fire.
+    /// </summary>
+    void RecoverFromSuppression()
+    {
+        float older = NormalTurnLimitPenaltyDegrees - _suppressionThisTurn;
+        NormalTurnLimitPenaltyDegrees = _suppressionThisTurn > 0f ? _suppressionThisTurn + older * SuppressionLinger : 0f;
+        _suppressionThisTurn = 0f;
     }
 
     /// <summary>Remove the current order and restore the normal throttle, if needed.</summary>

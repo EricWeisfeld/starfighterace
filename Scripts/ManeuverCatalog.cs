@@ -159,7 +159,7 @@ public static class ManeuverCatalog
         ShipAbility.BreakTurn => "Swing through a wide 180° arc.",
         ShipAbility.EngineBoost => "A long burn that covers ground fast.",
         ShipAbility.RotatingGuns => "Creep forward while the guns sweep a wide arc.",
-        ShipAbility.SuppressionFire => "Always on: your hits make the target turn less sharply.",
+        ShipAbility.SuppressionFire => "Always on: your hits make the target turn less sharply next turn, until it gets out of your fire.",
         ShipAbility.EmergencyThrusters => "A fast escape sprint, at the cost of some evasion.",
         ShipAbility.SnapTurn => "Whip around 145° in a very short distance.",
         ShipAbility.HunterLock => "Lock an enemy for extra accuracy against it.",

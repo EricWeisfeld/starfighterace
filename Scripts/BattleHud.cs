@@ -373,7 +373,14 @@ public partial class BattleHud : CanvasLayer
         }
 
         ManeuverInfo info = ManeuverCatalog.ForManeuver(fighter.PlannedManeuver);
-        SetSummary(info.Summary(fighter) + (info.Directional ? " Tap again to switch sides." : ""), Muted);
+        string summary = info.Summary(fighter) + (info.Directional ? " Tap again to switch sides." : "");
+        if (fighter.IsSuppressed)
+        {
+            // Maneuvers keep their own angles, so they are the way out.
+            SetSummary(summary + $" Suppressed: normal turns −{fighter.NormalTurnLimitPenaltyDegrees:0}° until you get out of the fire.", Warning);
+            return;
+        }
+        SetSummary(summary, Muted);
     }
 
     void SetSummary(string text, Color color)

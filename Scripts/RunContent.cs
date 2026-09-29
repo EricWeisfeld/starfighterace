@@ -550,7 +550,7 @@ public static class RunContent
                         ShipUpgradeDefinition upgrade = upgrades[rng.RandiRange(0, upgrades.Length - 1)];
                         pilot.InstallUpgrade(upgrade.Id);
                         string text = $"{pilot.Callsign} fits a {upgrade.Name}.";
-                        if (rng.Randf() < 0.3f && !pilot.IsWrecked)
+                        if (rng.Randf() < 0.3f)
                         {
                             int damage = Mathf.CeilToInt(pilot.MaxHull * 0.4f);
                             pilot.TakeHullDamage(damage);

@@ -63,10 +63,10 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 - Level-ups and the ship are described in Phase 4.
 - A pilot who is shot down without ejecting is killed, along with the ship.
 - A pilot who ejects is wounded (sits out the next stop). What happens to the ship depends on the result:
-  - **Win:** the squadron holds the field and tows the wreck home. Frame and modules are intact, but the ship is grounded (WRECKED) until repaired at a dock, at the full 2 salvage per hull point. Any repair, including the drones event and the half patch between sectors, makes it flyable again.
+  - **Win:** the squadron holds the field and tows the wreck home. Frame and modules are intact, but the hull is down to 1. It can still fly, on full shields, until it is repaired at a dock (2 salvage per hull point), by the drones event, or by the half patch between sectors.
   - **Loss or retreat:** the wreck is left behind. The pilot comes home to a new, bare base frame of their class; the refit and every module are gone. Maneuvers, masteries, instincts and level stay, and a level-3 pilot can buy a refit again.
   - The pause menu's Retreat note names any wrecks a retreat would leave behind.
-- If nobody is fit to fly, the wounded and wrecked fly anyway, so a run can never soft-lock. A wreck forced into battle gets an emergency patch to a quarter hull.
+- If nobody is fit to fly, the wounded fly anyway, so a run can never soft-lock.
 
 ### Saving
 

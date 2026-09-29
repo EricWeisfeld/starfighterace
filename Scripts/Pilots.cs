@@ -32,30 +32,21 @@ public class Pilot
     public PilotCondition Condition = PilotCondition.Ready;
     /// <summary>Run stops a wounded pilot still has to sit out.</summary>
     public int RecoveryStops;
-    /// <summary>
-    /// Unrepaired hull points carried between battles. Damage equal to the
-    /// ship's full hull means it is a wreck (see <see cref="IsWrecked"/>).
-    /// </summary>
+    /// <summary>Unrepaired hull points carried between battles. A ship always keeps at least 1 hull.</summary>
     public int HullDamage;
     public int Kills;
     public int Battles;
 
     public bool Alive => Condition != PilotCondition.KIA;
-    /// <summary>Fit to fly: not wounded, and the ship is not a wreck.</summary>
-    public bool CanDeploy => Condition == PilotCondition.Ready && !IsWrecked;
+    public bool CanDeploy => Condition == PilotCondition.Ready;
     public bool IsWounded => Condition == PilotCondition.Wounded;
-    /// <summary>
-    /// The ship was shot down and towed home after a win. It stays grounded
-    /// until repaired; any repair brings it back above zero hull.
-    /// </summary>
-    public bool IsWrecked => Alive && HullDamage >= MaxHull;
     public bool IsMaxLevel => Level >= MaxLevel;
     public ShipType BaseClass => ShipTypes.BaseClass(ClassId);
     public bool CanRefit => Level >= RefitLevel && Ship == BaseClass;
     /// <summary>Maximum hull: the frame's, plus armor plating.</summary>
     public int MaxHull => Ship.MaxHp + (HasUpgrade(ShipUpgrade.ShieldsArmor) ? ShipUpgrades.ArmorHullBonus : 0);
-    /// <summary>Hull the ship will launch with; zero for a wreck.</summary>
-    public int Hull => IsWrecked ? 0 : Mathf.Clamp(MaxHull - HullDamage, 1, MaxHull);
+    /// <summary>Hull the ship will launch with. Shields always launch full.</summary>
+    public int Hull => Mathf.Clamp(MaxHull - HullDamage, 1, MaxHull);
     public IEnumerable<ShipAbility> UnlearnedManeuvers => Ship.ManeuverPool.Where(ability => !Maneuvers.Contains(ability));
     public IEnumerable<ShipAbility> UnmasteredManeuvers => Maneuvers.Where(ability => !Masteries.Contains(ability));
     public IEnumerable<Perk> Instincts => Perks.Where(perk => perk.Positive);
@@ -105,16 +96,18 @@ public class Pilot
     {
         if (!CanRefit || !ShipTypes.HullBranches(ClassId).Contains(frame))
             return false;
-        bool wrecked = IsWrecked;
         Ship = frame;
         Upgrades.RemoveAll(upgrade => !HasSlot(ShipUpgrades.Get(upgrade).Slot));
-        KeepHullState(wrecked);
+        HullDamage = Mathf.Min(HullDamage, MaxHull - 1);
         RestoreManeuvers(Maneuvers.ToArray());
         return true;
     }
 
-    /// <summary>Marks the ship as a wreck: grounded until repaired, frame and modules intact.</summary>
-    public void Wreck() => HullDamage = MaxHull;
+    /// <summary>
+    /// The ship was shot down but towed home: frame and modules intact, hull
+    /// down to 1. It can still fly, on its shields, until it is repaired.
+    /// </summary>
+    public void RecoverWreck() => HullDamage = MaxHull - 1;
 
     /// <summary>
     /// The ship was left behind. The pilot flies a new, bare base frame of
@@ -131,18 +124,8 @@ public class Pilot
         return lost;
     }
 
-    /// <summary>
-    /// Hull damage from outside a battle (events). It can bring a ship low
-    /// but never wrecks it, and a wreck takes no further damage.
-    /// </summary>
-    public void TakeHullDamage(int amount)
-    {
-        if (!IsWrecked)
-            HullDamage = Mathf.Min(MaxHull - 1, HullDamage + amount);
-    }
-
-    /// <summary>After the maximum hull changes: a wreck stays a wreck, otherwise the ship keeps at least 1 hull.</summary>
-    void KeepHullState(bool wrecked) => HullDamage = wrecked ? MaxHull : Mathf.Min(HullDamage, MaxHull - 1);
+    /// <summary>Hull damage from outside a battle (events). It never takes a ship below 1 hull.</summary>
+    public void TakeHullDamage(int amount) => HullDamage = Mathf.Min(MaxHull - 1, HullDamage + amount);
 
     public bool HasSlot(ShipUpgradeSlot slot) => Ship.UpgradeSlots.Contains(slot);
     public bool HasUpgrade(ShipUpgrade upgrade) => Upgrades.Contains(upgrade);
@@ -159,11 +142,10 @@ public class Pilot
     {
         if (!CanInstall(upgrade))
             return false;
-        bool wrecked = IsWrecked;
         ShipUpgradeSlot slot = ShipUpgrades.Get(upgrade).Slot;
         Upgrades.RemoveAll(existing => ShipUpgrades.Get(existing).Slot == slot);
         Upgrades.Add(upgrade);
-        KeepHullState(wrecked);
+        HullDamage = Mathf.Min(HullDamage, MaxHull - 1);
         return true;
     }
 
@@ -204,7 +186,7 @@ public class PilotResult
     public Pilot Pilot;
     public bool Survived;
     public bool Ejected;
-    /// <summary>Shot down in a win: the ship came home as a wreck.</summary>
+    /// <summary>Shot down in a win: the ship came home as a wreck at 1 hull.</summary>
     public bool WreckRecovered;
     /// <summary>Shot down in a loss: the ship was left behind.</summary>
     public bool ShipLost;
@@ -265,7 +247,7 @@ public static class BattleResolution
                 else if (won)
                 {
                     // Holding the field means towing the wreck home.
-                    f.Pilot.Wreck();
+                    f.Pilot.RecoverWreck();
                     r.WreckRecovered = true;
                 }
                 else

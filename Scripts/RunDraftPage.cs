@@ -57,8 +57,8 @@ public partial class RunScreen
         title.AddChild(name);
         title.AddChild(Text("CHANGE", FontMicro, Accent, 3));
         words.AddChild(title);
-        words.AddChild(Text(ShipStatLine(frame), FontMicro, Body, 1, wrap: true));
-        words.AddChild(Text(SlotLine(frame), FontMicro, Positive, 2, wrap: true));
+        words.AddChild(RoleLabel(frame, $" · {ShipTypes.ClassName(ShipTypes.ClassIdForHull(frame.Id)).ToUpper()} LINE"));
+        words.AddChild(Text(CombatStats(frame) + " · " + HandlingStats(frame), FontMicro, Body, 1, wrap: true));
         row.AddChild(words);
         ship.AddChild(row);
         content.AddChild(ship);
@@ -82,7 +82,11 @@ public partial class RunScreen
         }
     }
 
-    /// <summary>Every frame, grouped by class line, with the maneuvers each line learns.</summary>
+    /// <summary>
+    /// Every frame, grouped by class line. A line's frames fly alike and learn
+    /// the same maneuvers, so both are shown once per line; each frame shows
+    /// its role and how it fights.
+    /// </summary>
     Control BuildShipPickerPage(int slot)
     {
         DraftPilot draft = Run.Draft[slot];
@@ -92,12 +96,14 @@ public partial class RunScreen
             _shipPickerSlot = null;
             Render();
         }));
+        page.AddChild(Text("Every ship has an engine, guns and shields slot. Ships in a line fly alike; attack and guard frames trade firepower for toughness or back.",
+            FontCaption, Body, 0, wrap: true));
         (TouchScroll scroll, VBoxContainer content) = ScrollBody(12);
         page.AddChild(scroll);
         foreach (var line in ShipTypes.PlayerFrames.GroupBy(frame => ShipTypes.ClassIdForHull(frame.Id)))
         {
             ShipAbility[] pool = line.First().ManeuverPool;
-            content.AddChild(Text($"{ShipTypes.ClassName(line.Key).ToUpper()} LINE", FontCaption, Muted, 4));
+            content.AddChild(Text($"{ShipTypes.ClassName(line.Key).ToUpper()} LINE · {HandlingStats(line.First())}", FontCaption, Muted, 4));
             content.AddChild(Text($"Starts with {ManeuverCatalog.AbilityName(pool[0])}. Learns " +
                 string.Join(", ", pool.Skip(1).Select(ManeuverCatalog.AbilityName)) + ".", FontMicro, Muted, 0, wrap: true));
             foreach (ShipType frame in line)
@@ -120,20 +126,36 @@ public partial class RunScreen
         VBoxContainer words = Stack(4);
         words.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         words.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        words.AddChild(RoleLabel(frame));
         words.AddChild(Text(frame.DisplayName.ToUpper(), FontBody, TextBright, 2));
         words.AddChild(Text(frame.Description, FontCaption, Body, 0, wrap: true));
-        words.AddChild(Text(ShipStatLine(frame), FontMicro, Body, 1, wrap: true));
-        words.AddChild(Text(SlotLine(frame), FontMicro, Positive, 2, wrap: true));
+        words.AddChild(Text(CombatStats(frame), FontMicro, Body, 1, wrap: true));
         row.AddChild(words);
         tap.AddChild(row);
         return tap;
     }
 
-    // Non-breaking spaces keep each stat's name and number on one line.
-    static string ShipStatLine(ShipType frame) =>
-        $"HULL\u00A0{frame.MaxHp} · SHIELD\u00A0{frame.MaxShield} · DMG\u00A0{frame.ShotDamage} · ACC\u00A0{frame.Accuracy * 100:0}% · " +
-        $"EVA\u00A0{frame.Evasion * 100:0}% · TURN\u00A0{frame.NormalTurnLimitDegrees:0}° · SPEED\u00A0{frame.NormalMoveMaxDistance:0}";
+    static Label RoleLabel(ShipType frame, string suffix = "")
+    {
+        (string role, Color color) = frame.Role switch
+        {
+            FrameRole.Attack => ("ATTACK", Warning),
+            FrameRole.Guard => ("GUARD", Accent),
+            _ => ("BALANCED", Muted),
+        };
+        return Text(role + suffix, FontMicro, color, 3);
+    }
 
-    static string SlotLine(ShipType frame) =>
-        $"{frame.UpgradeSlots.Length}\u00A0SLOTS · " + string.Join(" · ", frame.UpgradeSlots.Select(ShipUpgrades.SlotName));
+    // Non-breaking spaces keep each stat's name and number on one line.
+    static string CombatStats(ShipType frame)
+    {
+        string stats = $"HULL\u00A0{frame.MaxHp} · SHIELD\u00A0{frame.MaxShield} · DMG\u00A0{frame.ShotDamage} · " +
+            $"ACC\u00A0{frame.Accuracy * 100:0}% · EVA\u00A0{frame.Evasion * 100:0}%";
+        if (frame.ShieldRegenPerTurn != ShipType.DefaultShieldRegen)
+            stats += $" · REGEN\u00A0{frame.ShieldRegenPerTurn}";
+        return stats;
+    }
+
+    static string HandlingStats(ShipType frame) =>
+        $"TURN\u00A0{frame.NormalTurnLimitDegrees:0}° · SPEED\u00A0{frame.NormalMoveMaxDistance:0}";
 }

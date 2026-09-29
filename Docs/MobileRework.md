@@ -51,7 +51,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | Boss | Sector 1: blockade command ship (strike). Sector 2: the convoy escort. Sector 3: the ace wing. |
 
 - **Threat** runs from 1 in the first sector to 9 at the last boss. It feeds the existing `EncounterDifficulty` curve.
-- **Enemy wings** draw from generalist frames early and specialist frames later.
+- **Enemy wings** draw from balanced frames early and attack and guard frames later, for variety; their strength comes from threat.
 - **Sector transitions:** clearing a sector patches half of each ship's damage. Full repairs are at docks.
 - **Losing** an ordinary battle spends the stop and earns nothing. Losing a boss, or losing every pilot, ends the run.
 
@@ -92,13 +92,29 @@ to keep the run simple.)
 
 ### Ship growth (`ShipUpgrades`, `ShipTypes`)
 
-- **Frames** set the base numbers, the slots and the class line (which sets the maneuvers). Each of the three lines has a generalist with plain numbers and all three slots, and two specialists with sharper numbers and two slots:
+- **The line decides how a ship flies and what its pilot can learn; the frame decides how it fights.** Every frame has the same three slots (engine, guns, shields), and every frame in a line has the line's handling:
 
-| Line | Generalist (3 slots) | Specialists (2 slots) |
-| --- | --- | --- |
-| Kestrel | S1 Kestrel | S4 Striker (engine, guns) · S9 Ghost (engine, shields) |
-| Raptor | Raptor | R3 Black Hawk (guns, shields) · R5 Falcon (guns, engine) |
-| ZT | ZT Class | ZT-6 (shields, guns) · ZT-8 Bulwark (shields, engine) |
+| Line | Turn | Speed | Maneuvers it can learn |
+| --- | --- | --- | --- |
+| Kestrel | 120° | 170–235 | 7 |
+| Raptor | 110° | 145–210 | 3 |
+| ZT | 70° | 105–165 | 3 |
+
+- **Roles.** Each line has a balanced, an attack and a guard frame. Measured by firepower (damage × accuracy) and toughness ((hull + shield) ÷ (1 − evasion), since a hit lands at accuracy × (1 − evasion)), attack and guard frames move about a fifth of one into the other, so firepower × toughness stays about level within a line and none is a straight upgrade.
+
+| Frame | Role | Hull | Shield | Dmg | Acc | Eva | Firepower | Toughness |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| S1 Kestrel | Balanced | 20 | 10 | 3 | 85% | 35% | 2.55 | 46 |
+| S4 Striker | Attack | 16 | 8 | 4 | 80% | 35% | 3.20 (+25%) | 37 (−20%) |
+| S9 Ghost | Guard | 20 | 14 | 3 | 70% | 40% | 2.10 (−18%) | 57 (+23%) |
+| Raptor | Balanced | 34 | 17 | 5 | 88% | 28% | 4.40 | 71 |
+| R3 Black Hawk | Attack | 29 | 14 | 6 | 88% | 28% | 5.28 (+20%) | 60 (−16%) |
+| R5 Falcon | Guard | 34 | 22 | 4 | 88% | 36% | 3.52 (−20%) | 88 (+24%) |
+| ZT Class | Balanced | 50 | 25 | 5 | 82% | 15% | 4.10 | 88 |
+| ZT-6 | Attack | 40 | 20 | 6 | 85% | 15% | 5.10 (+24%) | 71 (−20%) |
+| ZT-8 Bulwark | Guard | 58 | 32 | 4 | 82% | 15% | 3.28 (−20%) | 106 (+20%), 3 shield regen |
+
+- The lines are not balanced against each other on paper: the Kestrel line's firepower × toughness is about a third of the ZT line's. It relies on speed, turning and its larger maneuver pool.
 
 - **Modules**, one per slot, three choices per slot:
 
@@ -167,6 +183,6 @@ new run. A run saved during the draft resumes on the draft page.
 ## Known issues and next steps
 
 - `EnemyAI` reads the player's queued maneuver when choosing its own, so enemies react to orders the player has not revealed yet. For a simultaneous-turn game this is worth reconsidering, together with difficulty.
-- Balance is untested with human play: generalist frames (three slots) against specialists (two slots, better numbers), how many level-ups a run gives, free docks, threat per layer, ejection and scar odds, and instinct strength.
+- Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many level-ups a run gives now that every ship has three slots, free docks, threat per layer, ejection and scar odds, and instinct strength.
 - More battle maps would add variety; there are currently three regular maps plus the escort corridor.
 - An Android export preset and a device test pass are still to do.

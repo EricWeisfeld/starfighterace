@@ -89,6 +89,12 @@ public sealed record ShipManeuverProfile
     public int[] SlotLevels { get; init; } = System.Array.Empty<int>();
 }
 
+/// <summary>
+/// A frame's place in its class line. Attack frames hit harder and die
+/// faster; guard frames last longer and hit softer.
+/// </summary>
+public enum FrameRole { Balanced, Attack, Guard }
+
 /// <summary>A hull class: combat stats, shared maneuver profile, and per-team art.</summary>
 public class ShipType
 {
@@ -97,7 +103,10 @@ public class ShipType
     public string Description;
     public int MaxHp;
     public int MaxShield;
-    public int ShieldRegenPerTurn = 2;
+    /// <summary>The frame's place in its line: balanced, attack or guard.</summary>
+    public FrameRole Role;
+    public const int DefaultShieldRegen = 2;
+    public int ShieldRegenPerTurn = DefaultShieldRegen;
     public int ShotDamage;
     public float Accuracy;
     public float Evasion;
@@ -154,7 +163,14 @@ public class ShipType
 
 public static class ShipTypes
 {
+    /// <summary>Every player frame carries the same three slots.</summary>
     static readonly ShipUpgradeSlot[] AllSlots = { ShipUpgradeSlot.Engine, ShipUpgradeSlot.Guns, ShipUpgradeSlot.Shields };
+
+    // Handling belongs to the class line: every frame in a line turns and
+    // moves alike, and frames differ only in how they fight.
+    const float KestrelTurn = 120f, KestrelMinMove = 170f, KestrelMaxMove = 235f;
+    const float RaptorTurn = 110f, RaptorMinMove = 145f, RaptorMaxMove = 210f;
+    const float ZtTurn = 70f, ZtMinMove = 105f, ZtMaxMove = 165f;
 
     const string Nairan = "res://Assets/Foozle_2DS0013_Void_FleetPack_2/Foozle_2DS0013_Void_EnemyFleet_2/Nairan";
     const string Klaed = "res://Assets/Foozle_2DS0012_Void_FleetPack_1/Foozle_2DS0012_Void_EnemyFleet_1/Kla'ed";
@@ -188,20 +204,21 @@ public static class ShipTypes
     };
 
     /// <summary>The Kestrel line's generalist: plain numbers, but a slot for every module type.</summary>
+    /// <summary>The Kestrel line's balanced frame.</summary>
     public static readonly ShipType Scout = new()
     {
         Id = "scout",
         DisplayName = "S1 Kestrel",
         Description = "Fast and nimble reconnaissance frame with a tight turn, but fragile and lightly armed.",
+        Role = FrameRole.Balanced,
         MaxHp = 20,
         MaxShield = 10,
         ShotDamage = 3,
         Accuracy = 0.85f,
         Evasion = 0.35f,
-        NormalTurnLimitDegrees = 120f,
-        // Former slow and regular throttle distances.
-        NormalMoveMinDistance = 170f,
-        NormalMoveMaxDistance = 235f,
+        NormalTurnLimitDegrees = KestrelTurn,
+        NormalMoveMinDistance = KestrelMinMove,
+        NormalMoveMaxDistance = KestrelMaxMove,
         Maneuvers = new ShipManeuverProfile
         {
             BreakTurnMoveDistance = 180f,
@@ -247,40 +264,44 @@ public static class ShipTypes
     };
 
     /// <summary>The Striker is the first selectable Kestrel-series specialization.</summary>
+    /// <summary>The Kestrel line's attack frame: heavier guns, less hull and precision.</summary>
     public static readonly ShipType ScoutStriker = new()
     {
         Id = "s4_striker",
         DisplayName = "S4 Striker",
-        Description = "An aggressive Kestrel-series frame built to reverse pursuit, lock a target, and run it down.",
-        MaxHp = 18,
+        Description = "An aggressive Kestrel-series frame. Heavier guns, paid for with hull and precision.",
+        Role = FrameRole.Attack,
+        MaxHp = 16,
         MaxShield = 8,
         ShotDamage = 4,
-        Accuracy = 0.88f,
-        Evasion = 0.38f,
-        NormalTurnLimitDegrees = 125f,
-        NormalMoveMinDistance = 170f,
-        NormalMoveMaxDistance = 250f,
+        Accuracy = 0.80f,
+        Evasion = 0.35f,
+        NormalTurnLimitDegrees = KestrelTurn,
+        NormalMoveMinDistance = KestrelMinMove,
+        NormalMoveMaxDistance = KestrelMaxMove,
         Maneuvers = Scout.Maneuvers,
-        UpgradeSlots = new[] { ShipUpgradeSlot.Engine, ShipUpgradeSlot.Guns },
+        UpgradeSlots = AllSlots,
         SkinsByTeam = Scout.SkinsByTeam,
     };
 
     /// <summary>The Ghost is the evasive electronic-warfare Kestrel-series specialization.</summary>
+    /// <summary>The Kestrel line's guard frame: survives by not being hit, at the cost of its own aim.</summary>
     public static readonly ShipType ScoutGhost = new()
     {
         Id = "s9_ghost",
         DisplayName = "S9 Ghost",
-        Description = "An evasive Kestrel-series frame that confuses enemy sensors and slips out of danger.",
+        Description = "An evasive Kestrel-series frame that is hard to hit, but its jamming gear throws off its own aim.",
+        Role = FrameRole.Guard,
         MaxHp = 20,
-        MaxShield = 12,
+        MaxShield = 14,
         ShotDamage = 3,
-        Accuracy = 0.84f,
-        Evasion = 0.42f,
-        NormalTurnLimitDegrees = 130f,
-        NormalMoveMinDistance = 170f,
-        NormalMoveMaxDistance = 245f,
+        Accuracy = 0.70f,
+        Evasion = 0.40f,
+        NormalTurnLimitDegrees = KestrelTurn,
+        NormalMoveMinDistance = KestrelMinMove,
+        NormalMoveMaxDistance = KestrelMaxMove,
         Maneuvers = Scout.Maneuvers,
-        UpgradeSlots = new[] { ShipUpgradeSlot.Engine, ShipUpgradeSlot.Shields },
+        UpgradeSlots = AllSlots,
         SkinsByTeam = Scout.SkinsByTeam,
     };
 
@@ -288,19 +309,21 @@ public static class ShipTypes
     /// The Raptor line's generalist: plain numbers, but a slot for every
     /// module type. It uses the Black Hawk art.
     /// </summary>
+    /// <summary>The Raptor line's balanced frame. It uses the Black Hawk art.</summary>
     public static readonly ShipType Raptor = new()
     {
         Id = "raptor",
         DisplayName = "Raptor",
-        Description = "Versatile Raptor-class starfighter with a hardpoint for every module type.",
+        Description = "Versatile Raptor-class starfighter, balanced between firepower and protection.",
+        Role = FrameRole.Balanced,
         MaxHp = 34,
         MaxShield = 17,
         ShotDamage = 5,
         Accuracy = 0.88f,
         Evasion = 0.28f,
-        NormalTurnLimitDegrees = 110f,
-        NormalMoveMinDistance = 145f,
-        NormalMoveMaxDistance = 210f,
+        NormalTurnLimitDegrees = RaptorTurn,
+        NormalMoveMinDistance = RaptorMinMove,
+        NormalMoveMaxDistance = RaptorMaxMove,
         Maneuvers = new ShipManeuverProfile
         {
             UTurnMoveDistance = 75f,
@@ -334,23 +357,23 @@ public static class ShipTypes
         },
     };
 
+    /// <summary>The Raptor line's attack frame: stronger shots, less protection.</summary>
     public static readonly ShipType BlackHawk = new()
     {
         Id = "r3_black_hawk",
         DisplayName = "R3 Black Hawk",
-        // Balance identity: a modestly heavier hitter than the baseline Raptor,
-        // paid for with small reductions to speed, handling, and defense.
-        Description = "A heavier-hitting Raptor variant that trades a little speed, handling, and protection for stronger shots.",
-        MaxHp = 32,
-        MaxShield = 15,
+        Description = "A heavier-hitting Raptor variant that trades protection for stronger shots.",
+        Role = FrameRole.Attack,
+        MaxHp = 29,
+        MaxShield = 14,
         ShotDamage = 6,
-        Accuracy = 0.87f,
-        Evasion = 0.26f,
-        NormalTurnLimitDegrees = 105f,
-        NormalMoveMinDistance = 145f,
-        NormalMoveMaxDistance = 195f,
+        Accuracy = 0.88f,
+        Evasion = 0.28f,
+        NormalTurnLimitDegrees = RaptorTurn,
+        NormalMoveMinDistance = RaptorMinMove,
+        NormalMoveMaxDistance = RaptorMaxMove,
         Maneuvers = Raptor.Maneuvers,
-        UpgradeSlots = new[] { ShipUpgradeSlot.Guns, ShipUpgradeSlot.Shields },
+        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -373,23 +396,23 @@ public static class ShipTypes
         },
     };
 
+    /// <summary>The Raptor line's guard frame: extra shields and evasion, lighter guns.</summary>
     public static readonly ShipType Falcon = new()
     {
         Id = "r5_falcon",
         DisplayName = "R5 Falcon",
-        // Balance identity: the safe general-purpose Raptor advancement, with
-        // small improvements across the frame and no dramatic weakness.
-        Description = "A refined all-round Raptor with slightly better durability, accuracy, evasion, turning, and speed.",
-        MaxHp = 35,
-        MaxShield = 18,
-        ShotDamage = 5,
-        Accuracy = 0.90f,
-        Evasion = 0.29f,
-        NormalTurnLimitDegrees = 115f,
-        NormalMoveMinDistance = 145f,
-        NormalMoveMaxDistance = 215f,
+        Description = "A shielded, hard-to-hit Raptor variant that carries lighter guns.",
+        Role = FrameRole.Guard,
+        MaxHp = 34,
+        MaxShield = 22,
+        ShotDamage = 4,
+        Accuracy = 0.88f,
+        Evasion = 0.36f,
+        NormalTurnLimitDegrees = RaptorTurn,
+        NormalMoveMinDistance = RaptorMinMove,
+        NormalMoveMaxDistance = RaptorMaxMove,
         Maneuvers = Raptor.Maneuvers,
-        UpgradeSlots = new[] { ShipUpgradeSlot.Guns, ShipUpgradeSlot.Engine },
+        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -412,19 +435,21 @@ public static class ShipTypes
     };
 
     /// <summary>The ZT line's generalist: plain numbers, but a slot for every module type.</summary>
+    /// <summary>The ZT line's balanced frame.</summary>
     public static readonly ShipType Zt = new()
     {
         Id = "zt",
         DisplayName = "ZT Class",
-        Description = "Armored ZT-class starfighter with a hardpoint for every module type.",
+        Description = "Armored ZT-class starfighter, balanced between firepower and protection.",
+        Role = FrameRole.Balanced,
         MaxHp = 50,
         MaxShield = 25,
         ShotDamage = 5,
         Accuracy = 0.82f,
         Evasion = 0.15f,
-        NormalTurnLimitDegrees = 70f,
-        NormalMoveMinDistance = 105f,
-        NormalMoveMaxDistance = 165f,
+        NormalTurnLimitDegrees = ZtTurn,
+        NormalMoveMinDistance = ZtMinMove,
+        NormalMoveMaxDistance = ZtMaxMove,
         Maneuvers = new ShipManeuverProfile
         {
             RotatingGunsMoveDistance = 80f,
@@ -458,21 +483,23 @@ public static class ShipTypes
         },
     };
 
+    /// <summary>The ZT line's attack frame: heavier guns, less armor.</summary>
     public static readonly ShipType Zt6 = new()
     {
         Id = "zt_6",
         DisplayName = "ZT-6",
-        Description = "A slow armored gunship that pins enemies down with broadside suppression.",
-        MaxHp = 48,
-        MaxShield = 22,
+        Description = "A slow armored gunship that trades armor for heavier guns to pin enemies down.",
+        Role = FrameRole.Attack,
+        MaxHp = 40,
+        MaxShield = 20,
         ShotDamage = 6,
-        Accuracy = 0.87f,
-        Evasion = 0.14f,
-        NormalTurnLimitDegrees = 65f,
-        NormalMoveMinDistance = 105f,
-        NormalMoveMaxDistance = 165f,
+        Accuracy = 0.85f,
+        Evasion = 0.15f,
+        NormalTurnLimitDegrees = ZtTurn,
+        NormalMoveMinDistance = ZtMinMove,
+        NormalMoveMaxDistance = ZtMaxMove,
         Maneuvers = Zt.Maneuvers,
-        UpgradeSlots = new[] { ShipUpgradeSlot.Shields, ShipUpgradeSlot.Guns },
+        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -495,29 +522,33 @@ public static class ShipTypes
     };
 
     /// <summary>A shield-first ZT specialization with reinforced armor and improved handling.</summary>
+    /// <summary>The ZT line's guard frame: more armor and faster shield regeneration, weaker guns.</summary>
     public static readonly ShipType Zt8Bulwark = new()
     {
         Id = "zt_8_bulwark",
         DisplayName = "ZT-8 Bulwark",
-        Description = "A reinforced fleet defender that trades gun output for armor, shields, and steadier handling.",
-        MaxHp = 56,
+        Description = "A reinforced fleet defender that trades gun output for armor and faster shield regeneration.",
+        Role = FrameRole.Guard,
+        MaxHp = 58,
         MaxShield = 32,
         ShieldRegenPerTurn = 3,
         ShotDamage = 4,
-        Accuracy = 0.80f,
-        Evasion = 0.12f,
-        NormalTurnLimitDegrees = 72f,
-        NormalMoveMinDistance = 105f,
-        NormalMoveMaxDistance = 170f,
+        Accuracy = 0.82f,
+        Evasion = 0.15f,
+        NormalTurnLimitDegrees = ZtTurn,
+        NormalMoveMinDistance = ZtMinMove,
+        NormalMoveMaxDistance = ZtMaxMove,
         Maneuvers = Zt.Maneuvers,
-        UpgradeSlots = new[] { ShipUpgradeSlot.Shields, ShipUpgradeSlot.Engine },
+        UpgradeSlots = AllSlots,
         SkinsByTeam = Zt.SkinsByTeam,
     };
 
     /// <summary>
-    /// Every frame a pilot can fly, grouped by class line: each line's
-    /// generalist (three slots, plain numbers) and its two specialists (two
-    /// slots, sharper numbers). A pilot's frame is chosen when they join.
+    /// Every frame a pilot can fly, grouped by class line: balanced, attack,
+    /// guard. Within a line, attack and guard move about a fifth of the
+    /// balanced frame's firepower (damage x accuracy) into toughness ((hull +
+    /// shield) / (1 - evasion)) or back, so none is a straight upgrade. A
+    /// pilot's frame is chosen when they join.
     /// </summary>
     public static readonly ShipType[] PlayerFrames = { Scout, ScoutStriker, ScoutGhost, Raptor, BlackHawk, Falcon, Zt, Zt6, Zt8Bulwark };
     public static readonly ShipType[] SandboxHulls = PlayerFrames;

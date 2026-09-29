@@ -110,54 +110,75 @@ public partial class RunScreen
     }
 
     /// <summary>
-    /// Height of the stop sheet. It is fixed, sized for the largest content,
-    /// so selecting a stop never resizes the map above it and moves the stops.
+    /// Height of the stop sheet. The sheet lives in a holder of exactly this
+    /// height, so no stop's text can resize the map above it and move the stops.
     /// </summary>
-    const float StopSheetHeight = 310f;
+    const float StopSheetHeight = 330f;
 
-    /// <summary>What the tapped stop is, and a Go button if the squadron can travel there.</summary>
+    /// <summary>
+    /// What the tapped stop is, and the button to travel there. Every state
+    /// fills the same four slots (title, two-line description, detail line,
+    /// button), so tapping between stops changes text, never layout.
+    /// </summary>
     Control BuildStopSheet()
     {
+        // A plain Control does not grow to fit its children, unlike a
+        // container; clipping keeps any overlong text inside the sheet.
+        var holder = new Control
+        {
+            CustomMinimumSize = new Vector2(0, StopSheetHeight),
+            ClipContents = true,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
         PanelContainer sheet = Card(24, 18);
-        sheet.CustomMinimumSize = new Vector2(0, StopSheetHeight);
+        sheet.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        holder.AddChild(sheet);
         VBoxContainer stack = Stack(12);
         sheet.AddChild(stack);
 
         RunNode node = _selectedNodeId is int id ? Run.Node(id) : null;
-        if (node == null)
-        {
-            stack.AddChild(Text("CHOOSE YOUR NEXT STOP", FontBody, TextBright, 2));
-            stack.AddChild(Text("Tap a glowing stop on the map. Routes only lead upward.", FontCaption, Muted, 0, wrap: true));
-            return sheet;
-        }
+        string title = "CHOOSE YOUR NEXT STOP";
+        Color titleColor = TextBright;
+        string summary = "Tap a glowing stop on the map. Routes only lead upward.";
+        string detail = "";
+        string action = "SELECT A STOP";
+        bool canGo = false;
 
-        bool reachable = Run.Reachable.Contains(node);
-        stack.AddChild(Text(RunContent.KindName(node.Kind), FontBody, SectorMapView.KindColor(node.Kind), 3));
-        Label summary = Text(RunContent.KindSummary(node.Kind, Run.Sector), FontCaption, Body, 0, wrap: true);
-        summary.MaxLinesVisible = 2;
-        stack.AddChild(summary);
-        if (node.BattleKind is RunNodeKind kind)
+        if (node != null)
         {
-            BattleMission mission = RunContent.BuildMission(node, Run.Sector, kind);
-            stack.AddChild(Text($"THREAT {mission.Threat} · {mission.EnemySquad.Length} HOSTILES · +{RunContent.SalvageReward(kind, Run.Sector)} SALVAGE",
-                FontCaption, Muted, 2));
-        }
-
-        if (node.Visited)
-        {
-            stack.AddChild(Text("ALREADY VISITED", FontCaption, Muted, 2));
-        }
-        else if (!reachable)
-        {
-            stack.AddChild(Text("NOT ON YOUR ROUTE YET", FontCaption, Muted, 2));
-        }
-        else
-        {
+            title = RunContent.KindName(node.Kind);
+            titleColor = SectorMapView.KindColor(node.Kind);
+            summary = RunContent.KindSummary(node.Kind, Run.Sector);
+            detail = StopDetail(node);
             bool isBattle = node.BattleKind != null;
-            bool canFly = !isBattle || Run.Deployable().Count > 0;
-            Button go = TouchButton(isBattle ? "FLY TO BATTLE" : "SET COURSE", primary: true);
-            go.Disabled = !canFly;
-            stack.AddChild(Spacer()); // keeps the button at the same height for every stop
+            if (node.Visited)
+                action = "ALREADY VISITED";
+            else if (!Run.Reachable.Contains(node))
+                action = "NOT ON YOUR ROUTE";
+            else
+            {
+                action = isBattle ? "FLY TO BATTLE" : "SET COURSE";
+                canGo = !isBattle || Run.Deployable().Count > 0;
+            }
+        }
+
+        Label titleLabel = Text(title, FontBody, titleColor, 3);
+        titleLabel.ClipText = true;
+        stack.AddChild(titleLabel);
+        Label summaryLabel = Text(summary, FontCaption, Body, 0, wrap: true);
+        summaryLabel.MaxLinesVisible = 2;
+        summaryLabel.CustomMinimumSize = new Vector2(0, 68);
+        stack.AddChild(summaryLabel);
+        Label detailLabel = Text(detail, FontCaption, Muted, 2);
+        detailLabel.ClipText = true;
+        detailLabel.CustomMinimumSize = new Vector2(0, 30);
+        stack.AddChild(detailLabel);
+        stack.AddChild(Spacer()); // pins the button to the bottom of the sheet
+
+        Button go = TouchButton(action, primary: true);
+        go.Disabled = !canGo;
+        if (canGo)
+        {
             go.Pressed += () =>
             {
                 Run.EnterNode(node);
@@ -166,9 +187,25 @@ public partial class RunScreen
                 _eventBattleAcknowledged = false;
                 Render();
             };
-            stack.AddChild(go);
         }
-        return sheet;
+        stack.AddChild(go);
+        return holder;
+    }
+
+    /// <summary>One line of numbers about a stop: the fight's size and reward, or what it offers.</summary>
+    string StopDetail(RunNode node)
+    {
+        if (node.BattleKind is RunNodeKind kind)
+        {
+            BattleMission mission = RunContent.BuildMission(node, Run.Sector, kind);
+            return $"THREAT {mission.Threat} · {Plural(mission.EnemySquad.Length, "HOSTILE")} · +{RunContent.SalvageReward(kind, Run.Sector)} SALVAGE";
+        }
+        return node.Kind switch
+        {
+            RunNodeKind.Repair => $"REPAIR {RunState.RepairCostPerHull} PER HULL · WOUNDS {RunState.TreatWoundCost}",
+            RunNodeKind.Recruit => $"ROSTER {Run.Living.Count()}/{RunState.RosterLimit}",
+            _ => "OUTCOME UNKNOWN",
+        };
     }
 }
 

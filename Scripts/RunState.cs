@@ -133,7 +133,13 @@ public class RunState
     public int CurrentNodeId { get; set; } = -1;
     /// <summary>The stop the squadron is at but has not finished, or -1.</summary>
     public int ActiveNodeId { get; set; } = -1;
+    /// <summary>
+    /// True from launch until the battle's result is saved. The save made at
+    /// launch is the battle's checkpoint: quitting mid-battle resumes here.
+    /// </summary>
     public bool BattleInProgress { get; set; }
+    /// <summary>Callsigns of the pilots flying the battle in progress.</summary>
+    public List<string> BattleSquad { get; set; } = new();
     public List<PendingPromotion> Promotions { get; set; } = new();
     public List<RecruitOffer> RecruitOffers { get; set; } = new();
     /// <summary>The report of an event option already chosen at the active stop.</summary>
@@ -143,7 +149,7 @@ public class RunState
     public int TotalKills { get; set; }
     public int NextCallsign { get; set; }
     public int NextRngStep { get; set; }
-    /// <summary>A one-time message for the map, such as a new sector or an abandoned battle.</summary>
+    /// <summary>A one-time message for the map, such as a new sector.</summary>
     public string Notice { get; set; }
     public List<PilotSave> PilotData { get; set; } = new();
 
@@ -187,8 +193,9 @@ public class RunState
     }
 
     /// <summary>
-    /// Loads the saved run. A battle that was still running when the app
-    /// closed counts as abandoned: the stop is spent and nothing is earned.
+    /// Loads the saved run. If a battle was running when the game closed,
+    /// <see cref="BattleInProgress"/> is still set and the run resumes at the
+    /// start of that battle (see <see cref="ResumeBattle"/>).
     /// </summary>
     public static RunState Load()
     {
@@ -202,12 +209,6 @@ public class RunState
                 return null;
             run.Pilots = run.PilotData.Select(p => p.ToPilot()).ToList();
             Current = run;
-            if (run.BattleInProgress)
-            {
-                run.BattleInProgress = false;
-                run.Notice = "The last engagement was abandoned. Nothing was gained.";
-                run.CompleteActiveNode();
-            }
             return run;
         }
         catch (Exception error)
@@ -280,14 +281,48 @@ public class RunState
         return ready.Count > 0 ? ready : Living.ToList();
     }
 
+    /// <summary>
+    /// Saves a checkpoint at the start of the battle, then hands the squad and
+    /// mission to the battle scene. Nothing is saved again until the battle
+    /// ends, so this checkpoint is where a quit mid-battle returns to.
+    /// </summary>
     public void LaunchBattle(List<Pilot> squad)
     {
         BattleMission mission = ActiveMission;
         if (mission == null || squad.Count == 0)
             return;
         BattleInProgress = true;
+        BattleSquad = squad.Select(p => p.Callsign).ToList();
         Save();
         GameSetup.StartRunBattle(squad, mission);
+    }
+
+    /// <summary>
+    /// Restarts the battle in progress from its beginning: the same squad,
+    /// the same enemy wing and map (both are seeded by the stop), and pilots
+    /// exactly as they were at launch. Returns false if there is none.
+    /// </summary>
+    public bool ResumeBattle()
+    {
+        BattleMission mission = ActiveMission;
+        if (!BattleInProgress || mission == null)
+        {
+            BattleInProgress = false;
+            return false;
+        }
+        List<Pilot> squad = BattleSquad
+            .Select(callsign => Living.FirstOrDefault(p => p.Callsign == callsign))
+            .Where(p => p != null)
+            .ToList();
+        if (squad.Count == 0)
+            squad = Deployable().OrderByDescending(p => p.Hull / (float)p.MaxHull).Take(SquadLimit).ToList();
+        if (squad.Count == 0)
+        {
+            BattleInProgress = false;
+            return false;
+        }
+        GameSetup.StartRunBattle(squad, mission);
+        return true;
     }
 
     /// <summary>Applies a finished battle to the run and saves.</summary>
@@ -299,6 +334,7 @@ public class RunState
         List<PilotResult> results = BattleResolution.Resolve(playerFighters, won, combatants);
         var report = new RunBattleReport();
         BattleInProgress = false;
+        BattleSquad.Clear();
 
         TotalKills += results.Sum(r => r.Kills);
         if (won)

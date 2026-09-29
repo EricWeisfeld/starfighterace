@@ -566,6 +566,9 @@ public partial class BattleManager : Node2D
         }
     }
 
+    // Leaving mid-turn must not carry the execution slow-motion into menus.
+    public override void _ExitTree() => Engine.TimeScale = 1f;
+
     public override void _Notification(int what)
     {
         // Android's back gesture opens the battle menu instead of quitting.

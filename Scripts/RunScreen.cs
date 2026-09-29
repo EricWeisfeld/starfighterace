@@ -25,7 +25,13 @@ public partial class RunScreen : Node2D
         RenderingServer.SetDefaultClearColor(Bg);
         if (RunState.Current == null && RunState.Load() == null)
         {
-            GetTree().CallDeferred(SceneTree.MethodName.ChangeSceneToFile, "res://Scenes/HomeScreen.tscn");
+            ChangeScene(this, "res://Scenes/HomeScreen.tscn");
+            return;
+        }
+        // A battle that was interrupted picks up from its start checkpoint.
+        if (Run.BattleInProgress && Run.ResumeBattle())
+        {
+            ChangeScene(this, "res://Scenes/Battle.tscn");
             return;
         }
         _root = ScreenRoot(this, extraTop: 28, extraBottom: 28);

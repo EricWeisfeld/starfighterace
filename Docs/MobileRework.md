@@ -68,7 +68,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 ### Saving
 
 - The run is saved as JSON at `user://ace-star-pilot-run.json` after every change.
-- A battle still running when the app closed counts as abandoned: the stop is spent and nothing is earned.
+- Launching a battle saves a checkpoint and nothing is saved again until the battle ends. Quitting mid-battle (closing the app, or Quit to Title in the pause menu) resumes at the start of that battle, with the same squad, enemy wing and map. Retrying a battle this way is allowed by design.
 
 ### Screens
 

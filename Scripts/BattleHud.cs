@@ -177,6 +177,18 @@ public partial class BattleHud : CanvasLayer
             Mgr.Retreat();
         };
         stack.AddChild(_retreat);
+        stack.AddChild(Text("Ends the battle as a loss. Your pilots come home.", FontCaption, Muted, 0, wrap: true));
+        Button quit = TouchButton("QUIT TO TITLE");
+        quit.Pressed += () =>
+        {
+            GetTree().Paused = false;
+            ChangeScene(this, "res://Scenes/HomeScreen.tscn");
+        };
+        stack.AddChild(quit);
+        stack.AddChild(Text(GameSetup.IsTestBattle
+            ? "Leaves this quick battle."
+            : "The run was saved when this battle began. Continue to replay it from the start.",
+            FontCaption, Muted, 0, wrap: true));
 
         stack.AddChild(new Control { CustomMinimumSize = new Vector2(0, 4) });
         stack.AddChild(Text("CONTROLS", FontCaption, Muted, 3));

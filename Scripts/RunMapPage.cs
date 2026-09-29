@@ -109,10 +109,17 @@ public partial class RunScreen
         return stack;
     }
 
+    /// <summary>
+    /// Height of the stop sheet. It is fixed, sized for the largest content,
+    /// so selecting a stop never resizes the map above it and moves the stops.
+    /// </summary>
+    const float StopSheetHeight = 310f;
+
     /// <summary>What the tapped stop is, and a Go button if the squadron can travel there.</summary>
     Control BuildStopSheet()
     {
         PanelContainer sheet = Card(24, 18);
+        sheet.CustomMinimumSize = new Vector2(0, StopSheetHeight);
         VBoxContainer stack = Stack(12);
         sheet.AddChild(stack);
 
@@ -126,7 +133,9 @@ public partial class RunScreen
 
         bool reachable = Run.Reachable.Contains(node);
         stack.AddChild(Text(RunContent.KindName(node.Kind), FontBody, SectorMapView.KindColor(node.Kind), 3));
-        stack.AddChild(Text(RunContent.KindSummary(node.Kind, Run.Sector), FontCaption, Body, 0, wrap: true));
+        Label summary = Text(RunContent.KindSummary(node.Kind, Run.Sector), FontCaption, Body, 0, wrap: true);
+        summary.MaxLinesVisible = 2;
+        stack.AddChild(summary);
         if (node.BattleKind is RunNodeKind kind)
         {
             BattleMission mission = RunContent.BuildMission(node, Run.Sector, kind);
@@ -148,6 +157,7 @@ public partial class RunScreen
             bool canFly = !isBattle || Run.Deployable().Count > 0;
             Button go = TouchButton(isBattle ? "FLY TO BATTLE" : "SET COURSE", primary: true);
             go.Disabled = !canFly;
+            stack.AddChild(Spacer()); // keeps the button at the same height for every stop
             go.Pressed += () =>
             {
                 Run.EnterNode(node);

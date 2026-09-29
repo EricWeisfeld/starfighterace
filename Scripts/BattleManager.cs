@@ -368,7 +368,7 @@ public partial class BattleManager : Node2D
         }
 
         ShipType[] enemySquad = GameSetup.IsTestBattle
-            ? new[] { ShipTypes.All[0], ShipTypes.All[1], ShipTypes.All[2] }
+            ? new[] { ShipTypes.Scout, ShipTypes.Raptor, ShipTypes.Zt }
             : CurrentMission?.EnemySquad ?? new[] { ShipTypes.Scout, ShipTypes.Scout, ShipTypes.Scout };
         for (int i = 0; i < enemySquad.Length; i++)
         {
@@ -416,7 +416,7 @@ public partial class BattleManager : Node2D
     {
         _escortReinforcementsSpawned = true;
         ShipType[] enemyWave = GameSetup.IsTestBattle
-            ? new[] { ShipTypes.All[0], ShipTypes.All[1], ShipTypes.All[2] }
+            ? new[] { ShipTypes.Scout, ShipTypes.Raptor, ShipTypes.Zt }
             : CurrentMission?.EnemySquad ?? new[] { ShipTypes.Scout, ShipTypes.Scout, ShipTypes.Scout };
         BattleSpawn[] spawnPoints = Map.EscortReinforcementSpawns;
         if (spawnPoints == null || spawnPoints.Length == 0 || enemyWave.Length == 0)

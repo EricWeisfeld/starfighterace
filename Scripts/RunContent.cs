@@ -6,17 +6,16 @@ using System.Linq;
 public enum RunNodeKind { Skirmish, Strike, Elite, Repair, Recruit, Event, Boss }
 
 /// <summary>
-/// What a card offers. Level-ups offer everything: maneuvers, masteries and
-/// instincts for the pilot, modules and refit frames for the ship. Module
-/// crates offer modules only.
+/// What a card offers. Level-ups offer maneuvers and masteries for the pilot
+/// and modules for the ship. Module crates offer modules only.
 /// </summary>
-public enum CardKind { Maneuver, Mastery, Instinct, Module, Frame }
+public enum CardKind { Maneuver, Mastery, Module }
 
 /// <summary>One option in a promotion or module-crate choice.</summary>
 public class PromotionCard
 {
     public CardKind Kind { get; set; }
-    /// <summary>A ShipAbility (maneuver or mastery), perk id, ShipUpgrade or frame id, depending on <see cref="Kind"/>.</summary>
+    /// <summary>A ShipAbility (maneuver or mastery) or ShipUpgrade, depending on <see cref="Kind"/>.</summary>
     public string Id { get; set; } = "";
     /// <summary>For crate cards: the pilot whose ship gets the module.</summary>
     public string Callsign { get; set; }
@@ -304,21 +303,26 @@ public static class RunContent
         "ORION", "TALON", "DUSK", "ZEPHYR", "IRONSIDE", "PIXIE",
     };
 
-    /// <summary>A fresh level-1 pilot with their class's signature maneuver.</summary>
-    public static Pilot NewPilot(string callsign, ShipType baseClass)
+    /// <summary>A fresh level-1 pilot with their class's signature maneuver and, usually, an instinct.</summary>
+    public static Pilot NewPilot(string callsign, ShipType frame, Perk instinct = null)
     {
-        var pilot = new Pilot(callsign, baseClass);
-        pilot.LearnManeuver(baseClass.ManeuverPool[0]);
+        var pilot = new Pilot(callsign, frame);
+        pilot.LearnManeuver(frame.ManeuverPool[0]);
+        if (instinct is { Positive: true })
+            pilot.Perks.Add(instinct);
         return pilot;
     }
 
     /// <summary>
-    /// A recruit arrives at a level just below the squadron's, having already
-    /// taken a level-up card for each level, ship cards included.
+    /// A recruit flies a random frame with a random instinct, and arrives at
+    /// a level just below the squadron's, having already taken a level-up
+    /// card for each level.
     /// </summary>
-    public static Pilot NewRecruit(string callsign, ShipType baseClass, int level, RandomNumberGenerator rng)
+    public static Pilot NewRecruit(string callsign, int level, RandomNumberGenerator rng)
     {
-        Pilot pilot = NewPilot(callsign, baseClass);
+        ShipType frame = ShipTypes.PlayerFrames[rng.RandiRange(0, ShipTypes.PlayerFrames.Length - 1)];
+        Perk instinct = Perks.Instincts[rng.RandiRange(0, Perks.Instincts.Length - 1)];
+        Pilot pilot = NewPilot(callsign, frame, instinct);
         for (int next = 2; next <= level; next++)
         {
             pilot.Level = next;
@@ -332,17 +336,13 @@ public static class RunContent
     // -------------------------------------------------------------- cards
 
     /// <summary>
-    /// Three distinct level-up choices. Pilot and ship both grow here. A
-    /// pilot ready for a refit is offered both frames. Otherwise the choices
-    /// lean toward a new maneuver and a module for an empty slot, then fill
-    /// from instincts, masteries and module swaps.
+    /// Three distinct level-up choices, pilot and ship side by side: one each
+    /// of a new maneuver, a module for an empty slot and a mastery while there
+    /// are any, then any of those or a module swap.
     /// </summary>
     public static List<PromotionCard> PromotionCards(Pilot pilot, RandomNumberGenerator rng)
     {
         var cards = new List<PromotionCard>();
-        if (pilot.CanRefit)
-            cards.AddRange(ShipTypes.HullBranches(pilot.ClassId).Select(frame => new PromotionCard { Kind = CardKind.Frame, Id = frame.Id }));
-
         var maneuvers = new List<PromotionCard>();
         if (pilot.Maneuvers.Count < Pilot.MaxManeuvers)
             maneuvers.AddRange(pilot.UnlearnedManeuvers.Select(a => new PromotionCard { Kind = CardKind.Maneuver, Id = a.ToString() }));
@@ -351,16 +351,13 @@ public static class RunContent
             .Select(module => new PromotionCard { Kind = CardKind.Module, Id = module.Id.ToString() }).ToList();
         List<PromotionCard> fits = ModuleCards(emptySlot: true);
         List<PromotionCard> swaps = ModuleCards(emptySlot: false);
-        List<PromotionCard> instincts = Perks.Instincts.Where(p => !pilot.Perks.Contains(p))
-            .Select(p => new PromotionCard { Kind = CardKind.Instinct, Id = p.Id }).ToList();
         List<PromotionCard> masteries = pilot.UnmasteredManeuvers
             .Select(a => new PromotionCard { Kind = CardKind.Mastery, Id = a.ToString() }).ToList();
 
-        if (cards.Count < 3 && maneuvers.Count > 0)
-            cards.Add(TakeRandom(maneuvers, rng));
-        if (cards.Count < 3 && fits.Count > 0)
-            cards.Add(TakeRandom(fits, rng));
-        var rest = maneuvers.Concat(fits).Concat(instincts).Concat(masteries).Concat(swaps).ToList();
+        foreach (List<PromotionCard> kind in new[] { maneuvers, fits, masteries })
+            if (kind.Count > 0)
+                cards.Add(TakeRandom(kind, rng));
+        var rest = maneuvers.Concat(fits).Concat(masteries).Concat(swaps).ToList();
         while (cards.Count < 3 && rest.Count > 0)
             cards.Add(TakeRandom(rest, rng));
         return cards;
@@ -420,16 +417,8 @@ public static class RunContent
             case CardKind.Mastery when Enum.TryParse(card.Id, out ShipAbility mastered):
                 pilot.Master(mastered);
                 break;
-            case CardKind.Instinct:
-                Perk perk = Perks.ById(card.Id);
-                if (perk != null && perk.Positive && !pilot.Perks.Contains(perk))
-                    pilot.Perks.Add(perk);
-                break;
             case CardKind.Module when ShipUpgrades.TryParse(card.Id, out ShipUpgrade module):
                 pilot.InstallUpgrade(module);
-                break;
-            case CardKind.Frame:
-                pilot.Refit(ShipTypes.FromId(card.Id));
                 break;
         }
     }
@@ -443,9 +432,6 @@ public static class RunContent
                 return (ManeuverCatalog.AbilityName(ability).ToUpper(), "NEW MANEUVER", ManeuverCatalog.Blurb(ability));
             case CardKind.Mastery when Enum.TryParse(card.Id, out ShipAbility mastered):
                 return (ManeuverCatalog.AbilityName(mastered).ToUpper(), "MASTERY", Masteries.Describe(mastered, pilot.Ship));
-            case CardKind.Instinct:
-                Perk perk = Perks.ById(card.Id);
-                return ((perk?.Name ?? card.Id).ToUpper(), "INSTINCT", perk?.Description ?? "");
             case CardKind.Module when ShipUpgrades.TryParse(card.Id, out ShipUpgrade module):
                 ShipUpgradeDefinition definition = ShipUpgrades.Get(module);
                 string text = definition.Description;
@@ -455,34 +441,8 @@ public static class RunContent
                 if (!string.IsNullOrEmpty(card.Callsign))
                     category += $" · {card.Callsign}";
                 return (definition.Name.ToUpper(), category, text);
-            case CardKind.Frame:
-                ShipType frame = ShipTypes.FromId(card.Id);
-                string delta = FrameDelta(pilot.Ship, frame);
-                string[] added = frame.UpgradeSlots.Where(slot => !pilot.HasSlot(slot)).Select(ShipUpgrades.SlotName).ToArray();
-                if (added.Length > 0)
-                    delta += $" Adds a {string.Join(" and ", added)} slot.";
-                return (frame.DisplayName.ToUpper(), "NEW FRAME", delta);
         }
         return (card.Id, "", "");
-    }
-
-    /// <summary>How a refit frame differs from the pilot's current hull.</summary>
-    public static string FrameDelta(ShipType from, ShipType to)
-    {
-        var parts = new List<string>();
-        void Add(string label, float delta, string unit = "")
-        {
-            if (Mathf.Abs(delta) >= 0.5f)
-                parts.Add($"{(delta > 0 ? "+" : "")}{delta:0}{unit} {label}");
-        }
-        Add("hull", to.MaxHp - from.MaxHp);
-        Add("shield", to.MaxShield - from.MaxShield);
-        Add("damage", to.ShotDamage - from.ShotDamage);
-        Add("accuracy", (to.Accuracy - from.Accuracy) * 100f, "%");
-        Add("evasion", (to.Evasion - from.Evasion) * 100f, "%");
-        Add("turn", to.NormalTurnLimitDegrees - from.NormalTurnLimitDegrees, "°");
-        Add("speed", to.NormalMoveMaxDistance - from.NormalMoveMaxDistance);
-        return string.Join(", ", parts) + ".";
     }
 
     // ------------------------------------------------------------- events

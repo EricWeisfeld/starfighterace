@@ -231,23 +231,26 @@ public partial class BattleHud : CanvasLayer
         _menu.Visible = !_menu.Visible;
         GetTree().Paused = _menu.Visible;
         _retreat.Disabled = !Mgr.CanRetreat;
-        List<string> wrecks = WrecksLeftByRetreat();
-        _retreatNote.Text = RetreatNote(wrecks);
-        _retreatNote.AddThemeColorOverride("font_color", wrecks.Count > 0 ? Warning : Muted);
+        List<string> ejected = EjectedPilots();
+        _retreatNote.Text = RetreatNote(ejected);
+        _retreatNote.AddThemeColorOverride("font_color", ejected.Count > 0 ? Warning : Muted);
     }
 
-    /// <summary>In a run, the callsigns whose wrecks a retreat would leave behind.</summary>
-    static List<string> WrecksLeftByRetreat() => GameSetup.IsTestBattle ? new List<string>()
+    /// <summary>In a run, the callsigns of pilots who have ejected and are waiting to be found.</summary>
+    static List<string> EjectedPilots() => GameSetup.IsTestBattle ? new List<string>()
         : Mgr.PlayerFighters.Where(f => f.Ejected).Select(BattleManager.CallsignOf).ToList();
 
-    /// <summary>What retreating costs right now.</summary>
-    static string RetreatNote(List<string> wrecks) =>
-        wrecks.Count switch
+    /// <summary>What retreating risks right now: a loss leaves each ejected pilot to a coin flip.</summary>
+    static string RetreatNote(List<string> ejected)
+    {
+        string odds = $"{BattleResolution.LossEjectSurvival * 100:0}%";
+        return ejected.Count switch
         {
             0 => "Ends the battle as a loss. Your pilots come home.",
-            1 => $"Ends the battle as a loss. {wrecks[0]}'s wreck is left behind: the ship and its modules are lost.",
-            _ => $"Ends the battle as a loss. The wrecks of {string.Join(" and ", wrecks)} are left behind: those ships and their modules are lost.",
+            1 => $"Ends the battle as a loss. {ejected[0]} has ejected and has a {odds} chance of being found.",
+            _ => $"Ends the battle as a loss. {string.Join(" and ", ejected)} have ejected; each has a {odds} chance of being found.",
         };
+    }
 
     public override void _ExitTree()
     {

@@ -13,7 +13,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | Between runs | Nothing carries over (pure roguelite). |
 | Currency | None. Everything grows through level-ups. |
 | Fleet | Lean squadron: pilots with a class, a level, maneuvers, masteries and instincts, flying ships with a frame and modules. |
-| Progression | One track: XP. A level-up offers pilot cards and ship cards side by side. See Phase 4. |
+| Progression | Each pilot's ship and instinct are picked at the start and never change. XP is the only growth: a level-up offers pilot cards and ship cards side by side. See Phase 4. |
 
 ## Phase 1: battles on a phone (done)
 
@@ -46,26 +46,24 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | Strike | Destroy a marked command ship; the rest of the wing can live. |
 | Elite wing | +2 threat. A win opens a module crate: pick one of three modules, each matched to a surviving ship. |
 | Repair dock | Every hull is repaired to full on arrival, and the medic treats one scar per visit. |
-| Recruit | Two candidates at the squadron's level minus one, already promoted to that level. One can join. |
+| Recruit | Two candidates at the squadron's level minus one, each with a random ship and instinct, already promoted to that level. One can join. |
 | Signal | One of six events. Rewards are XP, module crates, repairs, a recruit or a faded scar. Some turn into a fight. |
 | Boss | Sector 1: blockade command ship (strike). Sector 2: the convoy escort. Sector 3: the ace wing. |
 
 - **Threat** runs from 1 in the first sector to 9 at the last boss. It feeds the existing `EncounterDifficulty` curve.
-- **Enemy wings** draw from base hulls early and refit frames later.
+- **Enemy wings** draw from generalist frames early and specialist frames later.
 - **Sector transitions:** clearing a sector patches half of each ship's damage. Full repairs are at docks.
 - **Losing** an ordinary battle spends the stop and earns nothing. Losing a boss, or losing every pilot, ends the run.
 
 ### Squadron (`Pilot`)
 
-- The run starts with three level-1 pilots, one per class. Each knows their class's signature maneuver: Break Turn, U-Turn or Rotating Guns.
+- **Draft:** a run starts by setting up three level-1 pilots (`RunDraftPage`). Each picks any of the nine frames, and one of three instincts offered to them (the three pilots' offers never overlap). Both stay with the pilot for the whole run. Each pilot knows their class's signature maneuver: Break Turn, U-Turn or Rotating Guns.
 - The roster holds up to 5 pilots, and up to 3 fly each battle.
 - XP needed per level rises (100, 150, 200, 250, 300), with a cap at level 6.
 - Level-ups and the ship are described in Phase 4.
 - A pilot who is shot down without ejecting is killed, along with the ship.
-- A pilot who ejects is fit to fly the next battle; being shot down costs the ship and risks a scar (Gun Shy or Rattled). There are no wounds. What happens to the ship depends on the result:
-  - **Win:** the squadron holds the field and tows the wreck home. Frame and modules are intact, but the hull is down to 1. It can still fly, on full shields, until it is repaired at a dock, by the drones event, or by the half patch between sectors.
-  - **Loss or retreat:** the wreck is left behind. The pilot comes home to a new, bare base frame of their class; the refit and every module are gone. Maneuvers, masteries, instincts and level stay. The pilot's next level-up offers the refit frames again.
-  - The pause menu's Retreat note names any wrecks a retreat would leave behind.
+- A pilot who ejects and is found comes home with the wreck: frame and modules intact, hull down to 1. It can still fly, on full shields, until it is repaired at a dock, by the drones event, or by the half patch between sectors. Being shot down also risks a scar (Gun Shy or Rattled).
+- A win finds every ejected pilot. A loss or retreat gives each a 50% chance; the pause menu's Retreat note names who is at risk.
 
 ### Saving
 
@@ -74,7 +72,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 
 ### Screens
 
-- `Run.tscn` / `RunScreen` shows one page chosen from run state: sector map, squadron, briefing, promotion or crate cards, repair dock, recruit, signal, or run end. A signal's outcome is shown before any crate or level-up it brought.
+- `Run.tscn` / `RunScreen` shows one page chosen from run state: the starting draft (and its ship picker), sector map, squadron, briefing, promotion or crate cards, repair dock, recruit, signal, or run end. A signal's outcome is shown before any crate or level-up it brought.
 - Home offers New Run, Continue Run and Quick Battle.
 
 ### Removed
@@ -87,12 +85,21 @@ The rule that keeps pilot and ship apart: **a ship's bonuses are always on; a
 pilot's only apply in a situation.** Anything true on turn 1 with no setup is
 hardware. Anything you have to fly a certain way to get is a pilot skill.
 
-Both grow from the same place: level-ups. There is no currency. (Phase 4 first
-had ships bought with salvage at docks; that was removed to keep the run simple.)
+The ship type and the instinct are picked when a pilot joins and never change.
+Everything else grows from level-ups; there is no currency. (Phase 4 first had
+ships bought with salvage and refit frames earned at level 3; both were removed
+to keep the run simple.)
 
 ### Ship growth (`ShipUpgrades`, `ShipTypes`)
 
-- **Frames** set the base numbers and the slots. Base frames (Kestrel, Raptor, ZT) have one slot; refit frames keep it and add a second. From level 3, a pilot still in the base frame is offered both refit frames at every level-up until they take one; modules move across.
+- **Frames** set the base numbers, the slots and the class line (which sets the maneuvers). Each of the three lines has a generalist with plain numbers and all three slots, and two specialists with sharper numbers and two slots:
+
+| Line | Generalist (3 slots) | Specialists (2 slots) |
+| --- | --- | --- |
+| Kestrel | S1 Kestrel | S4 Striker (engine, guns) · S9 Ghost (engine, shields) |
+| Raptor | Raptor | R3 Black Hawk (guns, shields) · R5 Falcon (guns, engine) |
+| ZT | ZT Class | ZT-6 (shields, guns) · ZT-8 Bulwark (shields, engine) |
+
 - **Modules**, one per slot, three choices per slot:
 
 | Slot | Modules |
@@ -106,15 +113,17 @@ had ships bought with salvage at docks; that was removed to keep the run simple.
 
 ### Level-ups (`RunContent.PromotionCards`, `Masteries`, `Perks`)
 
-A level-up offers three cards. A pilot ready for a refit sees both frames plus
-one more card. Otherwise the offer leans toward a new maneuver and a module for
-an empty slot, and the rest is drawn from instincts, masteries and module swaps.
+A level-up offers three cards: one each of a new maneuver, a module for an
+empty slot and a mastery while there are any, then any of those or a module
+swap. Frames and instincts never appear.
 
-- **New frame** (ship): from level 3, see above.
 - **Module** (ship): for an empty slot, or a swap for a filled one.
 - **New maneuver** from the class pool, up to three.
 - **Mastery** of a maneuver the pilot knows. It only matters on turns that maneuver is flown: Snap Turn to 180°, Boost turns 90°, U-Turn and Break Turn lose their cooldown, Lock On +25%, Scramble jams a second enemy, and so on (`Masteries.Describe`).
-- **Instinct**, a situational bonus:
+
+
+Each pilot has exactly one **instinct**, a situational bonus picked in the draft
+(recruits bring a random one):
 
 | Instinct | When it applies |
 | --- | --- |
@@ -148,19 +157,16 @@ medic treats one scar per visit, and waiting out the ion storm fades one.
 | Tunnel Vision | -15% accuracy when switching targets | Missing most shots |
 | Engine Shy | 25% less turning at full throttle | Hitting an asteroid |
 
-Positive traits are never rolled after battles, and recruits carry no random
-traits.
+Instincts are never rolled after battles or learned later.
 
 ### Saving
 
-The save is version 2. Older saves can't be loaded; Home says so and offers a
-new run.
+The save is version 3. Older saves can't be loaded; Home says so and offers a
+new run. A run saved during the draft resumes on the draft page.
 
 ## Known issues and next steps
 
 - `EnemyAI` reads the player's queued maneuver when choosing its own, so enemies react to orders the player has not revealed yet. For a simultaneous-turn game this is worth reconsidering, together with difficulty.
-- Balance is untested with human play: how many level-ups a run gives against how many cards a pilot wants, free docks, threat per layer, ejection and scar odds, and instinct strength.
-- A max-level pilot who loses their ship can't take a refit again, because frames only come from level-ups. Crates can still fill the base frame's slot.
-- Next: pick the three starting pilots at the start of a run, each with an instinct, instead of drawing instincts from level-ups.
+- Balance is untested with human play: generalist frames (three slots) against specialists (two slots, better numbers), how many level-ups a run gives, free docks, threat per layer, ejection and scar odds, and instinct strength.
 - More battle maps would add variety; there are currently three regular maps plus the escort corridor.
 - An Android export preset and a device test pass are still to do.

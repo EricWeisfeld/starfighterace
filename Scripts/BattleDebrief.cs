@@ -157,29 +157,13 @@ public partial class BattleDebrief : CanvasLayer
         {
             { Survived: false, Ejected: true } => ("KIA", ChipRole.Loss, "Ejected, but lost in enemy space."),
             { Survived: false } => ("KIA", ChipRole.Loss, "Shot down. No ejection."),
-            { WreckRecovered: true } => ("EJECTED", ChipRole.Impaired,
-                "Ejected and recovered, and the wreck was towed home. It flies on shields and 1 hull until repaired at a dock."),
-            { ShipLost: true } => ("EJECTED", ChipRole.Impaired,
-                $"Ejected and escaped, but the ship was left behind. Flies a new {r.Pilot.Ship.DisplayName} next time."),
-            { Ejected: true } => ("EJECTED", ChipRole.Impaired, "Ejected and recovered."),
+            { Ejected: true } => ("EJECTED", ChipRole.Impaired,
+                "Ejected and recovered, along with the wreck. It flies on shields and 1 hull until repaired at a dock."),
             _ => ("RETURNED", ChipRole.Gain,
                 r.Pilot.HullDamage > 0 ? $"{r.Pilot.HullDamage} hull damage to repair at a dock." : "No hull damage."),
         };
-        stack.AddChild(CardHeader(r.LostFrame ?? r.Pilot.Ship, r.Pilot.Callsign.ToUpper(), r.Survived, fate, fateRole));
+        stack.AddChild(CardHeader(r.Pilot.Ship, r.Pilot.Callsign.ToUpper(), r.Survived, fate, fateRole));
         stack.AddChild(Text(fateNote, FontCaption, Muted, 0, wrap: true));
-        if (r.WreckRecovered)
-            stack.AddChild(Tag("WRECK RECOVERED", ChipRole.Impaired));
-        if (r.ShipLost)
-        {
-            // Name what went down with the ship, when it was worth anything.
-            var lost = new List<string>();
-            if (r.LostFrame != null && r.LostFrame != r.Pilot.Ship)
-                lost.Add(r.LostFrame.DisplayName.ToUpper());
-            lost.AddRange(r.LostModules.Select(m => ShipUpgrades.Get(m).Name.ToUpper()));
-            stack.AddChild(Tag("SHIP LOST", ChipRole.Loss));
-            if (lost.Count > 0)
-                stack.AddChild(Text("Lost with it: " + string.Join(" · ", lost), FontCaption, Negative, 1, wrap: true));
-        }
 
         if (r.Survived)
         {
@@ -202,13 +186,8 @@ public partial class BattleDebrief : CanvasLayer
             advancement.AddThemeConstantOverride("v_separation", 8);
             if (r.LevelsGained > 0)
                 advancement.AddChild(Tag($"LEVEL {r.Pilot.Level}", ChipRole.Gain));
-            bool refitUnlocked = r.LevelsGained > 0 && r.Pilot.CanRefit && r.Pilot.Level - r.LevelsGained < Pilot.RefitLevel;
-            if (refitUnlocked)
-                advancement.AddChild(Tag("REFIT READY", ChipRole.Gain));
             if (advancement.GetChildCount() > 0)
                 stack.AddChild(advancement);
-            if (refitUnlocked)
-                stack.AddChild(Text("Can now be refitted into a new frame at any repair dock.", FontCaption, Muted, 0, wrap: true));
             if (r.NewScar != null)
             {
                 stack.AddChild(Tag($"SCAR · {r.NewScar.Name.ToUpper()}", ChipRole.Impaired));

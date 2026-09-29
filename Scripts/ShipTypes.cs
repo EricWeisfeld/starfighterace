@@ -154,6 +154,8 @@ public class ShipType
 
 public static class ShipTypes
 {
+    static readonly ShipUpgradeSlot[] AllSlots = { ShipUpgradeSlot.Engine, ShipUpgradeSlot.Guns, ShipUpgradeSlot.Shields };
+
     const string Nairan = "res://Assets/Foozle_2DS0013_Void_FleetPack_2/Foozle_2DS0013_Void_EnemyFleet_2/Nairan";
     const string Klaed = "res://Assets/Foozle_2DS0012_Void_FleetPack_1/Foozle_2DS0012_Void_EnemyFleet_1/Kla'ed";
 
@@ -185,6 +187,7 @@ public static class ShipTypes
         },
     };
 
+    /// <summary>The Kestrel line's generalist: plain numbers, but a slot for every module type.</summary>
     public static readonly ShipType Scout = new()
     {
         Id = "scout",
@@ -221,7 +224,7 @@ public static class ShipTypes
                 ShipAbility.EcmJink, ShipAbility.SensorScramble, ShipAbility.GhostRun },
             SlotLevels = new[] { 2, 4, 6 },
         },
-        UpgradeSlots = new[] { ShipUpgradeSlot.Engine },
+        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -282,15 +285,14 @@ public static class ShipTypes
     };
 
     /// <summary>
-    /// The Raptor class before a pilot has committed to a flight-frame
-    /// specialization. It uses the Black Hawk art as a neutral frame until the
-    /// player makes that decision in the pilot career screen.
+    /// The Raptor line's generalist: plain numbers, but a slot for every
+    /// module type. It uses the Black Hawk art.
     /// </summary>
     public static readonly ShipType Raptor = new()
     {
         Id = "raptor",
         DisplayName = "Raptor",
-        Description = "Versatile Raptor-class starfighter. Build a three-maneuver loadout as its pilot levels up.",
+        Description = "Versatile Raptor-class starfighter with a hardpoint for every module type.",
         MaxHp = 34,
         MaxShield = 17,
         ShotDamage = 5,
@@ -310,7 +312,7 @@ public static class ShipTypes
             Pool = new[] { ShipAbility.UTurn, ShipAbility.EngineBoost, ShipAbility.EvasiveDodge },
             SlotLevels = new[] { 2, 4, 6 },
         },
-        UpgradeSlots = new[] { ShipUpgradeSlot.Guns },
+        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -409,12 +411,12 @@ public static class ShipTypes
         },
     };
 
-    /// <summary>Neutral ZT-class frame, before a pilot selects a specialization.</summary>
+    /// <summary>The ZT line's generalist: plain numbers, but a slot for every module type.</summary>
     public static readonly ShipType Zt = new()
     {
         Id = "zt",
         DisplayName = "ZT Class",
-        Description = "Armored ZT-class starfighter. Build a three-maneuver loadout as its pilot levels up.",
+        Description = "Armored ZT-class starfighter with a hardpoint for every module type.",
         MaxHp = 50,
         MaxShield = 25,
         ShotDamage = 5,
@@ -434,7 +436,7 @@ public static class ShipTypes
             Pool = new[] { ShipAbility.RotatingGuns, ShipAbility.SuppressionFire, ShipAbility.EmergencyThrusters },
             SlotLevels = new[] { 2, 4, 6 },
         },
-        UpgradeSlots = new[] { ShipUpgradeSlot.Shields },
+        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -512,27 +514,23 @@ public static class ShipTypes
         SkinsByTeam = Zt.SkinsByTeam,
     };
 
-    /// <summary>Current playable class lines. Their maneuvers come from pilot loadouts, not frame branches.</summary>
-    public static readonly ShipType[] All = { Scout, Raptor, Zt };
-    static readonly ShipType[] BranchFrames = { ScoutStriker, ScoutGhost, BlackHawk, Falcon, Zt6, Zt8Bulwark };
-    public static readonly ShipType[] RecruitableClasses = { Scout, Raptor, Zt };
-    public static readonly ShipType[] SandboxHulls = BranchFrames;
+    /// <summary>
+    /// Every frame a pilot can fly, grouped by class line: each line's
+    /// generalist (three slots, plain numbers) and its two specialists (two
+    /// slots, sharper numbers). A pilot's frame is chosen when they join.
+    /// </summary>
+    public static readonly ShipType[] PlayerFrames = { Scout, ScoutStriker, ScoutGhost, Raptor, BlackHawk, Falcon, Zt, Zt6, Zt8Bulwark };
+    public static readonly ShipType[] SandboxHulls = PlayerFrames;
 
     /// <summary>Resolves a data-authored hull id. Invalid or retired hull IDs fall back to the S1 Kestrel.</summary>
-    public static ShipType FromId(string id) => All.Concat(BranchFrames).FirstOrDefault(type => type.Id == id) ?? Scout;
+    public static ShipType FromId(string id) => PlayerFrames.FirstOrDefault(type => type.Id == id) ?? Scout;
 
-    public static ShipType BaseClass(string classId) => classId switch
+    /// <summary>A class line's name, for grouping frames: Kestrel, Raptor or ZT.</summary>
+    public static string ClassName(string classId) => classId switch
     {
-        "raptor" => Raptor,
-        "zt" => Zt,
-        _ => Scout,
-    };
-
-    public static ShipType[] HullBranches(string classId) => classId switch
-    {
-        "raptor" => new[] { BlackHawk, Falcon },
-        "zt" => new[] { Zt6, Zt8Bulwark },
-        _ => new[] { ScoutStriker, ScoutGhost },
+        "raptor" => "Raptor",
+        "zt" => "ZT",
+        _ => "Kestrel",
     };
 
     public static string ClassIdForHull(string hullId) => hullId switch

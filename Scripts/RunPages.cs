@@ -58,8 +58,6 @@ public partial class RunScreen
         stack.AddChild(PilotSkills(pilot));
         foreach (Perk perk in pilot.Perks)
             stack.AddChild(Text($"{perk.Name}: {perk.Description}", FontMicro, perk.Positive ? Muted : Warning, 0, wrap: true));
-        if (pilot.CanRefit && !pilot.IsMaxLevel)
-            stack.AddChild(Text("Ready for a new frame: the next level-up offers both refits.", FontMicro, Accent, 0, wrap: true));
         return card;
     }
 
@@ -254,7 +252,7 @@ public partial class RunScreen
     static Color CardColor(CardKind kind) => kind switch
     {
         CardKind.Maneuver => Accent,
-        CardKind.Module or CardKind.Frame => Positive,
+        CardKind.Module => Positive,
         _ => Instinct,
     };
 
@@ -273,15 +271,12 @@ public partial class RunScreen
                     MouseFilter = Control.MouseFilterEnum.Ignore,
                 };
         }
-        // A frame shows the new ship; a crate's module shows the ship it goes on.
-        ShipType ship = card.Kind == CardKind.Frame ? ShipTypes.FromId(card.Id)
-            : card.Kind == CardKind.Module && !string.IsNullOrEmpty(card.Callsign) ? pilot.Ship
-            : null;
-        if (ship != null)
+        if (card.Kind == CardKind.Module && !string.IsNullOrEmpty(card.Callsign))
         {
+            // A crate card shows whose ship the module goes on.
             VBoxContainer box = Stack(0);
             box.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-            box.AddChild(ShipIcon(ship, 88f));
+            box.AddChild(ShipIcon(pilot.Ship, 88f));
             return box;
         }
         return new CardBadge { Hardware = card.Kind == CardKind.Module, CustomMinimumSize = size };
@@ -505,7 +500,7 @@ public partial class RunScreen
     }
 }
 
-/// <summary>Round badge for cards with no path or ship to show: instincts, masteries and level-up modules.</summary>
+/// <summary>Round badge for cards with no path or ship to show: masteries and level-up modules.</summary>
 public partial class CardBadge : Control
 {
     public bool Hardware;

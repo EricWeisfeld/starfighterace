@@ -44,6 +44,21 @@ public class PendingPromotion
     [JsonIgnore] public bool IsCrate => string.IsNullOrEmpty(Callsign);
 }
 
+/// <summary>
+/// One pilot being set up at the start of a run: a ship picked from every
+/// frame, and one instinct picked from three offered.
+/// </summary>
+public class DraftPilot
+{
+    public string Callsign { get; set; } = "";
+    public string FrameId { get; set; } = "scout";
+    public List<string> InstinctOffers { get; set; } = new();
+    /// <summary>The chosen instinct's id, or null until one is picked.</summary>
+    public string Instinct { get; set; }
+
+    [JsonIgnore] public ShipType Frame => ShipTypes.FromId(FrameId);
+}
+
 /// <summary>Everything the debrief shows about a run battle's consequences.</summary>
 public class RunBattleReport
 {
@@ -90,8 +105,7 @@ public class PilotSave
         {
             Level = Level,
             Xp = Xp,
-            // Wounds were retired; a pilot saved as wounded simply flies.
-            Condition = Condition == PilotCondition.Wounded ? PilotCondition.Ready : Condition,
+            Condition = Condition,
             Kills = Kills,
             Battles = Battles,
         };
@@ -117,17 +131,20 @@ public class PilotSave
 
 /// <summary>
 /// A roguelite run: three sectors of branching stops and a squadron of up to
-/// five pilots. Hull damage, lost ships, scars and deaths carry from stop to
-/// stop. There is no currency: pilots and their ships grow through level-ups,
-/// with module crates as bonus rewards. The run saves after every change so a
-/// phone can close the app at any moment.
+/// five pilots. It starts by picking each pilot's ship and instinct. Hull
+/// damage, scars and deaths carry from stop to stop. There is no currency:
+/// pilots and their ships grow through level-ups, with module crates as bonus
+/// rewards. The run saves after every change so a phone can close the app at
+/// any moment.
 /// </summary>
 public class RunState
 {
-    /// <summary>Version 2: pilots and ships progress separately (modules, masteries, instincts, scars).</summary>
-    public const int SaveVersion = 2;
+    /// <summary>Version 3: ships and instincts are picked at the start; frames are never earned or lost.</summary>
+    public const int SaveVersion = 3;
     public const int RosterLimit = 5;
     public const int SquadLimit = 3;
+    public const int StartingPilots = 3;
+    public const int InstinctOffers = 3;
     /// <summary>Share of each ship's damage patched when a sector is cleared.</summary>
     public const float SectorPatchFraction = 0.5f;
     const string SavePath = "user://ace-star-pilot-run.json";
@@ -137,6 +154,8 @@ public class RunState
     public int Version { get; set; } = SaveVersion;
     public ulong Seed { get; set; }
     public int Sector { get; set; } = 1;
+    /// <summary>The starting squadron being set up; empty once the run is under way.</summary>
+    public List<DraftPilot> Draft { get; set; } = new();
     public List<RunNode> Nodes { get; set; } = new();
     /// <summary>The last stop completed in this sector, or -1 at the sector entrance.</summary>
     public int CurrentNodeId { get; set; } = -1;
@@ -165,6 +184,7 @@ public class RunState
     public List<PilotSave> PilotData { get; set; } = new();
 
     [JsonIgnore] public List<Pilot> Pilots { get; private set; } = new();
+    [JsonIgnore] public bool Drafting => Draft.Count > 0;
     [JsonIgnore] public IEnumerable<Pilot> Living => Pilots.Where(p => p.Alive);
     [JsonIgnore] public IEnumerable<Pilot> Fallen => Pilots.Where(p => !p.Alive);
     [JsonIgnore] public string SectorName => RunContent.SectorNames[Mathf.Clamp(Sector, 1, RunContent.SectorCount) - 1];
@@ -192,8 +212,17 @@ public class RunState
         {
             Seed = seed ?? (((ulong)GD.Randi() << 32) | GD.Randi()),
         };
-        foreach (ShipType shipClass in ShipTypes.RecruitableClasses)
-            run.Pilots.Add(RunContent.NewPilot(run.TakeCallsign(), shipClass));
+        // Each pilot is offered their own instincts, so no two offers overlap.
+        RandomNumberGenerator rng = run.NextRng();
+        List<Perk> instincts = Perks.Instincts.OrderBy(_ => rng.Randi()).ToList();
+        ShipType[] defaults = { ShipTypes.Scout, ShipTypes.Raptor, ShipTypes.Zt };
+        for (int i = 0; i < StartingPilots; i++)
+            run.Draft.Add(new DraftPilot
+            {
+                Callsign = run.TakeCallsign(),
+                FrameId = defaults[i % defaults.Length].Id,
+                InstinctOffers = instincts.Skip(i * InstinctOffers).Take(InstinctOffers).Select(p => p.Id).ToList(),
+            });
         run.Nodes = RunContent.GenerateSector(1, run.Seed);
         run.Notice = $"SECTOR 1 · {run.SectorName}. {RunContent.SectorBriefings[0]}";
         Current = run;
@@ -247,9 +276,41 @@ public class RunState
         Converters = { new JsonStringEnumConverter() },
     };
 
+    // ------------------------------------------------------------- draft
+
+    public void SetDraftFrame(int slot, ShipType frame)
+    {
+        if (slot < 0 || slot >= Draft.Count || !ShipTypes.PlayerFrames.Contains(frame))
+            return;
+        Draft[slot].FrameId = frame.Id;
+        Save();
+    }
+
+    public void SetDraftInstinct(int slot, string instinctId)
+    {
+        if (slot < 0 || slot >= Draft.Count || !Draft[slot].InstinctOffers.Contains(instinctId))
+            return;
+        Draft[slot].Instinct = instinctId;
+        Save();
+    }
+
+    [JsonIgnore] public bool DraftReady => Drafting && Draft.All(d => d.Instinct != null);
+
+    /// <summary>Turns the finished draft into the starting squadron.</summary>
+    public bool FinishDraft()
+    {
+        if (!DraftReady)
+            return false;
+        foreach (DraftPilot draft in Draft)
+            Pilots.Add(RunContent.NewPilot(draft.Callsign, draft.Frame, Perks.ById(draft.Instinct)));
+        Draft.Clear();
+        Save();
+        return true;
+    }
+
     string TakeCallsign()
     {
-        var used = new HashSet<string>(Pilots.Select(p => p.Callsign));
+        var used = new HashSet<string>(Pilots.Select(p => p.Callsign).Concat(Draft.Select(d => d.Callsign)));
         for (int attempt = 0; attempt < RunContent.Callsigns.Length * 3; attempt++)
         {
             int index = NextCallsign++;
@@ -499,12 +560,8 @@ public class RunState
     {
         RandomNumberGenerator rng = NextRng();
         int level = Mathf.Max(1, (Living.Any() ? (int)Living.Average(p => p.Level) : 1) - 1);
-        List<ShipType> classes = ShipTypes.RecruitableClasses.OrderBy(_ => rng.Randi()).Take(2).ToList();
-        foreach (ShipType shipClass in classes)
-        {
-            Pilot recruit = RunContent.NewRecruit(TakeCallsign(), shipClass, level, rng);
-            RecruitOffers.Add(new RecruitOffer { Pilot = PilotSave.From(recruit) });
-        }
+        for (int i = 0; i < 2; i++)
+            RecruitOffers.Add(new RecruitOffer { Pilot = PilotSave.From(RunContent.NewRecruit(TakeCallsign(), level, rng)) });
     }
 
     /// <summary>One candidate joins, which finishes the stop.</summary>
@@ -524,8 +581,7 @@ public class RunState
     public Pilot HireFreePilot(RandomNumberGenerator rng)
     {
         int level = Mathf.Max(1, (Living.Any() ? (int)Living.Average(p => p.Level) : 1) - 1);
-        ShipType shipClass = ShipTypes.RecruitableClasses[rng.RandiRange(0, ShipTypes.RecruitableClasses.Length - 1)];
-        Pilot pilot = RunContent.NewRecruit(TakeCallsign(), shipClass, level, rng);
+        Pilot pilot = RunContent.NewRecruit(TakeCallsign(), level, rng);
         Pilots.Add(pilot);
         return pilot;
     }

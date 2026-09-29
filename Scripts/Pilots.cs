@@ -3,20 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>
-/// A squadron member for one run. Levelling up grows both the pilot
-/// (maneuvers, masteries, instincts) and their ship (modules, a refit frame).
-/// Hull damage carries between battles, and a pilot can die for good.
+/// A squadron member for one run. The ship's frame and the pilot's instinct
+/// are chosen when they join and never change. Levelling up grows the pilot
+/// (maneuvers, masteries) and their ship (modules). Hull damage carries
+/// between battles, and a pilot can die for good.
 /// </summary>
 public class Pilot
 {
     public const int MaxManeuvers = 3;
     public const int MaxLevel = 6;
-    /// <summary>A pilot can refit into one of their class's two frames from this level.</summary>
-    public const int RefitLevel = 3;
 
     public string Callsign;
-    /// <summary>The pilot's current hull: their class's base frame or one of its refits.</summary>
-    public ShipType Ship { get; private set; }
+    /// <summary>The pilot's frame, chosen when they joined.</summary>
+    public ShipType Ship { get; }
     public string ClassId { get; }
     /// <summary>Maneuvers learned from this class's pool, at most <see cref="MaxManeuvers"/>.</summary>
     public readonly List<ShipAbility> Maneuvers = new();
@@ -26,7 +25,7 @@ public class Pilot
     public readonly List<ShipAbility> Masteries = new();
     public int Level = 1;
     public int Xp;                          // progress within the current level
-    /// <summary>Instincts and scars.</summary>
+    /// <summary>The pilot's instinct, then any scars.</summary>
     public readonly List<Perk> Perks = new();
     public PilotCondition Condition = PilotCondition.Ready;
     /// <summary>Unrepaired hull points carried between battles. A ship always keeps at least 1 hull.</summary>
@@ -36,8 +35,6 @@ public class Pilot
 
     public bool Alive => Condition != PilotCondition.KIA;
     public bool IsMaxLevel => Level >= MaxLevel;
-    public ShipType BaseClass => ShipTypes.BaseClass(ClassId);
-    public bool CanRefit => Level >= RefitLevel && Ship == BaseClass;
     /// <summary>Maximum hull: the frame's, plus armor plating.</summary>
     public int MaxHull => Ship.MaxHp + (HasUpgrade(ShipUpgrade.ShieldsArmor) ? ShipUpgrades.ArmorHullBonus : 0);
     /// <summary>Hull the ship will launch with. Shields always launch full.</summary>
@@ -46,7 +43,6 @@ public class Pilot
     public IEnumerable<ShipAbility> UnmasteredManeuvers => Maneuvers.Where(ability => !Masteries.Contains(ability));
     public IEnumerable<Perk> Instincts => Perks.Where(perk => perk.Positive);
     public IEnumerable<Perk> Scars => Perks.Where(perk => perk.IsScar);
-    public string ClassDisplayName => ClassId switch { "raptor" => "Raptor", "zt" => "ZT", _ => "Scout" };
 
     public Pilot(string callsign, ShipType ship)
     {
@@ -84,40 +80,11 @@ public class Pilot
     }
 
     /// <summary>
-    /// Moves the pilot into one of their class's refit frames. Modules move
-    /// across to the new frame when it has a slot for them.
-    /// </summary>
-    public bool Refit(ShipType frame)
-    {
-        if (!CanRefit || !ShipTypes.HullBranches(ClassId).Contains(frame))
-            return false;
-        Ship = frame;
-        Upgrades.RemoveAll(upgrade => !HasSlot(ShipUpgrades.Get(upgrade).Slot));
-        HullDamage = Mathf.Min(HullDamage, MaxHull - 1);
-        RestoreManeuvers(Maneuvers.ToArray());
-        return true;
-    }
-
-    /// <summary>
-    /// The ship was shot down but towed home: frame and modules intact, hull
-    /// down to 1. It can still fly, on its shields, until it is repaired.
+    /// The ship was shot down but the wreck was recovered: frame and modules
+    /// intact, hull down to 1. It can still fly, on its shields, until it is
+    /// repaired.
     /// </summary>
     public void RecoverWreck() => HullDamage = MaxHull - 1;
-
-    /// <summary>
-    /// The ship was left behind. The pilot flies a new, bare base frame of
-    /// their class; what they have learned stays with them. Returns what was
-    /// lost.
-    /// </summary>
-    public (ShipType Frame, List<ShipUpgrade> Modules) LoseShip()
-    {
-        (ShipType Frame, List<ShipUpgrade> Modules) lost = (Ship, Upgrades.ToList());
-        Ship = BaseClass;
-        Upgrades.Clear();
-        HullDamage = 0;
-        RestoreManeuvers(Maneuvers.ToArray());
-        return lost;
-    }
 
     /// <summary>Hull damage from outside a battle (events). It never takes a ship below 1 hull.</summary>
     public void TakeHullDamage(int amount) => HullDamage = Mathf.Min(MaxHull - 1, HullDamage + amount);
@@ -171,8 +138,6 @@ public class Pilot
 public enum PilotCondition
 {
     Ready,
-    /// <summary>Retired: only found in saves from before wounds were removed. Loads as Ready.</summary>
-    Wounded,
     KIA,
 }
 
@@ -181,14 +146,8 @@ public class PilotResult
 {
     public Pilot Pilot;
     public bool Survived;
+    /// <summary>Shot down but ejected. If they survived, the wreck came home at 1 hull.</summary>
     public bool Ejected;
-    /// <summary>Shot down in a win: the ship came home as a wreck at 1 hull.</summary>
-    public bool WreckRecovered;
-    /// <summary>Shot down in a loss: the ship was left behind.</summary>
-    public bool ShipLost;
-    /// <summary>For a lost ship: its frame and the modules that went with it.</summary>
-    public ShipType LostFrame;
-    public List<ShipUpgrade> LostModules = new();
     public int Kills;
     public int XpGained;
     public int LevelsGained;
@@ -197,8 +156,8 @@ public class PilotResult
 
 /// <summary>
 /// Applies the consequences of a finished battle to the pilots who flew it:
-/// eject survival, permadeath, hull damage, wrecks and lost ships,
-/// XP, level-ups and scar rolls. Call exactly once per battle.
+/// eject survival, permadeath, hull damage, recovered wrecks, XP,
+/// level-ups and scar rolls. Call exactly once per battle.
 /// </summary>
 public static class BattleResolution
 {
@@ -225,27 +184,16 @@ public static class BattleResolution
                 f.Pilot.Condition = PilotCondition.KIA;
                 f.Pilot.HullDamage = 0;
             }
+            else if (f.Ejected)
+            {
+                // A pilot who is found comes home with their wreck: 1 hull,
+                // everything else intact. They can fly the next battle.
+                f.Pilot.RecoverWreck();
+            }
             else
             {
-                // Being shot down costs the ship (and risks a scar); the
-                // pilot is fit to fly the next battle.
-                if (!f.Ejected)
-                {
-                    // A ship that made it home keeps its damage.
-                    f.Pilot.HullDamage = Mathf.Max(0, f.MaxHp - f.Hp);
-                }
-                else if (won)
-                {
-                    // Holding the field means towing the wreck home.
-                    f.Pilot.RecoverWreck();
-                    r.WreckRecovered = true;
-                }
-                else
-                {
-                    // A loss or retreat leaves the wreck behind.
-                    (r.LostFrame, r.LostModules) = f.Pilot.LoseShip();
-                    r.ShipLost = true;
-                }
+                // A ship that made it home keeps its damage.
+                f.Pilot.HullDamage = Mathf.Max(0, f.MaxHp - f.Hp);
             }
             results.Add(r);
             resultsByFighter[f] = r;

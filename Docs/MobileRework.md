@@ -154,7 +154,7 @@ matter in most battles, and never be a flat number (that is the ship's job):
 | Stalker | +20% evasion each turn until you open fire. | Hold fire, or fire late in the turn. |
 | Daredevil | +15% evasion on turns flown at full throttle or faster. | Fly flat out. |
 | Cool Under Fire | +20% accuracy below half hull. | Keep flying hurt; always on in a 1-hull wreck. |
-| Second Chance | Once per battle, a shot that would destroy you leaves you at 1 hull. | Take the risky pass. |
+| Second Chance | Once per battle, a shot that would destroy you leaves you at 1 hull, and no shot can finish you for the rest of that turn. | Take the risky pass, then plan a way out. |
 
 Stalker, Brawler and Second Chance replaced Phantom, Trigger Happy and Survivor,
 and Wingman was removed (old saves load Wingman as Daredevil); Daredevil is new.

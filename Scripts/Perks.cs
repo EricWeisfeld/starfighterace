@@ -81,7 +81,7 @@ public static class Perks
     public static readonly Perk SecondChance = new()
     {
         Id = "second-chance", Name = "Second Chance", Positive = true,
-        Description = "Once per battle, a shot that would destroy you leaves you at 1 hull instead.",
+        Description = "Once per battle, a shot that would destroy you leaves you at 1 hull, and no shot can finish you for the rest of that turn.",
     };
     public static readonly Perk TailGunner = new()
     {

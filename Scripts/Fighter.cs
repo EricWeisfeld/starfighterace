@@ -140,7 +140,8 @@ public partial class Fighter : Node2D
     int _volleysThisTurn;
     int _hullDamageTurn = -1;
     bool _aceResetThisTurn;
-    bool _secondChanceUsed;
+    /// <summary>The turn Second Chance was spent in, or -1 while it is still to come.</summary>
+    int _secondChanceTurn = -1;
     Fighter _lastVolleyTarget;
     bool _volleySwitchedTarget;
     readonly Dictionary<Perk, int> _calloutTurn = new();
@@ -863,13 +864,17 @@ public partial class Fighter : Node2D
 
     /// <summary>
     /// Damage from an enemy shot. Second Chance turns the first killing shot
-    /// of a battle into a narrow escape: shields stripped, 1 hull left.
+    /// of a battle into a narrow escape: shields stripped, 1 hull left, and no
+    /// shot can finish the ship for the rest of that turn, so the pilot gets
+    /// to plan a way out. Asteroids stay fatal: they don't come through here.
     /// </summary>
     public void TakeHit(int dmg)
     {
-        if (IsAlive && !_secondChanceUsed && HasPerk(Perks.SecondChance) && dmg >= Hp + Shield)
+        int turn = BattleManager.Instance?.TurnNumber ?? 0;
+        if (IsAlive && HasPerk(Perks.SecondChance) && dmg >= Hp + Shield &&
+            (_secondChanceTurn < 0 || _secondChanceTurn == turn))
         {
-            _secondChanceUsed = true;
+            _secondChanceTurn = turn;
             dmg = Hp + Shield - 1;
             NoteTrait(Perks.SecondChance);
         }

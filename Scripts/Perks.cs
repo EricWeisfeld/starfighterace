@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>
-/// A pilot trait. Positive traits are instincts, learned at level-ups; the
-/// rest are scars, picked up from mishaps in battle and treated at repair
-/// docks. Both only take effect in a situation the pilot flies into, never as
-/// a flat stat change: flat numbers belong to the ship.
+/// A pilot trait. Positive traits are instincts: one per pilot, picked when
+/// they join, and meant to shape how that pilot flies. The rest are scars,
+/// picked up from mishaps in battle and treated at repair docks. Both only
+/// take effect in a situation the pilot flies into, never as a flat stat
+/// change: flat numbers belong to the ship.
 /// </summary>
 public class Perk
 {
@@ -29,9 +30,8 @@ public static class Perks
     public const float SurvivorsGuiltSecondDeathChanceBonus = 0.20f;
 
     public const float BaseEjectChance = 0.6f;
-    public const float SurvivorEjectBonus = 0.25f;
 
-    public const float PhantomEvasionBonus = 0.15f;
+    public const float StalkerEvasionBonus = 0.20f;
     public const float CoolUnderFireAccuracyBonus = 0.20f;
     public const float CoolUnderFireThreshold = 0.50f;
     public const float FinisherDamageMultiplier = 1.25f;
@@ -42,10 +42,13 @@ public static class Perks
     public const float LongShotDamageMultiplier = 1.5f;
     /// <summary>Hits from beyond this fraction of weapon range count as long shots.</summary>
     public const float LongShotRangeFraction = 2f / 3f;
-    public const int TriggerHappyExtraShots = 2;
+    public const int BrawlerExtraShots = 2;
+    /// <summary>Volleys from within this fraction of weapon range count as close in.</summary>
+    public const float BrawlerRangeFraction = 1f / 3f;
     public const int SteadyShieldRegenBonus = 2;
     public const float WingmanEvasionBonus = 0.15f;
     public const float WingmanRange = 250f;
+    public const float DaredevilEvasionBonus = 0.15f;
 
     public const float HesitantRangeMultiplier = 0.80f;
     public const float SurvivorsGuiltCombatPenalty = 0.15f;
@@ -62,10 +65,10 @@ public static class Perks
 
     // ------------------------------------------------------------ instincts
 
-    public static readonly Perk Phantom = new()
+    public static readonly Perk Stalker = new()
     {
-        Id = "phantom", Name = "Phantom", Positive = true,
-        Description = $"+{PhantomEvasionBonus * 100:0}% evasion until first hit each battle.",
+        Id = "stalker", Name = "Stalker", Positive = true,
+        Description = $"+{StalkerEvasionBonus * 100:0}% evasion each turn until you open fire.",
     };
     public static readonly Perk CoolUnderFire = new()
     {
@@ -77,10 +80,10 @@ public static class Perks
         Id = "finisher", Name = "Finisher", Positive = true,
         Description = $"+{(FinisherDamageMultiplier - 1f) * 100:0}% damage against enemies below {FinisherHullThreshold * 100:0}% hull.",
     };
-    public static readonly Perk Survivor = new()
+    public static readonly Perk SecondChance = new()
     {
-        Id = "survivor", Name = "Survivor", Positive = true,
-        Description = $"+{SurvivorEjectBonus * 100:0}% chance to eject when shot down.",
+        Id = "second-chance", Name = "Second Chance", Positive = true,
+        Description = "Once per battle, a shot that would destroy you leaves you at 1 hull instead.",
     };
     public static readonly Perk TailGunner = new()
     {
@@ -95,12 +98,12 @@ public static class Perks
     public static readonly Perk Ace = new()
     {
         Id = "ace", Name = "Ace", Positive = true,
-        Description = "A kill resets all your maneuver cooldowns.",
+        Description = "A kill resets all your maneuver cooldowns and refills your shields.",
     };
-    public static readonly Perk TriggerHappy = new()
+    public static readonly Perk Brawler = new()
     {
-        Id = "trigger-happy", Name = "Trigger Happy", Positive = true,
-        Description = $"Your first volley each turn has +{TriggerHappyExtraShots} shots.",
+        Id = "brawler", Name = "Brawler", Positive = true,
+        Description = $"Volleys fired from the inner third of your range have +{BrawlerExtraShots} shots.",
     };
     public static readonly Perk Steady = new()
     {
@@ -111,6 +114,11 @@ public static class Perks
     {
         Id = "wingman", Name = "Wingman", Positive = true,
         Description = $"+{WingmanEvasionBonus * 100:0}% evasion while flying close to a squadmate.",
+    };
+    public static readonly Perk Daredevil = new()
+    {
+        Id = "daredevil", Name = "Daredevil", Positive = true,
+        Description = $"+{DaredevilEvasionBonus * 100:0}% evasion on turns flown at full throttle or faster.",
     };
 
     // ---------------------------------------------------------------- scars
@@ -152,11 +160,21 @@ public static class Perks
         EarnHint = "Risked by hitting an asteroid.",
     };
 
-    public static readonly Perk[] Instincts = { Phantom, CoolUnderFire, Finisher, Survivor, TailGunner, LongShot, Ace, TriggerHappy, Steady, Wingman };
+    public static readonly Perk[] Instincts = { Stalker, CoolUnderFire, Finisher, SecondChance, TailGunner, LongShot, Ace, Brawler, Steady, Wingman, Daredevil };
     public static readonly Perk[] Scars = { Hesitant, SurvivorsGuilt, GunShy, Rattled, TunnelVision, EngineShy };
     public static readonly Perk[] All = Instincts.Concat(Scars).ToArray();
 
-    public static Perk ById(string id) => All.FirstOrDefault(perk => perk.Id == id);
+    /// <summary>Instincts that were reworked under a new id; saves may still name the old one.</summary>
+    static readonly Dictionary<string, string> RenamedIds = new()
+    {
+        ["phantom"] = "stalker",
+        ["trigger-happy"] = "brawler",
+        ["survivor"] = "second-chance",
+    };
+
+    public static Perk ById(string id) =>
+        All.FirstOrDefault(perk => perk.Id == id) ??
+        (id != null && RenamedIds.TryGetValue(id, out string renamed) ? ById(renamed) : null);
 
     /// <summary>Scars this battle record risks.</summary>
     public static List<Perk> EligibleScars(Fighter f, bool won, int squadmateDeaths = 0)

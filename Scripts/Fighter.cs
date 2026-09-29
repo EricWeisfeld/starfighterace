@@ -140,6 +140,7 @@ public partial class Fighter : Node2D
     int _volleysThisTurn;
     int _hullDamageTurn = -1;
     bool _aceResetThisTurn;
+    bool _secondChanceUsed;
     Fighter _lastVolleyTarget;
     bool _volleySwitchedTarget;
     readonly Dictionary<Perk, int> _calloutTurn = new();
@@ -155,7 +156,12 @@ public partial class Fighter : Node2D
     public bool SurvivorsGuiltActive => HasPerk(Perks.SurvivorsGuilt) &&
         BattleManager.Instance?.GetTeam(Team).Any(other => other != this && other.Pilot != null && !other.IsAlive) == true;
     public bool HesitantActive => HasPerk(Perks.Hesitant) && HitsLanded == 0;
-    public bool PhantomActive => HasPerk(Perks.Phantom) && !TookDamage;
+    /// <summary>Until this ship fires in a turn; the whole planning phase counts, since no one has fired yet.</summary>
+    public bool StalkerActive => HasPerk(Perks.Stalker) &&
+        (_volleysThisTurn == 0 || BattleManager.Instance?.CurrentPhase != BattleManager.Phase.Executing);
+    /// <summary>On a turn flown at full throttle, or further with a maneuver.</summary>
+    public bool DaredevilActive => HasPerk(Perks.Daredevil) &&
+        (BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing ? _execDist : PlannedPathDistance) >= NormalMoveMaxDistance - 0.5f;
     public bool CoolUnderFireActive => HasPerk(Perks.CoolUnderFire) && Hp < MaxHp * Perks.CoolUnderFireThreshold;
     public bool RattledActive => HasPerk(Perks.Rattled) && Hp < MaxHp * Perks.RattledThreshold;
     public bool WingmanActive => HasPerk(Perks.Wingman) &&
@@ -179,9 +185,12 @@ public partial class Fighter : Node2D
     public bool FinisherActiveAgainst(Fighter target) =>
         HasPerk(Perks.Finisher) && target != null && target.Hp < target.MaxHp * Perks.FinisherHullThreshold;
 
+    public bool BrawlerActiveAgainst(Vector2 targetPosition) =>
+        HasPerk(Perks.Brawler) && Position.DistanceTo(targetPosition) <= EffectiveFireRange * Perks.BrawlerRangeFraction;
+
     public float EffectiveFireRange => FireRange * (HesitantActive ? Perks.HesitantRangeMultiplier : 1f);
     public float EffectiveFireCooldown => FireCooldown;
-    public float EjectChance => Perks.BaseEjectChance + (HasPerk(Perks.Survivor) ? Perks.SurvivorEjectBonus : 0f);
+    public float EjectChance => Perks.BaseEjectChance;
     public float EngineBoostTurnLimitDegrees => Mathf.Max(0f, Moves.EngineBoostTurnLimitDegrees);
     public float PursuitBurnTurnLimitDegrees => Mathf.Max(0f, Moves.PursuitBurnTurnLimitDegrees);
     public float EcmJinkTurnLimitDegrees => Mathf.Max(0f, Moves.EcmJinkTurnLimitDegrees);
@@ -225,8 +234,9 @@ public partial class Fighter : Node2D
         + (IsEcmJinkActive ? Moves.EcmJinkEvasionBonus : 0f)
         + (IsGhostRunActive ? Moves.GhostRunEvasionBonus : 0f)
         + (IsEvasiveDodgeActive ? Moves.EvasiveDodgeEvasionBonus : 0f)
-        + (PhantomActive ? Perks.PhantomEvasionBonus : 0f)
+        + (StalkerActive ? Perks.StalkerEvasionBonus : 0f)
         + (WingmanActive ? Perks.WingmanEvasionBonus : 0f)
+        + (DaredevilActive ? Perks.DaredevilEvasionBonus : 0f)
         - (RattledActive ? Perks.RattledEvasionPenalty : 0f)
         - (SurvivorsGuiltActive ? Perks.SurvivorsGuiltCombatPenalty : 0f), 0f, 0.95f);
     /// <summary>Move distance currently planned for this turn.</summary>
@@ -323,6 +333,8 @@ public partial class Fighter : Node2D
             HunterLockCooldownTurns = 0;
             SensorScrambleCooldownTurns = 0;
             _aceResetThisTurn = true;
+            Shield = MaxShield;
+            PlayShieldAnimation();
             NoteTrait(Perks.Ace);
         }
     }
@@ -336,10 +348,10 @@ public partial class Fighter : Node2D
         _volleySwitchedTarget = _lastVolleyTarget != null && target != _lastVolleyTarget;
         _lastVolleyTarget = target;
         int shots = GD.RandRange(BarrageMin, BarrageMax);
-        if (_volleysThisTurn == 0 && HasPerk(Perks.TriggerHappy))
+        if (target != null && BrawlerActiveAgainst(target.Position))
         {
-            shots += Perks.TriggerHappyExtraShots;
-            NoteTrait(Perks.TriggerHappy);
+            shots += Perks.BrawlerExtraShots;
+            NoteTrait(Perks.Brawler);
         }
         if (GunShyActive)
         {
@@ -374,10 +386,12 @@ public partial class Fighter : Node2D
     /// <summary>Calls out the situational traits in play as this ship is shot at.</summary>
     public void NoteDefendingTraits()
     {
-        if (PhantomActive)
-            NoteTrait(Perks.Phantom);
+        if (StalkerActive)
+            NoteTrait(Perks.Stalker);
         if (WingmanActive)
             NoteTrait(Perks.Wingman);
+        if (DaredevilActive)
+            NoteTrait(Perks.Daredevil);
         if (RattledActive)
             NoteTrait(Perks.Rattled);
     }
@@ -859,6 +873,21 @@ public partial class Fighter : Node2D
         float radius = dist / Mathf.Abs(turn);
         Vector2 center = p0 + Vector2.FromAngle(h0).Rotated(Mathf.Sign(turn) * Mathf.Pi / 2f) * radius;
         pos = center + (p0 - center).Rotated(turn * s);
+    }
+
+    /// <summary>
+    /// Damage from an enemy shot. Second Chance turns the first killing shot
+    /// of a battle into a narrow escape: shields stripped, 1 hull left.
+    /// </summary>
+    public void TakeHit(int dmg)
+    {
+        if (IsAlive && !_secondChanceUsed && HasPerk(Perks.SecondChance) && dmg >= Hp + Shield)
+        {
+            _secondChanceUsed = true;
+            dmg = Hp + Shield - 1;
+            NoteTrait(Perks.SecondChance);
+        }
+        TakeDamage(dmg);
     }
 
     public void TakeDamage(int dmg)

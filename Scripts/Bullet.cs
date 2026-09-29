@@ -64,7 +64,7 @@ public partial class Bullet : Node2D
             {
                 if (f.IsAlive && Position.DistanceTo(f.Position) < 16f)
                 {
-                    f.TakeDamage(_shooter?.RollShotDamage(f, _damageMultiplier) ?? _damage);
+                    f.TakeHit(_shooter?.RollShotDamage(f, _damageMultiplier) ?? _damage);
                     _shooter?.RecordHit(!f.IsAlive);
                     mgr.SpawnFlash(Position);
                     QueueFree();

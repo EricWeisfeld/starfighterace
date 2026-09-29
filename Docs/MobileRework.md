@@ -138,21 +138,26 @@ swap. Frames and instincts never appear.
 - **Mastery** of a maneuver the pilot knows. It only matters on turns that maneuver is flown: Snap Turn to 180°, Boost turns 90°, U-Turn and Break Turn lose their cooldown, Lock On +25%, Scramble jams a second enemy, and so on (`Masteries.Describe`).
 
 
-Each pilot has exactly one **instinct**, a situational bonus picked in the draft
-(recruits bring a random one):
+Each pilot has exactly one **instinct**, picked in the draft (recruits bring a
+random one). An instinct should shape how that pilot flies or whom they shoot,
+matter in most battles, and never be a flat number (that is the ship's job):
 
-| Instinct | When it applies |
-| --- | --- |
-| Phantom | +15% evasion until first hit each battle. |
-| Cool Under Fire | +20% accuracy below half hull. |
-| Finisher | +25% damage against enemies below 40% hull. |
-| Survivor | +25% eject chance. |
-| Tail Gunner | +20% accuracy against a target flying away from you. |
-| Long Shot | +50% damage from the outer third of range. |
-| Ace | A kill resets all maneuver cooldowns. |
-| Trigger Happy | First volley each turn has +2 shots. |
-| Steady | +2 shield regen after a turn of normal flight. |
-| Wingman | +15% evasion within 250 of a squadmate. |
+| Instinct | When it applies | What it asks of you |
+| --- | --- | --- |
+| Tail Gunner | +20% accuracy against a target flying away from you. | Get behind targets. |
+| Long Shot | +50% damage from the outer third of range. | Hold at the edge of range. |
+| Brawler | +2 shots on volleys from the inner third of range. | Close in. |
+| Finisher | +25% damage against enemies below 40% hull. | Pick off the wounded. |
+| Ace | A kill resets all maneuver cooldowns and refills shields. | Chase kills. |
+| Steady | +2 shield regen after a turn of normal flight. | Fly plain turns instead of maneuvers. |
+| Stalker | +20% evasion each turn until you open fire. | Hold fire, or fire late in the turn. |
+| Daredevil | +15% evasion on turns flown at full throttle or faster. | Fly flat out. |
+| Wingman | +15% evasion within 250 of a squadmate. | Fly in formation. |
+| Cool Under Fire | +20% accuracy below half hull. | Keep flying hurt; always on in a 1-hull wreck. |
+| Second Chance | Once per battle, a shot that would destroy you leaves you at 1 hull. | Take the risky pass. |
+
+Stalker, Brawler and Second Chance replaced Phantom, Trigger Happy and Survivor
+(old saves load them under the new names); Daredevil is new.
 
 In battle, the HUD lists the selected pilot's instincts and scars, a trait's
 name floats above the ship when it makes a difference (`TraitCallout`), and the

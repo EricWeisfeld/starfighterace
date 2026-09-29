@@ -550,10 +550,10 @@ public static class RunContent
                         ShipUpgradeDefinition upgrade = upgrades[rng.RandiRange(0, upgrades.Length - 1)];
                         pilot.InstallUpgrade(upgrade.Id);
                         string text = $"{pilot.Callsign} fits a {upgrade.Name}.";
-                        if (rng.Randf() < 0.3f)
+                        if (rng.Randf() < 0.3f && !pilot.IsWrecked)
                         {
                             int damage = Mathf.CeilToInt(pilot.MaxHull * 0.4f);
-                            pilot.HullDamage = Mathf.Min(pilot.MaxHull - 1, pilot.HullDamage + damage);
+                            pilot.TakeHullDamage(damage);
                             text += $" A charge goes off: {damage} hull damage.";
                         }
                         return new EventOutcome { Text = text };
@@ -574,7 +574,7 @@ public static class RunContent
                     Resolve = (run, _) =>
                     {
                         foreach (Pilot pilot in run.Living)
-                            pilot.HullDamage = Mathf.Min(pilot.MaxHull - 1, pilot.HullDamage + 6);
+                            pilot.TakeHullDamage(6);
                         return Salvage(run, 40, "Rough going, but the storm hid some prizes. +40 salvage.");
                     },
                 },

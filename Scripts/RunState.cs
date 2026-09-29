@@ -96,7 +96,6 @@ public class PilotSave
             Xp = Xp,
             Condition = Condition,
             RecoveryStops = RecoveryStops,
-            HullDamage = HullDamage,
             Kills = Kills,
             Battles = Battles,
         };
@@ -114,6 +113,8 @@ public class PilotSave
             if (perk != null && !pilot.Perks.Contains(perk))
                 pilot.Perks.Add(perk);
         }
+        // Damage last: fitting armor above would otherwise clamp it.
+        pilot.HullDamage = HullDamage;
         return pilot;
     }
 }
@@ -139,6 +140,8 @@ public class RunState
     public const int DockStockSize = 3;
     /// <summary>Share of each ship's damage patched for free when a sector is cleared.</summary>
     public const float SectorPatchFraction = 0.5f;
+    /// <summary>Hull a wreck is patched to when nobody else can fly and it has to launch.</summary>
+    public const float EmergencyPatchFraction = 0.25f;
     const string SavePath = "user://ace-star-pilot-run.json";
 
     public static RunState Current { get; private set; }
@@ -298,7 +301,11 @@ public class RunState
     public BattleMission ActiveMission =>
         ActiveNode?.BattleKind is RunNodeKind kind ? RunContent.BuildMission(ActiveNode, Sector, kind) : null;
 
-    /// <summary>Pilots who can fly the next battle. If nobody is fit, the wounded fly anyway.</summary>
+    /// <summary>
+    /// Pilots who can fly the next battle. If nobody is fit, the wounded and
+    /// the wrecked fly anyway (wrecks get an emergency patch at launch), so a
+    /// run can never lock up.
+    /// </summary>
     public List<Pilot> Deployable()
     {
         List<Pilot> ready = Ready.ToList();
@@ -315,6 +322,8 @@ public class RunState
         BattleMission mission = ActiveMission;
         if (mission == null || squad.Count == 0)
             return;
+        foreach (Pilot pilot in squad.Where(p => p.IsWrecked))
+            pilot.HullDamage = pilot.MaxHull - Mathf.CeilToInt(pilot.MaxHull * EmergencyPatchFraction);
         BattleInProgress = true;
         BattleSquad = squad.Select(p => p.Callsign).ToList();
         Save();

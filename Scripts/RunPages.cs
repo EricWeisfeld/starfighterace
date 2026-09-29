@@ -152,10 +152,12 @@ public partial class RunScreen
         }
         content.AddChild(wing);
 
-        bool flyingWounded = !Run.Ready.Any();
+        bool flyingUnfit = !Run.Ready.Any();
         content.AddChild(Text($"CHOOSE UP TO {RunState.SquadLimit} PILOTS · {_briefingPicks.Count} SELECTED", FontCaption, Muted, 4));
-        if (flyingWounded)
-            content.AddChild(Text("Nobody is fit to fly, so the wounded are going up anyway.", FontCaption, Warning, 0, wrap: true));
+        if (flyingUnfit)
+            content.AddChild(Text(Run.Living.Any(p => p.IsWrecked)
+                ? "Nobody is fit to fly, so everyone goes up anyway. Wrecks get an emergency patch to a quarter hull."
+                : "Nobody is fit to fly, so the wounded are going up anyway.", FontCaption, Warning, 0, wrap: true));
         foreach (Pilot pilot in deployable)
         {
             bool picked = _briefingPicks.Contains(pilot.Callsign);
@@ -177,7 +179,12 @@ public partial class RunScreen
             content.AddChild(card);
         }
         foreach (Pilot pilot in Run.Living.Except(deployable))
-            content.AddChild(Text($"{pilot.Callsign} is wounded and sits this one out.", FontCaption, Muted, 0, wrap: true));
+            content.AddChild(Text(pilot switch
+            {
+                { IsWounded: true, IsWrecked: true } => $"{pilot.Callsign} is wounded and their ship is a wreck.",
+                { IsWrecked: true } => $"{pilot.Callsign}'s ship is a wreck. Repair it at a dock to fly again.",
+                _ => $"{pilot.Callsign} is wounded and sits this one out.",
+            }, FontCaption, Muted, 0, wrap: true));
 
         Button launch = TouchButton("LAUNCH", primary: true);
         launch.Disabled = _briefingPicks.Count == 0;
@@ -409,7 +416,7 @@ public partial class RunScreen
         int repairCost = Run.RepairCost(pilot);
         if (repairCost > 0)
         {
-            Button repair = TouchButton($"REPAIR · {repairCost}", fontSize: FontCaption);
+            Button repair = TouchButton($"{(pilot.IsWrecked ? "REPAIR WRECK" : "REPAIR")} · {repairCost}", fontSize: FontCaption);
             repair.Disabled = repairCost > Run.Salvage;
             repair.Pressed += () =>
             {

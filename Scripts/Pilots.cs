@@ -32,21 +32,30 @@ public class Pilot
     public PilotCondition Condition = PilotCondition.Ready;
     /// <summary>Run stops a wounded pilot still has to sit out.</summary>
     public int RecoveryStops;
-    /// <summary>Unrepaired hull points carried between battles.</summary>
+    /// <summary>
+    /// Unrepaired hull points carried between battles. Damage equal to the
+    /// ship's full hull means it is a wreck (see <see cref="IsWrecked"/>).
+    /// </summary>
     public int HullDamage;
     public int Kills;
     public int Battles;
 
     public bool Alive => Condition != PilotCondition.KIA;
-    public bool CanDeploy => Condition == PilotCondition.Ready;
+    /// <summary>Fit to fly: not wounded, and the ship is not a wreck.</summary>
+    public bool CanDeploy => Condition == PilotCondition.Ready && !IsWrecked;
     public bool IsWounded => Condition == PilotCondition.Wounded;
+    /// <summary>
+    /// The ship was shot down and towed home after a win. It stays grounded
+    /// until repaired; any repair brings it back above zero hull.
+    /// </summary>
+    public bool IsWrecked => Alive && HullDamage >= MaxHull;
     public bool IsMaxLevel => Level >= MaxLevel;
     public ShipType BaseClass => ShipTypes.BaseClass(ClassId);
     public bool CanRefit => Level >= RefitLevel && Ship == BaseClass;
     /// <summary>Maximum hull: the frame's, plus armor plating.</summary>
     public int MaxHull => Ship.MaxHp + (HasUpgrade(ShipUpgrade.ShieldsArmor) ? ShipUpgrades.ArmorHullBonus : 0);
-    /// <summary>Hull the ship will launch with.</summary>
-    public int Hull => Mathf.Clamp(MaxHull - HullDamage, 1, MaxHull);
+    /// <summary>Hull the ship will launch with; zero for a wreck.</summary>
+    public int Hull => IsWrecked ? 0 : Mathf.Clamp(MaxHull - HullDamage, 1, MaxHull);
     public IEnumerable<ShipAbility> UnlearnedManeuvers => Ship.ManeuverPool.Where(ability => !Maneuvers.Contains(ability));
     public IEnumerable<ShipAbility> UnmasteredManeuvers => Maneuvers.Where(ability => !Masteries.Contains(ability));
     public IEnumerable<Perk> Instincts => Perks.Where(perk => perk.Positive);
@@ -96,12 +105,44 @@ public class Pilot
     {
         if (!CanRefit || !ShipTypes.HullBranches(ClassId).Contains(frame))
             return false;
+        bool wrecked = IsWrecked;
         Ship = frame;
         Upgrades.RemoveAll(upgrade => !HasSlot(ShipUpgrades.Get(upgrade).Slot));
-        HullDamage = Mathf.Min(HullDamage, MaxHull - 1);
+        KeepHullState(wrecked);
         RestoreManeuvers(Maneuvers.ToArray());
         return true;
     }
+
+    /// <summary>Marks the ship as a wreck: grounded until repaired, frame and modules intact.</summary>
+    public void Wreck() => HullDamage = MaxHull;
+
+    /// <summary>
+    /// The ship was left behind. The pilot flies a new, bare base frame of
+    /// their class; what they have learned stays with them. Returns what was
+    /// lost.
+    /// </summary>
+    public (ShipType Frame, List<ShipUpgrade> Modules) LoseShip()
+    {
+        (ShipType Frame, List<ShipUpgrade> Modules) lost = (Ship, Upgrades.ToList());
+        Ship = BaseClass;
+        Upgrades.Clear();
+        HullDamage = 0;
+        RestoreManeuvers(Maneuvers.ToArray());
+        return lost;
+    }
+
+    /// <summary>
+    /// Hull damage from outside a battle (events). It can bring a ship low
+    /// but never wrecks it, and a wreck takes no further damage.
+    /// </summary>
+    public void TakeHullDamage(int amount)
+    {
+        if (!IsWrecked)
+            HullDamage = Mathf.Min(MaxHull - 1, HullDamage + amount);
+    }
+
+    /// <summary>After the maximum hull changes: a wreck stays a wreck, otherwise the ship keeps at least 1 hull.</summary>
+    void KeepHullState(bool wrecked) => HullDamage = wrecked ? MaxHull : Mathf.Min(HullDamage, MaxHull - 1);
 
     public bool HasSlot(ShipUpgradeSlot slot) => Ship.UpgradeSlots.Contains(slot);
     public bool HasUpgrade(ShipUpgrade upgrade) => Upgrades.Contains(upgrade);
@@ -118,10 +159,11 @@ public class Pilot
     {
         if (!CanInstall(upgrade))
             return false;
+        bool wrecked = IsWrecked;
         ShipUpgradeSlot slot = ShipUpgrades.Get(upgrade).Slot;
         Upgrades.RemoveAll(existing => ShipUpgrades.Get(existing).Slot == slot);
         Upgrades.Add(upgrade);
-        HullDamage = Mathf.Min(HullDamage, MaxHull - 1);
+        KeepHullState(wrecked);
         return true;
     }
 
@@ -162,6 +204,13 @@ public class PilotResult
     public Pilot Pilot;
     public bool Survived;
     public bool Ejected;
+    /// <summary>Shot down in a win: the ship came home as a wreck.</summary>
+    public bool WreckRecovered;
+    /// <summary>Shot down in a loss: the ship was left behind.</summary>
+    public bool ShipLost;
+    /// <summary>For a lost ship: its frame and the modules that went with it.</summary>
+    public ShipType LostFrame;
+    public List<ShipUpgrade> LostModules = new();
     public int Kills;
     public int XpGained;
     public int LevelsGained;
@@ -170,8 +219,8 @@ public class PilotResult
 
 /// <summary>
 /// Applies the consequences of a finished battle to the pilots who flew it:
-/// eject survival, permadeath, wounds, hull damage, XP, level-ups and scar
-/// rolls. Call exactly once per battle.
+/// eject survival, permadeath, wounds, hull damage, wrecks and lost ships,
+/// XP, level-ups and scar rolls. Call exactly once per battle.
 /// </summary>
 public static class BattleResolution
 {
@@ -206,11 +255,25 @@ public static class BattleResolution
             }
             else
             {
-                // A ship that made it home keeps its damage; a shot-down pilot
-                // returns in a replacement hull after recovering from injuries.
-                f.Pilot.HullDamage = f.Ejected ? 0 : Mathf.Max(0, f.MaxHp - f.Hp);
                 f.Pilot.Condition = f.Ejected ? PilotCondition.Wounded : PilotCondition.Ready;
                 f.Pilot.RecoveryStops = f.Ejected ? WoundedRecoveryStops : 0;
+                if (!f.Ejected)
+                {
+                    // A ship that made it home keeps its damage.
+                    f.Pilot.HullDamage = Mathf.Max(0, f.MaxHp - f.Hp);
+                }
+                else if (won)
+                {
+                    // Holding the field means towing the wreck home.
+                    f.Pilot.Wreck();
+                    r.WreckRecovered = true;
+                }
+                else
+                {
+                    // A loss or retreat leaves the wreck behind.
+                    (r.LostFrame, r.LostModules) = f.Pilot.LoseShip();
+                    r.ShipLost = true;
+                }
             }
             results.Add(r);
             resultsByFighter[f] = r;

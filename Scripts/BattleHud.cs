@@ -25,6 +25,7 @@ public partial class BattleHud : CanvasLayer
     Button _undo, _engage;
     Control _menu;
     Button _retreat;
+    Label _retreatNote;
     int _framesLaidOut;
 
     /// <summary>True once both bars have been laid out, so the camera can frame around them.</summary>
@@ -194,7 +195,8 @@ public partial class BattleHud : CanvasLayer
             Mgr.Retreat();
         };
         stack.AddChild(_retreat);
-        stack.AddChild(Text("Ends the battle as a loss. Your pilots come home.", FontCaption, Muted, 0, wrap: true));
+        _retreatNote = Text("", FontCaption, Muted, 0, wrap: true);
+        stack.AddChild(_retreatNote);
         Button quit = TouchButton("QUIT TO TITLE");
         quit.Pressed += () =>
         {
@@ -229,7 +231,23 @@ public partial class BattleHud : CanvasLayer
         _menu.Visible = !_menu.Visible;
         GetTree().Paused = _menu.Visible;
         _retreat.Disabled = !Mgr.CanRetreat;
+        List<string> wrecks = WrecksLeftByRetreat();
+        _retreatNote.Text = RetreatNote(wrecks);
+        _retreatNote.AddThemeColorOverride("font_color", wrecks.Count > 0 ? Warning : Muted);
     }
+
+    /// <summary>In a run, the callsigns whose wrecks a retreat would leave behind.</summary>
+    static List<string> WrecksLeftByRetreat() => GameSetup.IsTestBattle ? new List<string>()
+        : Mgr.PlayerFighters.Where(f => f.Ejected).Select(BattleManager.CallsignOf).ToList();
+
+    /// <summary>What retreating costs right now.</summary>
+    static string RetreatNote(List<string> wrecks) =>
+        wrecks.Count switch
+        {
+            0 => "Ends the battle as a loss. Your pilots come home.",
+            1 => $"Ends the battle as a loss. {wrecks[0]}'s wreck is left behind: the ship and its modules are lost.",
+            _ => $"Ends the battle as a loss. The wrecks of {string.Join(" and ", wrecks)} are left behind: those ships and their modules are lost.",
+        };
 
     public override void _ExitTree()
     {
@@ -404,7 +422,7 @@ public partial class SquadChip : Button
         Color hullColor = hull < 0.35f ? SignalUi.Warning : SignalUi.Positive;
         DrawRect(new Rect2(12, 50, barWidth * hull, 7), hullColor);
 
-        (string status, Color color) = !alive ? ("DOWN", SignalUi.Negative)
+        (string status, Color color) = !alive ? (Fighter.Ejected ? "EJECTED" : "DOWN", SignalUi.Negative)
             : !Planning ? ("FLYING", SignalUi.Muted)
             : BattleManager.HasOrders(Fighter) ? ("ORDERS SET", SignalUi.Positive)
             : ("HOLDING", SignalUi.Muted);

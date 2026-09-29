@@ -61,8 +61,12 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 - The roster holds up to 5 pilots, and up to 3 fly each battle.
 - XP needed per level rises (100, 150, 200, 250, 300), with a cap at level 6.
 - Level-ups and the ship are described in Phase 4.
-- Ejection, wounds (sit out the next stop) and permanent death are unchanged.
-- If nobody is fit to fly, the wounded fly anyway, so a run can never soft-lock.
+- A pilot who is shot down without ejecting is killed, along with the ship.
+- A pilot who ejects is wounded (sits out the next stop). What happens to the ship depends on the result:
+  - **Win:** the squadron holds the field and tows the wreck home. Frame and modules are intact, but the ship is grounded (WRECKED) until repaired at a dock, at the full 2 salvage per hull point. Any repair, including the drones event and the half patch between sectors, makes it flyable again.
+  - **Loss or retreat:** the wreck is left behind. The pilot comes home to a new, bare base frame of their class; the refit and every module are gone. Maneuvers, masteries, instincts and level stay, and a level-3 pilot can buy a refit again.
+  - The pause menu's Retreat note names any wrecks a retreat would leave behind.
+- If nobody is fit to fly, the wounded and wrecked fly anyway, so a run can never soft-lock. A wreck forced into battle gets an emergency patch to a quarter hull.
 
 ### Saving
 

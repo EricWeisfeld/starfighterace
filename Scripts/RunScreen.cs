@@ -171,6 +171,7 @@ public partial class RunScreen : Node2D
     {
         PilotCondition.KIA => ("KIA", ChipRole.Loss),
         PilotCondition.Wounded => ("WOUNDED", ChipRole.Impaired),
+        _ when pilot.IsWrecked => ("WRECKED", ChipRole.Impaired),
         _ when pilot.HullDamage > 0 => ("DAMAGED", ChipRole.Impaired),
         _ => ("READY", ChipRole.Gain),
     };
@@ -200,7 +201,7 @@ public partial class RunScreen : Node2D
                 SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
                 SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
             });
-            string hull = $"HULL {pilot.Hull}/{pilot.MaxHull}";
+            string hull = pilot.IsWrecked ? "WRECK · REPAIR TO FLY" : $"HULL {pilot.Hull}/{pilot.MaxHull}";
             if (pilot.IsWounded)
                 hull += " · SITS OUT NEXT STOP";
             if (trailingNote != null)

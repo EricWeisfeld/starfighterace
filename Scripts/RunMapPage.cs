@@ -433,7 +433,8 @@ public partial class PilotChip : Control
         float fraction = Mathf.Clamp(Pilot.Hull / (float)Pilot.MaxHull, 0f, 1f);
         DrawRect(new Rect2(0, 60, Size.X, 8), new Color(1, 1, 1, 0.12f));
         DrawRect(new Rect2(0, 60, Size.X * fraction, 8), fraction < 0.35f ? SignalUi.Warning : SignalUi.Positive);
-        if (Pilot.IsWounded)
-            DrawString(font, new Vector2(0, 94), "WOUNDED", HorizontalAlignment.Left, Size.X, SignalUi.FontMicro, SignalUi.Warning);
+        string status = Pilot.IsWrecked ? "WRECKED" : Pilot.IsWounded ? "WOUNDED" : null;
+        if (status != null)
+            DrawString(font, new Vector2(0, 94), status, HorizontalAlignment.Left, Size.X, SignalUi.FontMicro, SignalUi.Warning);
     }
 }

@@ -85,7 +85,7 @@ public partial class BattleDebrief : CanvasLayer
         var grid = new GridContainer { Columns = 4, MouseFilter = Control.MouseFilterEnum.Ignore };
         grid.AddThemeConstantOverride("h_separation", 12);
         int kills = _report.Squad.Sum(f => f.Kills);
-        int lost = _report.Squad.Count(f => !f.IsAlive);
+        int downed = _report.Squad.Count(f => !f.IsAlive);
         AddKpi(grid, kills.ToString(), "KILLS", TextBright);
         if (_report.Results.Count > 0)
             AddKpi(grid, $"+{_report.Results.Sum(r => r.XpGained)}", "SQUAD XP", TextBright);
@@ -94,7 +94,8 @@ public partial class BattleDebrief : CanvasLayer
         int salvage = _report.Run?.Salvage ?? 0;
         if (salvage > 0)
             AddKpi(grid, $"+{salvage}", "SALVAGE", Positive);
-        AddKpi(grid, lost.ToString(), "LOST", lost > 0 ? Negative : Muted);
+        // Shot down is not the same as lost: a win tows the wrecks home.
+        AddKpi(grid, downed.ToString(), "SHOT DOWN", downed > 0 ? Negative : Muted);
         return grid;
     }
 
@@ -159,13 +160,29 @@ public partial class BattleDebrief : CanvasLayer
         {
             { Survived: false, Ejected: true } => ("KIA", ChipRole.Loss, "Ejected, but lost in enemy space."),
             { Survived: false } => ("KIA", ChipRole.Loss, "Shot down. No ejection."),
-            { Ejected: true } => ("WOUNDED", ChipRole.Impaired,
-                $"Ejected and {(_report.Won ? "recovered" : "escaped")}. Sits out the next stop in a new ship."),
+            { WreckRecovered: true } => ("WOUNDED", ChipRole.Impaired,
+                $"Ejected and recovered, and the wreck was towed home. Sits out the next stop; the ship needs a full repair ({RunState.RepairCostPerHull * r.Pilot.HullDamage} salvage) before it flies again."),
+            { ShipLost: true } => ("WOUNDED", ChipRole.Impaired,
+                $"Ejected and escaped, but the ship was left behind. Sits out the next stop, then flies a new {r.Pilot.Ship.DisplayName}."),
+            { Ejected: true } => ("WOUNDED", ChipRole.Impaired, "Ejected and recovered. Sits out the next stop."),
             _ => ("RETURNED", ChipRole.Gain,
                 r.Pilot.HullDamage > 0 ? $"{r.Pilot.HullDamage} hull damage still to repair." : "Hull fully repaired."),
         };
-        stack.AddChild(CardHeader(r.Pilot.Ship, r.Pilot.Callsign.ToUpper(), r.Survived, fate, fateRole));
+        stack.AddChild(CardHeader(r.LostFrame ?? r.Pilot.Ship, r.Pilot.Callsign.ToUpper(), r.Survived, fate, fateRole));
         stack.AddChild(Text(fateNote, FontCaption, Muted, 0, wrap: true));
+        if (r.WreckRecovered)
+            stack.AddChild(Tag("WRECK RECOVERED", ChipRole.Impaired));
+        if (r.ShipLost)
+        {
+            // Name what went down with the ship, when it was worth anything.
+            var lost = new List<string>();
+            if (r.LostFrame != null && r.LostFrame != r.Pilot.Ship)
+                lost.Add(r.LostFrame.DisplayName.ToUpper());
+            lost.AddRange(r.LostModules.Select(m => ShipUpgrades.Get(m).Name.ToUpper()));
+            stack.AddChild(Tag("SHIP LOST", ChipRole.Loss));
+            if (lost.Count > 0)
+                stack.AddChild(Text("Lost with it: " + string.Join(" · ", lost), FontCaption, Negative, 1, wrap: true));
+        }
 
         if (r.Survived)
         {

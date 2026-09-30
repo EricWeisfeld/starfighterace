@@ -130,7 +130,8 @@ public partial class SpaceBackdrop : CanvasLayer
         _washB.Modulate = new Color(_look.WashB, 0.16f);
         _planet?.QueueFree();
         _planet = new AnimatedCelestial();
-        _planet.Setup($"{Bodies}{_look.Planet}.png", 100, framesPerSecond: 7f);
+        // About 75 seconds a turn: slow enough to read as distant.
+        _planet.Setup($"{Bodies}{_look.Planet}.png", 100, framesPerSecond: 4f);
         _planet.Size = Vector2.One * _look.PlanetSize;
         // Pushed back into the dark, and a little cool so it reads as distant.
         _planet.Modulate = new Color(_look.PlanetLight, _look.PlanetLight, _look.PlanetLight * 1.2f);
@@ -175,7 +176,8 @@ public partial class SpaceBackdrop : CanvasLayer
         _washA.Position = new Vector2(view.X * 0.25f, view.Y * 0.30f) - drift * 0.02f;
         _washB.Position = new Vector2(view.X * 0.80f, view.Y * 0.72f) - drift * 0.03f;
 
-        _planet.Position = view * _look.PlanetAnchor - Vector2.One * _look.PlanetSize / 2f - drift * 0.05f;
+        // Whole pixels only: a planet between pixels shimmers as its sheet pixels change width.
+        _planet.Position = (view * _look.PlanetAnchor - Vector2.One * _look.PlanetSize / 2f - drift * 0.05f).Round();
     }
 
     /// <summary>One of the sky's repeating star tiles, far (0) to near (2), for other scenes to reuse.</summary>

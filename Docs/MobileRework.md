@@ -45,7 +45,12 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
   - Shots use the packs' pixel bolts (Nairan for you, Kla'ed for the enemy), glowing in the team colour with a short tracer, plus muzzle flashes and sparks (orange on hull, blue on shields, grey on rock). A kill adds a debris burst, a shock ring and a small camera shake. The ship's own shield animation still plays when its shield takes a hit.
   - `AsteroidSprite`: each rock is generated from its terrain circle as pixel art. It has a lumpy outline between 96% and 108% of the collision radius, craters and banded lighting from the top-left. The rock turns slowly while the light stays fixed.
   - `NebulaCloud`: nebulas are drifting, banded gas drawn by a shader. While planning, a dashed ring marks the exact edge that decides who is inside.
-  - `BattleBackdrop`: a per-map colour wash, three pixel-star layers that drift with the camera at different speeds, and a dimmed, slowly turning planet at the screen edge (`MapLook` per map). The 12000px star sheets in `CelestialBodies` are skipped, because they exceed many phone GPUs' texture size.
+  - `SpaceBackdrop.ForBattle`: a per-map colour wash, three pixel-star layers that drift with the camera at different speeds, and a dimmed, slowly turning planet at the screen edge (`MapLook` per map). The 12000px star sheets in `CelestialBodies` are skipped, because they exceed many phone GPUs' texture size.
+- **Menu visuals:**
+  - Display font: Chakra Petch SemiBold (SIL Open Font License, `Assets/Fonts`). `SignalUi.Tracked` builds on it, so every tracked uppercase label, title, button and tag uses it, and so do the battle's drawn labels and damage numbers (`SignalUi.Display`). Running sentences stay in the default font.
+  - `SpaceBackdrop.ForMenu`: the battle sky drifts slowly behind Home, Quick Battle and every run page. Each sector has its own planet and tint (ice, then ocean, then fire); Home's planet sits inside its orbit rings.
+  - `EventScene`: each event page shows an animated viewscreen in the space between the story and the choices. It shows a gutted Nautolan freighter with arcing sparks, a pod pinging its beacon, a repair swarm welding a hull, a munitions cache, an ion storm with lightning, or raiders circling a convoy.
+  - Ship pictures on cards are cropped to the hull (`FighterSkin.Icon`), so the ship fills its box instead of sitting small in the middle of a 64px sheet. Enemy pictures on briefings use the enemy red.
 
 ## Phase 2 and 3: runs and the lean squadron (done)
 
@@ -209,4 +214,4 @@ new run. A run saved during the draft resumes on the draft page.
 - Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many level-ups a run gives now that every ship has three slots, free docks, threat per layer, ejection and scar odds, and instinct strength.
 - Maps could be drawn from pools by stop type (open maps for skirmishes, dense ones for elites) and mirrored left to right for more variety.
 - An Android export preset and a device test pass are still to do. The device pass should check the nebula and asteroid shaders' frame rate on a low-end phone.
-- Visual follow-ups not yet done: a closer camera while a turn plays, a display font, and backdrops and art on the menu pages.
+- Visual follow-up not yet done: a closer camera while a turn plays.

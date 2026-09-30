@@ -399,7 +399,12 @@ public partial class RunScreen
         VBoxContainer page = Stack(20);
         page.AddChild(Header("SIGNAL", runEvent.Title));
         page.AddChild(Text(runEvent.Text, FontBody, Body, 0, wrap: true));
-        page.AddChild(Spacer());
+        // The scene fills the space between the story and the choices.
+        page.AddChild(new EventScene(runEvent.Id)
+        {
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            CustomMinimumSize = new Vector2(0, 260),
+        });
 
         if (Run.EventResult == null)
         {

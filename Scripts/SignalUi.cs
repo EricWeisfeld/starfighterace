@@ -47,13 +47,33 @@ public static class SignalUi
     public const int ScreenGutter = 32;
 
     static readonly Dictionary<int, FontVariation> TrackedFonts = new();
+    static Font _display;
 
-    /// <summary>Default font with extra letter-spacing, for uppercase micro-labels.</summary>
+    /// <summary>
+    /// The game's display face, Chakra Petch SemiBold (SIL Open Font License,
+    /// see Assets/Fonts). Every tracked uppercase label, title, button and
+    /// battle callout uses it; running sentences stay in the default font.
+    /// </summary>
+    public static Font Display
+    {
+        get
+        {
+            if (_display == null)
+            {
+                var font = GD.Load<FontFile>("res://Assets/Fonts/ChakraPetch-SemiBold.ttf");
+                font.Fallbacks = new Godot.Collections.Array<Font> { ThemeDB.FallbackFont };
+                _display = font;
+            }
+            return _display;
+        }
+    }
+
+    /// <summary>The display face with extra letter-spacing, for uppercase labels, titles and buttons.</summary>
     public static Font Tracked(int spacing)
     {
         if (!TrackedFonts.TryGetValue(spacing, out FontVariation font))
         {
-            font = new FontVariation { BaseFont = ThemeDB.FallbackFont };
+            font = new FontVariation { BaseFont = Display };
             font.SetSpacing(TextServer.SpacingType.Glyph, spacing);
             TrackedFonts[spacing] = font;
         }
@@ -297,24 +317,6 @@ public static class SignalUi
             row.AddChild(cell);
         }
         return frame;
-    }
-
-    /// <summary>Sparse star backdrop shared by every screen's _Draw.</summary>
-    public static void DrawStarfield(CanvasItem canvas, ulong seed, float width, float height, int count = 150)
-    {
-        var rng = new RandomNumberGenerator { Seed = seed };
-        for (int i = 0; i < count; i++)
-        {
-            var point = new Vector2(rng.RandfRange(0, width), rng.RandfRange(0, height));
-            canvas.DrawCircle(point, rng.RandfRange(0.4f, 1.2f), new Color(0.74f, 0.84f, 1f, rng.RandfRange(0.05f, 0.28f)));
-        }
-    }
-
-    /// <summary>Faint radial glow approximated with stacked translucent discs.</summary>
-    public static void DrawNebula(CanvasItem canvas, Vector2 center, Color color, int layers = 14, float step = 22f, float alpha = 0.008f)
-    {
-        for (int i = layers; i >= 1; i--)
-            canvas.DrawCircle(center, i * step, new Color(color.R, color.G, color.B, alpha));
     }
 }
 

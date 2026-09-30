@@ -48,6 +48,9 @@ public class SkinDef
         Rect2I used = _cached.Base.GetImage()?.GetUsedRect() ?? new Rect2I(0, 0, 32, 32);
         if (used.Size.X > 0 && used.Size.Y > 0)
             _cached.HullRadius = (used.Size.X + used.Size.Y) / 4f;
+        _cached.Icon = used.Size.X > 0 && used.Size.Y > 0
+            ? new AtlasTexture { Atlas = _cached.Base, Region = new Rect2(used.Position, used.Size) }
+            : _cached.Base;
         return _cached;
     }
 }

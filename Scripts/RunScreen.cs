@@ -20,6 +20,7 @@ public partial class RunScreen : Node2D
     bool _confirmAbandon;
 
     RunState Run => RunState.Current;
+    SpaceBackdrop _backdrop;
 
     public override void _Ready()
     {
@@ -35,6 +36,8 @@ public partial class RunScreen : Node2D
             ChangeScene(this, "res://Scenes/Battle.tscn");
             return;
         }
+        _backdrop = SpaceBackdrop.ForMenu(SpaceBackdrop.Sector(Run.Sector));
+        AddChild(_backdrop);
         _root = ScreenRoot(this, extraTop: 28, extraBottom: 28);
         Render();
     }
@@ -118,17 +121,11 @@ public partial class RunScreen : Node2D
         else
             page = BuildMapPage();
         _root.AddChild(page);
-        QueueRedraw();
+        _backdrop.SetLook(SpaceBackdrop.Sector(Run.Sector));
     }
 
     bool _eventBattleAcknowledged;
 
-    public override void _Draw()
-    {
-        Vector2 size = GetViewportRect().Size;
-        DrawStarfield(this, 51177 + (ulong)(Run?.Sector ?? 0), size.X, size.Y, 200);
-        DrawNebula(this, new Vector2(size.X * 0.8f, size.Y * 0.25f), new Color(0.25f, 0.59f, 1f), 16, 24);
-    }
 
     // ------------------------------------------------------------ helpers
 
@@ -156,9 +153,11 @@ public partial class RunScreen : Node2D
         return row;
     }
 
+    /// <summary>A ship's hull, cropped to fill the box; enemies in their hostile red.</summary>
     static TextureRect ShipIcon(ShipType ship, float size = 88f, int team = 0, bool faded = false) => new()
     {
-        Texture = ship.GetSkin(team).Base,
+        Texture = ship.GetSkin(team).Icon,
+        Material = team == 1 ? ShipPaint.Enemy : null,
         CustomMinimumSize = new Vector2(size, size),
         ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
         StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,

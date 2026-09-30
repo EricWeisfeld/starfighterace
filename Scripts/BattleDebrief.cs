@@ -109,8 +109,8 @@ public partial class BattleDebrief : CanvasLayer
     {
         return new TextureRect
         {
-            Texture = ship.GetSkin(0).Base,
-            CustomMinimumSize = new Vector2(88, 88),
+            Texture = ship.GetSkin(0).Icon,
+            CustomMinimumSize = new Vector2(80, 80),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             TextureFilter = CanvasItem.TextureFilterEnum.Nearest,

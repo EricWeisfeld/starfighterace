@@ -292,7 +292,7 @@ public partial class BattleManager : Node2D
 
         _fighterLayer = new Node2D();
         _bulletLayer = new Node2D();
-        AddChild(new BattleBackdrop(Map.Id));
+        AddChild(SpaceBackdrop.ForBattle(Map.Id));
         AddChild(new TerrainLayer(Map.Terrain));
         AddChild(_fighterLayer);
         AddChild(_bulletLayer);
@@ -1291,7 +1291,7 @@ public partial class BattleManager : Node2D
 
     public override void _Draw()
     {
-        // The arena border; the sky behind it is BattleBackdrop.
+        // The arena border; the sky behind it is SpaceBackdrop.
         DrawRect(new Rect2(1, 1, ArenaW - 2, ArenaH - 2), new Color(1, 1, 1, 0.12f), false, 2f);
     }
 }

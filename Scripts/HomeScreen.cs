@@ -13,6 +13,7 @@ public partial class HomeScreen : Node2D
     public override void _Ready()
     {
         RenderingServer.SetDefaultClearColor(Bg);
+        AddChild(SpaceBackdrop.ForMenu(SpaceBackdrop.Home));
 
         MarginContainer root = ScreenRoot(this, extraTop: 96, extraBottom: 40);
         VBoxContainer page = Stack(20);
@@ -76,12 +77,9 @@ public partial class HomeScreen : Node2D
     public override void _Draw()
     {
         Vector2 size = GetViewportRect().Size;
-        DrawStarfield(this, 14052, size.X, size.Y, 220);
-        DrawNebula(this, new Vector2(size.X * 0.85f, size.Y * 0.18f), new Color(0.25f, 0.59f, 1f), 18, 26);
-        DrawNebula(this, new Vector2(size.X * 0.1f, size.Y * 0.8f), new Color(0.16f, 0.86f, 0.75f), 14, 24, 0.005f);
 
-        // Concentric command rings behind the title.
-        var center = new Vector2(size.X * 0.7f, size.Y * 0.3f);
+        // Concentric command rings, orbiting the planet behind the title.
+        Vector2 center = size * SpaceBackdrop.Home.PlanetAnchor;
         DrawArc(center, 420, 0, Mathf.Tau, 96, new Color(0.35f, 0.67f, 1f, 0.10f), 2f, true);
         const int dashes = 40;
         for (int i = 0; i < dashes; i++)

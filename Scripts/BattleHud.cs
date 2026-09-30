@@ -412,7 +412,7 @@ public partial class SquadChip : Button
 
     public override void _Draw()
     {
-        Font font = ThemeDB.FallbackFont;
+        Font font = SignalUi.Display;
         var rect = new Rect2(Vector2.Zero, Size);
         bool alive = Fighter.IsAlive;
         Color border = IsSelected ? SignalUi.Accent : SignalUi.Hairline;

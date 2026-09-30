@@ -301,7 +301,7 @@ public partial class DamageNumber : Node2D
         float k = _t / Life;
         float alpha = k < 0.7f ? 1f : 1f - (k - 0.7f) / 0.3f;
         float pop = 1f + 0.35f * Mathf.Max(0f, 1f - _sinceHit / 0.15f);
-        Font font = ThemeDB.FallbackFont;
+        Font font = SignalUi.Display;
         int size = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontBody * pop * s));
         string text = _hull > 0 && _shield > 0 ? $"-{_hull}" : $"-{_hull + _shield}";
         Color color = _hull > 0 ? HullColor : ShieldColor;

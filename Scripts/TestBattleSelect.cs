@@ -22,6 +22,7 @@ public partial class TestBattleSelect : Node2D
     public override void _Ready()
     {
         RenderingServer.SetDefaultClearColor(Bg);
+        AddChild(SpaceBackdrop.ForMenu(SpaceBackdrop.QuickBattle));
         BuildUi();
         Refresh();
     }
@@ -129,8 +130,8 @@ public partial class TestBattleSelect : Node2D
         card.AddChild(row);
         row.AddChild(new TextureRect
         {
-            Texture = ship.GetSkin(0).Base,
-            CustomMinimumSize = new Vector2(104, 104),
+            Texture = ship.GetSkin(0).Icon,
+            CustomMinimumSize = new Vector2(96, 96),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
@@ -192,10 +193,4 @@ public partial class TestBattleSelect : Node2D
         ChangeScene(this, "res://Scenes/Battle.tscn");
     }
 
-    public override void _Draw()
-    {
-        Vector2 size = GetViewportRect().Size;
-        DrawStarfield(this, 7342, size.X, size.Y, 200);
-        DrawNebula(this, new Vector2(size.X * 0.2f, size.Y * 0.1f), new Color(0.16f, 0.86f, 0.75f), 12, 20, 0.005f);
-    }
 }

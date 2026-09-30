@@ -119,8 +119,8 @@ public partial class ObjectiveShip : Fighter
         DrawRect(new Rect2(-width / 2f, barY, width * Mathf.Clamp(Hp / (float)MaxHp, 0f, 1f), 7f * s), new Color(0.4f, 1f, 0.7f));
         string label = Escaped ? "JUMP ZONE REACHED" : "TRANSPORT";
         int size = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontMicro * s));
-        Vector2 extent = ThemeDB.FallbackFont.GetStringSize(label, HorizontalAlignment.Left, -1f, size);
-        DrawString(ThemeDB.FallbackFont, new Vector2(-extent.X / 2f, barY - 6f * s), label, HorizontalAlignment.Left, -1f, size, hull);
+        Vector2 extent = SignalUi.Display.GetStringSize(label, HorizontalAlignment.Left, -1f, size);
+        DrawString(SignalUi.Display, new Vector2(-extent.X / 2f, barY - 6f * s), label, HorizontalAlignment.Left, -1f, size, hull);
         DrawSetTransform(Vector2.Zero);
     }
 }

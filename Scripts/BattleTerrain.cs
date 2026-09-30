@@ -485,8 +485,8 @@ public partial class NebulaMarks : Node2D
                 DrawArc(feature.Position, feature.Radius, from, from + Mathf.Tau / dashes * 0.55f, 4, ring,
                     1.5f * Mathf.Max(1f, _drawnScale), true);
             }
-            Vector2 extent = ThemeDB.FallbackFont.GetStringSize("NEBULA", HorizontalAlignment.Left, -1f, labelSize);
-            DrawString(ThemeDB.FallbackFont, feature.Position + new Vector2(-extent.X / 2f, -feature.Radius + labelSize * 1.2f), "NEBULA",
+            Vector2 extent = SignalUi.Display.GetStringSize("NEBULA", HorizontalAlignment.Left, -1f, labelSize);
+            DrawString(SignalUi.Display, feature.Position + new Vector2(-extent.X / 2f, -feature.Radius + labelSize * 1.2f), "NEBULA",
                 HorizontalAlignment.Left, -1f, labelSize, new Color(0.62f, 0.80f, 1f, 0.6f));
         }
     }

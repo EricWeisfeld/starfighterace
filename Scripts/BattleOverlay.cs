@@ -98,7 +98,7 @@ public partial class BattleOverlay : Node2D
     /// <summary>Draws a label centred on a world point at a constant on-screen size.</summary>
     void DrawLabel(Vector2 center, string text, int screenSize, Color color)
     {
-        Font font = ThemeDB.FallbackFont;
+        Font font = SignalUi.Display;
         int size = FontPx(screenSize);
         Vector2 extent = font.GetStringSize(text, HorizontalAlignment.Left, -1f, size);
         DrawString(font, center + new Vector2(-extent.X / 2f, size * 0.35f), text, HorizontalAlignment.Left, -1f, size, color);
@@ -569,7 +569,7 @@ public partial class BattleOverlay : Node2D
         }
 
         int size = FontPx(SignalUi.FontMicro);
-        DrawString(ThemeDB.FallbackFont, center + new Vector2(bracketX + 6f + Px(4f), size * 0.35f), status,
+        DrawString(SignalUi.Display, center + new Vector2(bracketX + 6f + Px(4f), size * 0.35f), status,
             HorizontalAlignment.Left, -1f, size, color);
     }
 
@@ -765,7 +765,7 @@ public partial class TraitCallout : Node2D
         float t = Age / Life;
         float alpha = (t < 0.75f ? 1f : 1f - (t - 0.75f) / 0.25f) * (1f - _shownRow * 0.2f);
         float pop = Mathf.Clamp(Age / 0.12f, 0f, 1f); // a short rise into place
-        Font font = ThemeDB.FallbackFont;
+        Font font = SignalUi.Display;
         int size = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontCaption * s));
         Vector2 extent = font.GetStringSize(Text, HorizontalAlignment.Left, -1f, size);
         float hullTop = IsInstanceValid(Anchor) ? Mathf.Max(26f, Anchor.VisualRadius + 6f) : 26f;

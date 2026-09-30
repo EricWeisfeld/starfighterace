@@ -310,7 +310,7 @@ public partial class SectorMapView : Control
                 travelled || open ? 4f : 2f, dashed: !travelled && !open);
         }
 
-        Font font = ThemeDB.FallbackFont;
+        Font font = SignalUi.Display;
         foreach (RunNode node in Run.Nodes)
         {
             Vector2 center = PositionOf(node);
@@ -345,8 +345,10 @@ public partial class SectorMapView : Control
         Pilot lead = Run.Living.FirstOrDefault();
         if (lead != null)
         {
-            Texture2D texture = lead.Ship.GetSkin(0).Base;
-            DrawTextureRect(texture, new Rect2(marker - new Vector2(28, 28), new Vector2(56, 56)), false);
+            // The lead's hull, cropped and fitted into a 48px box.
+            Texture2D texture = lead.Ship.GetSkin(0).Icon;
+            Vector2 fit = texture.GetSize() * (48f / Mathf.Max(texture.GetWidth(), texture.GetHeight()));
+            DrawTextureRect(texture, new Rect2(marker - fit / 2f, fit), false);
         }
     }
 
@@ -401,7 +403,7 @@ public partial class SectorMapView : Control
                 DrawArc(c + new Vector2(0, r * 1.05f), r * 0.85f, Mathf.Pi * 1.15f, Mathf.Pi * 1.85f, 16, color, w, true);
                 break;
             default:
-                Font font = ThemeDB.FallbackFont;
+                Font font = SignalUi.Display;
                 int size = Mathf.RoundToInt(r * 2.2f);
                 Vector2 extent = font.GetStringSize("?", HorizontalAlignment.Left, -1f, size);
                 DrawString(font, c + new Vector2(-extent.X / 2f, size * 0.36f), "?", HorizontalAlignment.Left, -1f, size, color);
@@ -423,7 +425,7 @@ public partial class PilotChip : Control
 
     public override void _Draw()
     {
-        Font font = ThemeDB.FallbackFont;
+        Font font = SignalUi.Display;
         // Shrink long callsigns to fit a five-pilot row rather than overlap.
         int size = SignalUi.FontCaption;
         while (size > 16 && font.GetStringSize(Pilot.Callsign, HorizontalAlignment.Left, -1f, size).X > Size.X)

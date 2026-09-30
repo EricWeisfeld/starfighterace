@@ -18,6 +18,8 @@ public class FighterSkin
     public int DestructionFrames;
     /// <summary>Rough radius of the hull art in texture pixels, for placing bars and rings around it.</summary>
     public float HullRadius = 16f;
+    /// <summary>The hull art cropped to the ship itself, so a picture of it fills its box.</summary>
+    public Texture2D Icon;
 }
 
 /// <summary>The move currently prepared for a fighter.</summary>
@@ -1061,8 +1063,8 @@ public partial class EjectPod : Node2D
         {
             float s = BattleManager.Instance?.ScreenToWorldScale ?? 1f;
             int size = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontMicro * s));
-            Vector2 extent = ThemeDB.FallbackFont.GetStringSize("EJECTED", HorizontalAlignment.Left, -1f, size);
-            DrawString(ThemeDB.FallbackFont, new Vector2(-extent.X / 2f, -10f - 8f * s), "EJECTED",
+            Vector2 extent = SignalUi.Display.GetStringSize("EJECTED", HorizontalAlignment.Left, -1f, size);
+            DrawString(SignalUi.Display, new Vector2(-extent.X / 2f, -10f - 8f * s), "EJECTED",
                 HorizontalAlignment.Left, -1f, size, new Color(1f, 1f, 1f, labelAlpha));
         }
     }

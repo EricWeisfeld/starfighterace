@@ -24,8 +24,8 @@ public partial class BattleHud : CanvasLayer
     string _gridSignature;
     Button _undo, _engage;
     Control _menu;
-    Button _retreat;
-    Label _retreatNote;
+    Button _retreat, _camera;
+    Label _retreatNote, _cameraNote;
     int _framesLaidOut;
 
     /// <summary>True once both bars have been laid out, so the camera can frame around them.</summary>
@@ -188,6 +188,19 @@ public partial class BattleHud : CanvasLayer
             Mgr.FrameBattle();
         };
         stack.AddChild(overview);
+        _camera = TouchButton("");
+        _camera.Pressed += () =>
+        {
+            GameSettings.CameraMode = GameSettings.CameraMode == BattleCameraMode.Overview
+                ? BattleCameraMode.Action
+                : BattleCameraMode.Overview;
+            ShowCameraMode();
+            Mgr.ApplyCameraMode();
+        };
+        stack.AddChild(_camera);
+        _cameraNote = Text("", FontCaption, Muted, 0, wrap: true);
+        stack.AddChild(_cameraNote);
+        ShowCameraMode();
         _retreat = TouchButton("RETREAT");
         _retreat.Pressed += () =>
         {
@@ -223,6 +236,16 @@ public partial class BattleHud : CanvasLayer
         {
             stack.AddChild(Text(line, FontCaption, Body, 0, wrap: true));
         }
+    }
+
+    /// <summary>The camera toggle names the mode in use and says what it does while a turn plays.</summary>
+    void ShowCameraMode()
+    {
+        bool action = GameSettings.CameraMode == BattleCameraMode.Action;
+        _camera.Text = action ? "CAMERA · ACTION" : "CAMERA · OVERVIEW";
+        _cameraNote.Text = action
+            ? "While a turn plays, the camera moves in on the ships that are fighting. Tap to keep every ship in view instead."
+            : "While a turn plays, the camera keeps every ship in view. Tap to move in on the fighting instead.";
     }
 
     /// <summary>Opens or closes the pause menu. The battle is paused while it is open.</summary>

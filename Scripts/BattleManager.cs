@@ -199,6 +199,7 @@ public partial class BattleManager : Node2D
         if (SegmentHitsAsteroid(from, to, 0f))
         {
             fighter.RecordAsteroidHit();
+            NoteAction(fighter);
             fighter.TakeDamage(fighter.Hp + fighter.Shield);
             return;
         }
@@ -210,6 +211,7 @@ public partial class BattleManager : Node2D
             if (additionalDamage > 0)
             {
                 fighter.RecordAsteroidHit();
+                NoteAction(fighter);
                 fighter.TakeDamage(additionalDamage);
                 SpawnImpact(fighter.Position, fighter.Velocity, ImpactSparks.Kind.Rock);
                 if (!fighter.IsAlive)
@@ -449,6 +451,58 @@ public partial class BattleManager : Node2D
         }
         if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped)
             yield return EscortShip.Position;
+    }
+
+    /// <summary>Before any shots, the action camera also shows enemies within this multiple of gun range of your ships.</summary>
+    const float ActionApproachRangeFactor = 1.2f;
+    /// <summary>Execution seconds a ship stays in the action shot after it last fired, was shot at or hit something.</summary>
+    const float ActionHoldSeconds = 1.2f;
+    readonly Dictionary<Fighter, float> _lastContact = new();
+
+    /// <summary>Marks a ship as in the thick of it, for the action camera.</summary>
+    void NoteAction(Fighter fighter)
+    {
+        if (fighter != null && CurrentPhase == Phase.Executing)
+            _lastContact[fighter] = _execT;
+    }
+
+    /// <summary>
+    /// Points the camera tracks while a turn plays, in the player's chosen
+    /// mode: every ship (overview), or just the fight (action).
+    /// </summary>
+    void FollowTurn()
+    {
+        if (GameSettings.CameraMode == BattleCameraMode.Action)
+            _camera.Follow(ActionPoints, maxZoom: 1.6f, easeRate: 4f, padding: 60f);
+        else
+            _camera.Follow(() => BattlePoints(includeGhosts: false));
+    }
+
+    /// <summary>Applies a camera mode chosen from the pause menu, mid-turn included.</summary>
+    public void ApplyCameraMode()
+    {
+        if (CurrentPhase == Phase.Executing)
+            FollowTurn();
+    }
+
+    /// <summary>
+    /// The action camera's shot: the ships trading fire, each held a moment
+    /// after its last shot, hit or crash (a ship that just died stays in shot
+    /// while it burns). Before anyone fires: your squadron, the transport and
+    /// any enemy closing on them.
+    /// </summary>
+    IEnumerable<Vector2> ActionPoints()
+    {
+        List<Vector2> fight = _lastContact.Where(contact => _execT - contact.Value <= ActionHoldSeconds)
+            .Select(contact => contact.Key.Position).ToList();
+        if (fight.Count > 0)
+            return fight;
+        var friendly = PlayerFighters.Where(f => f.IsAlive).ToList();
+        if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped)
+            friendly.Add(EscortShip);
+        IEnumerable<Fighter> closing = EnemyFighters.Where(enemy => enemy.IsAlive && friendly.Any(ours =>
+            ours.Position.DistanceTo(enemy.Position) <= Mathf.Max(ours.EffectiveFireRange, enemy.EffectiveFireRange) * ActionApproachRangeFactor));
+        return friendly.Concat(closing).Select(f => f.Position).ToList();
     }
 
     /// <summary>Eases the camera to show every combatant and every planned ghost.</summary>
@@ -990,7 +1044,8 @@ public partial class BattleManager : Node2D
         _graceT = 0f;
         _movementSimulationPending = 0f;
         CurrentPhase = Phase.Executing;
-        _camera.Follow(() => BattlePoints(includeGhosts: false));
+        _lastContact.Clear();
+        FollowTurn();
         // Slow the whole execution down a touch. Scaling engine time (not the
         // sim constants) keeps balance identical: cooldowns, bullets and
         // movement all stretch together.
@@ -1144,6 +1199,8 @@ public partial class BattleManager : Node2D
     void FireShot(Fighter shooter, Fighter target)
     {
         shooter.ShotsFired++;
+        NoteAction(shooter);
+        NoteAction(target);
         Vector2 nose = shooter.Position + Vector2.FromAngle(shooter.Heading) * 20f;
         float travelTime = nose.DistanceTo(target.Position) / BulletSpeed;
         Vector2 aim = target.Position + target.Velocity * travelTime; // basic lead
@@ -1178,6 +1235,8 @@ public partial class BattleManager : Node2D
     void FireShotAtObjective(Fighter shooter, ObjectiveShip target)
     {
         shooter.ShotsFired++;
+        NoteAction(shooter);
+        NoteAction(target);
         Vector2 nose = shooter.Position + Vector2.FromAngle(shooter.Heading) * 20f;
         Vector2 dir = (target.Position - nose).Normalized();
         bool hits = GD.Randf() < Mathf.Clamp(shooter.EffectiveAccuracyAgainst(null) * 0.9f, 0.1f, 0.9f);
@@ -1207,6 +1266,7 @@ public partial class BattleManager : Node2D
     /// <summary>A ship going up: a burst of debris, a shock ring and a jolt of the camera.</summary>
     public void ShowDestruction(Fighter fighter)
     {
+        NoteAction(fighter);
         SpawnImpact(fighter.Position, Vector2.Zero, ImpactSparks.Kind.Kill);
         _camera?.Shake(fighter.Team == 0 ? 14f : 9f);
     }

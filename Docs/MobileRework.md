@@ -24,6 +24,9 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
   - Tap a ship or ghost to select it. Tap an enemy to pin the targeting preview.
   - Drag or pinch the map. Double-tap empty space to frame everything.
 - **`BattleCameraRig`:** frames the battle each turn, focuses a ship on request, and follows the turn as it executes. It frames inside the band between the HUD bars.
+- **Camera modes** (pause menu toggle, saved in `user://settings.cfg` by `GameSettings`). Planning is framed the same way in both; they differ while a turn plays:
+  - Overview (the default): follows every ship.
+  - Action: follows the ships trading fire. A ship counts from its last shot, hit or crash for 1.2 execution seconds, so a ship that just died stays in shot. Before anyone fires, it frames your squadron and any enemy closing on it. It zooms in further (up to 1.6× against 1.1×), leaves a smaller margin, and eases more gently between framings.
 - **`BattleHud`:**
   - Squadron chips, objective, and labelled maneuver buttons with drawn path icons.
   - Undo, Engage, and a pause menu with Retreat.
@@ -214,4 +217,4 @@ new run. A run saved during the draft resumes on the draft page.
 - Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many level-ups a run gives now that every ship has three slots, free docks, threat per layer, ejection and scar odds, and instinct strength.
 - Maps could be drawn from pools by stop type (open maps for skirmishes, dense ones for elites) and mirrored left to right for more variety.
 - An Android export preset and a device test pass are still to do. The device pass should check the nebula and asteroid shaders' frame rate on a low-end phone.
-- Visual follow-up not yet done: a closer camera while a turn plays.
+- Try both camera modes in real play and pick the default. Overview stays the default until then.

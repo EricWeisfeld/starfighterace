@@ -25,6 +25,9 @@ public partial class BattleCameraRig : Camera2D
     float _targetZoom = 1f;
     bool _easing;
     System.Func<IEnumerable<Vector2>> _follow;
+    float _followMaxZoom = 1.1f;
+    float _easeRate = EaseRate;
+    float _padding = FramePadding;
 
     public float ZoomLevel => Zoom.X;
     Vector2 ScreenSize => GetViewportRect().Size;
@@ -57,6 +60,8 @@ public partial class BattleCameraRig : Camera2D
     public void Frame(IEnumerable<Vector2> points, float maxZoom = 1.35f, bool instant = false)
     {
         _follow = null;
+        _easeRate = EaseRate;
+        _padding = FramePadding;
         SetFrameTarget(points, maxZoom);
         if (instant)
             SnapToTarget();
@@ -66,11 +71,16 @@ public partial class BattleCameraRig : Camera2D
 
     /// <summary>
     /// Keeps re-framing a changing set of points every frame, used while the
-    /// turn executes. A manual gesture ends following.
+    /// turn executes. A lower ease rate glides between framings when the set
+    /// of points jumps. A manual gesture ends following.
     /// </summary>
-    public void Follow(System.Func<IEnumerable<Vector2>> points)
+    public void Follow(System.Func<IEnumerable<Vector2>> points, float maxZoom = 1.1f, float easeRate = EaseRate,
+        float padding = FramePadding)
     {
         _follow = points;
+        _followMaxZoom = maxZoom;
+        _easeRate = easeRate;
+        _padding = padding;
         _easing = true;
     }
 
@@ -123,14 +133,14 @@ public partial class BattleCameraRig : Camera2D
     {
         UpdateShake((float)delta / (float)Mathf.Max(Engine.TimeScale, 0.01));
         if (_follow != null)
-            SetFrameTarget(_follow(), 1.1f);
+            SetFrameTarget(_follow(), _followMaxZoom);
         if (!_easing)
             return;
 
         // Engine time is slowed during execution; ease on real time so the
         // camera keeps pace with what the player sees.
         float realDelta = (float)delta / (float)Mathf.Max(Engine.TimeScale, 0.01);
-        float t = 1f - Mathf.Exp(-EaseRate * realDelta);
+        float t = 1f - Mathf.Exp(-_easeRate * realDelta);
         float zoom = Mathf.Lerp(Zoom.X, _targetZoom, t);
         Zoom = Vector2.One * zoom;
         Position = Position.Lerp(_targetPosition, t);
@@ -153,7 +163,7 @@ public partial class BattleCameraRig : Camera2D
         if (region == null)
             return;
 
-        Rect2 world = region.Value.Grow(FramePadding);
+        Rect2 world = region.Value.Grow(_padding);
         Rect2 visible = VisibleScreenRect;
         float zoom = Mathf.Min(visible.Size.X / world.Size.X, visible.Size.Y / world.Size.Y);
         _targetZoom = Mathf.Clamp(zoom, MinZoomLevel, Mathf.Min(maxZoom, MaxZoomLevel));

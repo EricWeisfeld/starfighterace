@@ -19,6 +19,7 @@ public partial class BattleOverlay : Node2D
     static readonly Color ThreatLow = new(1f, 0.78f, 0.28f, 0.55f);
     static readonly Color ThreatHigh = new(1f, 0.32f, 0.28f, 0.7f);
     static readonly Color TimeSliceCone = new(1f, 0.9f, 0.4f, 0.13f);
+    static readonly Color NebulaTag = new(0.56f, 0.76f, 1f);
     static readonly float[] TimeSliceProgress = { 0.25f, 0.5f, 0.75f };
     const int TargetingTimeSamples = 24;
     const float StrongCoverageThreshold = 0.65f;
@@ -182,7 +183,8 @@ public partial class BattleOverlay : Node2D
     /// </summary>
     void DrawThrottleGauge(Fighter f)
     {
-        Vector2 forward = Vector2.FromAngle(f.Heading);
+        // Drawn at the distances actually flown, so nebula drag shows here too.
+        Vector2 forward = Vector2.FromAngle(f.Heading) * f.RouteScale;
         Vector2 min = f.Position + forward * f.NormalMoveMinDistance;
         Vector2 max = f.Position + forward * f.NormalMoveMaxDistance;
         Vector2 current = f.Position + forward * f.PlannedPathDistance;
@@ -210,7 +212,7 @@ public partial class BattleOverlay : Node2D
         for (int i = 0; i <= samples; i++)
         {
             float turn = Mathf.Lerp(-maxTurn, maxTurn, i / (float)samples);
-            Fighter.ArcPoint(f.Position, f.Heading, turn, f.PlannedPathDistance, 1f, out edge[i], out _);
+            f.RoutePoint(ManeuverType.Normal, turn, f.PlannedPathDistance, 1f, out edge[i], out _);
         }
 
         var poly = new Vector2[samples + 2];
@@ -229,8 +231,7 @@ public partial class BattleOverlay : Node2D
         var pts = new Vector2[samples + 1];
         float endHeading = f.Heading;
         for (int i = 0; i <= samples; i++)
-            Fighter.ManeuverPoint(f.PlannedManeuver, f.Position, f.Heading, turn, f.PlannedPathDistance,
-                i / (float)samples, out pts[i], out endHeading);
+            f.RoutePoint(f.PlannedManeuver, turn, f.PlannedPathDistance, i / (float)samples, out pts[i], out endHeading);
         Color pathColor = f.PlannedManeuver switch
         {
             ManeuverType.UTurn => new Color(0.62f, 0.48f, 1f, 0.85f),
@@ -652,8 +653,8 @@ public partial class BattleOverlay : Node2D
     /// <summary>
     /// Shield and hull bars under each ship, drawn at a constant screen size
     /// so they stay legible when the camera pulls back. Player ships also
-    /// carry a callsign above them, and a suppressed ship of either side says
-    /// so under its bars.
+    /// carry a callsign above them, and a suppressed or nebula-slowed ship of
+    /// either side says so under its bars.
     /// </summary>
     void DrawHpBar(Fighter f, Color color)
     {
@@ -676,10 +677,16 @@ public partial class BattleOverlay : Node2D
             DrawLabel(f.Position + new Vector2(0f, -26f - Px(12f)), BattleManager.CallsignOf(f), SignalUi.FontMicro,
                 new Color(SignalUi.Body.R, SignalUi.Body.G, SignalUi.Body.B, 0.85f));
 
-        // Suppression Fire slows a ship's turning until it gets out of the fire.
+        // Status tags under the bars: Suppression Fire slows a ship's turning
+        // until it gets out of the fire; nebula gas shortens this turn's move.
+        Vector2 tagAt = hullTopLeft + new Vector2(width / 2f, hullHeight + Px(12f));
         if (f.IsSuppressed)
-            DrawLabel(hullTopLeft + new Vector2(width / 2f, hullHeight + Px(12f)),
-                $"SUPPRESSED −{f.NormalTurnLimitPenaltyDegrees:0}°", SignalUi.FontMicro, SignalUi.Warning);
+        {
+            DrawLabel(tagAt, $"SUPPRESSED −{f.NormalTurnLimitPenaltyDegrees:0}°", SignalUi.FontMicro, SignalUi.Warning);
+            tagAt.Y += Px(16f);
+        }
+        if (f.InNebula && BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Planning)
+            DrawLabel(tagAt, $"NEBULA −{(1f - f.RouteScale) * 100:0}% MOVE", SignalUi.FontMicro, NebulaTag);
     }
 }
 

@@ -27,10 +27,11 @@ public partial class BattleManager : Node2D
     public const float BulletSpeed = 900f;
     public const float ShipCollisionRadius = 18f;
     public const int AsteroidMaxScrapeDamage = 14;
-    public const float NebulaSpeedMultiplier = 0.55f;
-    public const float NebulaAccuracyMultiplier = 0.55f;
-    // Movement and the planning preview share this fixed integration step so
-    // terrain crossings produce the same position at every preview time slice.
+    /// <summary>A ship that starts its turn in nebula gas flies this share of its maneuver.</summary>
+    public const float NebulaRouteScale = 0.75f;
+    public const float NebulaAccuracyMultiplier = 0.7f;
+    // Movement advances in fixed slices so asteroid contacts are checked
+    // along the whole route, whatever the frame rate.
     const float MovementSimulationStep = ExecTime / 240f;
     const float EscortReinforcementProgress = 0.60f;
 
@@ -93,73 +94,37 @@ public partial class BattleManager : Node2D
         return _firstDamageTurn == _turn;
     }
 
-    /// <summary>Returns the movement multiplier for the ship's current space.</summary>
-    public float MovementSpeedMultiplier(Vector2 position) =>
-        IsInNebula(position) ? NebulaSpeedMultiplier : 1f;
-
     /// <summary>
-    /// Predicts where a maneuver will be at a fraction of the execution clock,
-    /// using the same terrain-aware route progression as live movement.
+    /// Where a maneuver will be at a fraction of the execution clock. Every
+    /// maneuver spreads evenly over the clock, so this is also that fraction
+    /// of the route.
     /// </summary>
     public void PredictExecutionPoint(Fighter fighter, ManeuverType maneuver, float turn, float distance,
         float executionFraction, out Vector2 position, out float heading)
     {
-        float maxTime = Mathf.Clamp(executionFraction, 0f, 1f) * ExecTime;
-        float routeProgress = 0f;
-        float elapsed = 0f;
-        position = fighter.Position;
-        heading = fighter.Heading;
-
-        if (maneuver == ManeuverType.Normal)
-        {
-            float maxTurn = Mathf.DegToRad(fighter.GetNormalTurnLimitDegrees(distance));
-            turn = Mathf.Clamp(turn, -maxTurn, maxTurn);
-        }
-
-        while (elapsed < maxTime)
-        {
-            float step = Mathf.Min(MovementSimulationStep, maxTime - elapsed);
-            routeProgress = Fighter.AdvanceManeuverProgress(routeProgress, step, MovementSpeedMultiplier(position));
-            Fighter.ManeuverPoint(maneuver, fighter.Position, fighter.Heading, turn, distance, routeProgress,
-                out position, out heading);
-            elapsed += step;
-        }
+        turn = ClampPlannedTurn(fighter, maneuver, turn, distance);
+        fighter.RoutePoint(maneuver, turn, distance, Mathf.Clamp(executionFraction, 0f, 1f), out position, out heading);
     }
 
-    /// <summary>Fills evenly spaced execution-time samples for a terrain-aware maneuver.</summary>
+    /// <summary>Fills evenly spaced execution-time samples for a maneuver.</summary>
     public void PredictExecutionPath(Fighter fighter, ManeuverType maneuver, float turn, float distance,
         Vector2[] positions, float[] headings)
     {
         if (positions.Length != headings.Length || positions.Length < 2)
             throw new System.ArgumentException("Prediction paths need matching position and heading samples.");
 
-        if (maneuver == ManeuverType.Normal)
-        {
-            float maxTurn = Mathf.DegToRad(fighter.GetNormalTurnLimitDegrees(distance));
-            turn = Mathf.Clamp(turn, -maxTurn, maxTurn);
-        }
-
-        float routeProgress = 0f;
-        float elapsed = 0f;
-        Vector2 position = fighter.Position;
-        float heading = fighter.Heading;
-        positions[0] = position;
-        headings[0] = heading;
+        turn = ClampPlannedTurn(fighter, maneuver, turn, distance);
         int finalSample = positions.Length - 1;
-        for (int sample = 1; sample <= finalSample; sample++)
-        {
-            float targetTime = ExecTime * sample / finalSample;
-            while (elapsed < targetTime)
-            {
-                float step = Mathf.Min(MovementSimulationStep, targetTime - elapsed);
-                routeProgress = Fighter.AdvanceManeuverProgress(routeProgress, step, MovementSpeedMultiplier(position));
-                Fighter.ManeuverPoint(maneuver, fighter.Position, fighter.Heading, turn, distance, routeProgress,
-                    out position, out heading);
-                elapsed += step;
-            }
-            positions[sample] = position;
-            headings[sample] = heading;
-        }
+        for (int sample = 0; sample <= finalSample; sample++)
+            fighter.RoutePoint(maneuver, turn, distance, sample / (float)finalSample, out positions[sample], out headings[sample]);
+    }
+
+    static float ClampPlannedTurn(Fighter fighter, ManeuverType maneuver, float turn, float distance)
+    {
+        if (maneuver != ManeuverType.Normal)
+            return turn;
+        float maxTurn = Mathf.DegToRad(fighter.GetNormalTurnLimitDegrees(distance));
+        return Mathf.Clamp(turn, -maxTurn, maxTurn);
     }
 
     /// <summary>Checks whether a bullet segment is stopped by an asteroid.</summary>
@@ -172,8 +137,7 @@ public partial class BattleManager : Node2D
         Vector2 previous = fighter.Position;
         for (int i = 1; i <= samples; i++)
         {
-            Fighter.ManeuverPoint(maneuver, fighter.Position, fighter.Heading, turn, distance, i / (float)samples,
-                out Vector2 next, out _);
+            fighter.RoutePoint(maneuver, turn, distance, i / (float)samples, out Vector2 next, out _);
             if (SegmentHitsAsteroid(previous, next, 0f))
                 return true;
             previous = next;
@@ -194,8 +158,7 @@ public partial class BattleManager : Node2D
         Vector2 previous = fighter.Position;
         for (int i = 1; i <= samples; i++)
         {
-            Fighter.ManeuverPoint(maneuver, fighter.Position, fighter.Heading, turn, distance, i / (float)samples,
-                out Vector2 next, out _);
+            fighter.RoutePoint(maneuver, turn, distance, i / (float)samples, out Vector2 next, out _);
             foreach (TerrainFeature asteroid in Map.Terrain.Where(feature => feature.Type == TerrainFeatureType.Asteroid))
             {
                 float clearance = DistanceToSegment(previous, next, asteroid.Position) - asteroid.Radius - ShipCollisionRadius;
@@ -217,8 +180,7 @@ public partial class BattleManager : Node2D
         Vector2 previous = fighter.Position;
         for (int i = 1; i <= samples; i++)
         {
-            Fighter.ManeuverPoint(maneuver, fighter.Position, fighter.Heading, turn, distance, i / (float)samples,
-                out Vector2 next, out _);
+            fighter.RoutePoint(maneuver, turn, distance, i / (float)samples, out Vector2 next, out _);
             foreach (TerrainFeature asteroid in Map.Terrain.Where(feature => feature.Type == TerrainFeatureType.Asteroid))
             {
                 int damage = ScrapeDamageForContact(asteroid, previous, next);
@@ -228,21 +190,6 @@ public partial class BattleManager : Node2D
             previous = next;
         }
         return peakDamageByAsteroid.Values.Sum();
-    }
-
-    /// <summary>Fraction of a planned route that passes through speed-reducing nebula gas.</summary>
-    public float NebulaPathFraction(Fighter fighter, ManeuverType maneuver, float turn, float distance)
-    {
-        const int samples = 24;
-        int insideSamples = 0;
-        for (int i = 1; i <= samples; i++)
-        {
-            Fighter.ManeuverPoint(maneuver, fighter.Position, fighter.Heading, turn, distance, i / (float)samples,
-                out Vector2 point, out _);
-            if (IsInNebula(point))
-                insideSamples++;
-        }
-        return insideSamples / (float)samples;
     }
 
     void ResolveShipAsteroidContacts(Fighter fighter, Vector2 from, Vector2 to)
@@ -295,7 +242,7 @@ public partial class BattleManager : Node2D
         return Mathf.Max(1, Mathf.RoundToInt(AsteroidMaxScrapeDamage * severity * severity));
     }
 
-    bool IsInNebula(Vector2 point)
+    public bool IsInNebula(Vector2 point)
     {
         foreach (TerrainFeature feature in Map.Terrain)
         {
@@ -514,8 +461,8 @@ public partial class BattleManager : Node2D
     public void FocusOn(Fighter fighter)
     {
         var points = new List<Vector2> { fighter.Position };
-        Fighter.ManeuverPoint(fighter.PlannedManeuver, fighter.Position, fighter.Heading, fighter.PlannedTurnAngleRadians ?? 0f,
-            fighter.PlannedPathDistance, 1f, out Vector2 ghost, out float ghostHeading);
+        fighter.RoutePoint(fighter.PlannedManeuver, fighter.PlannedTurnAngleRadians ?? 0f, fighter.PlannedPathDistance, 1f,
+            out Vector2 ghost, out float ghostHeading);
         points.Add(ghost);
         points.Add(ghost + Vector2.FromAngle(ghostHeading) * fighter.EffectiveFireRange * 0.8f);
         float reach = fighter.NormalMoveMaxDistance;
@@ -791,8 +738,8 @@ public partial class BattleManager : Node2D
 
     public Vector2 GetGhostEndpoint(Fighter fighter)
     {
-        Fighter.ManeuverPoint(fighter.PlannedManeuver, fighter.Position, fighter.Heading, fighter.PlannedTurnAngleRadians ?? 0f,
-            fighter.PlannedPathDistance, 1f, out Vector2 endpoint, out _);
+        fighter.RoutePoint(fighter.PlannedManeuver, fighter.PlannedTurnAngleRadians ?? 0f, fighter.PlannedPathDistance, 1f,
+            out Vector2 endpoint, out _);
         return endpoint;
     }
 
@@ -808,7 +755,9 @@ public partial class BattleManager : Node2D
         float turn = Mathf.Clamp(2f * bearing, -maxTurn, maxTurn);
         float absTurn = Mathf.Abs(turn);
         float chordFraction = absTurn < 0.001f ? 1f : 2f * Mathf.Sin(absTurn / 2f) / absTurn;
-        fighter.SetPlannedMoveDistance(offset.Length() / chordFraction);
+        // Nebula drag shortens the route flown for a given throttle, so the
+        // ghost under the finger needs that much more throttle.
+        fighter.SetPlannedMoveDistance(offset.Length() / chordFraction / fighter.RouteScale);
 
         // The Reckless penalty depends on the resulting throttle, so clamp once
         // more after the requested endpoint has established the move distance.
@@ -816,7 +765,7 @@ public partial class BattleManager : Node2D
         turn = Mathf.Clamp(2f * bearing, -maxTurn, maxTurn);
         absTurn = Mathf.Abs(turn);
         chordFraction = absTurn < 0.001f ? 1f : 2f * Mathf.Sin(absTurn / 2f) / absTurn;
-        fighter.SetPlannedMoveDistance(offset.Length() / chordFraction);
+        fighter.SetPlannedMoveDistance(offset.Length() / chordFraction / fighter.RouteScale);
         fighter.PlannedTurnAngleRadians = turn;
     }
 
@@ -1051,6 +1000,11 @@ public partial class BattleManager : Node2D
     void BeginPlanningPhase(bool frameCamera = true)
     {
         CurrentPhase = Phase.Planning;
+        // Nebula drag is fixed for the whole turn by where each ship starts it.
+        foreach (Fighter f in AllAlive())
+            f.RouteScale = IsInNebula(f.Position) ? NebulaRouteScale : 1f;
+        if (EscortShip != null && EscortShip.IsAlive)
+            EscortShip.RouteScale = IsInNebula(EscortShip.Position) ? NebulaRouteScale : 1f;
         PendingTargetAction = null;
         _camera.StopFollowing();
         Selected = PlayerFighters.FirstOrDefault(f => f.IsAlive);
@@ -1063,9 +1017,8 @@ public partial class BattleManager : Node2D
 
     void UpdateExecution(float dt)
     {
-        // The execution clock is fixed. Nebulae slow a ship's progress along
-        // its maneuver, which leaves it short of its planned endpoint when
-        // the clock expires rather than making the whole turn run longer.
+        // The execution clock is fixed: every ship flies its whole planned
+        // route in it, so a turn ends exactly where the ghosts showed.
         float movementDt = Mathf.Min(dt, Mathf.Max(0f, ExecTime - _execT));
         if (movementDt > 0f)
         {
@@ -1102,7 +1055,7 @@ public partial class BattleManager : Node2D
         foreach (Fighter f in AllAlive().ToList())
         {
             Vector2 previousPosition = f.Position;
-            f.AdvanceExecute(dt, MovementSpeedMultiplier(previousPosition));
+            f.AdvanceExecute(dt);
             ResolveShipAsteroidContacts(f, previousPosition, f.Position);
         }
 
@@ -1110,7 +1063,7 @@ public partial class BattleManager : Node2D
             return;
 
         Vector2 previousEscortPosition = EscortShip.Position;
-        EscortShip.AdvanceExecute(dt, MovementSpeedMultiplier(previousEscortPosition));
+        EscortShip.AdvanceExecute(dt);
         ResolveShipAsteroidContacts(EscortShip, previousEscortPosition, EscortShip.Position);
         EscortShip.UpdateDestinationProgress(previousEscortPosition);
         if (!_escortReinforcementsSpawned && EscortShip.EscapeProgress >= EscortReinforcementProgress)

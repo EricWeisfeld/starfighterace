@@ -87,8 +87,8 @@ public static class EnemyAI
 
         // Predict the maneuver the target actually has queued, rather than
         // always treating a tight turn or ability move as a straight line.
-        Fighter.ManeuverPoint(target.PlannedManeuver, target.Position, target.Heading,
-            target.PlannedTurnAngleRadians ?? 0f, target.PlannedPathDistance, 1f, out Vector2 targetEnd, out _);
+        target.RoutePoint(target.PlannedManeuver, target.PlannedTurnAngleRadians ?? 0f, target.PlannedPathDistance, 1f,
+            out Vector2 targetEnd, out _);
 
         var arena = new Rect2(30, 30, BattleManager.ArenaW - 60, BattleManager.ArenaH - 60);
         var choices = new PlanChoices();
@@ -199,8 +199,7 @@ public static class EnemyAI
         BattleManager battle = BattleManager.Instance;
         foreach (FlightPlan candidate in candidates)
         {
-            Fighter.ManeuverPoint(candidate.Maneuver, self.Position, self.Heading, candidate.Turn, candidate.Distance, 1f,
-                out Vector2 end, out float endHeading);
+            self.RoutePoint(candidate.Maneuver, candidate.Turn, candidate.Distance, 1f, out Vector2 end, out float endHeading);
             float dist = end.DistanceTo(targetEnd);
             float bearing = Mathf.Abs(Mathf.Wrap((targetEnd - end).Angle() - endHeading, -Mathf.Pi, Mathf.Pi));
 
@@ -221,7 +220,9 @@ public static class EnemyAI
                 {
                     terrainPenalty = 10000f;
                 }
-                terrainPenalty += battle.NebulaPathFraction(self, candidate.Maneuver, candidate.Turn, candidate.Distance) * 35f;
+                // Ending in gas means a shorter move next turn.
+                if (battle.IsInNebula(end))
+                    terrainPenalty += 25f;
             }
 
             float score = -Mathf.RadToDeg(bearing) * 1.5f
@@ -233,8 +234,8 @@ public static class EnemyAI
             {
                 if (ally == self || !ally.IsAlive || !ally.PlannedTurnAngleRadians.HasValue)
                     continue;
-                Fighter.ManeuverPoint(ally.PlannedManeuver, ally.Position, ally.Heading, ally.PlannedTurnAngleRadians.Value,
-                    ally.PlannedPathDistance, 1f, out Vector2 allyEnd, out _);
+                ally.RoutePoint(ally.PlannedManeuver, ally.PlannedTurnAngleRadians.Value, ally.PlannedPathDistance, 1f,
+                    out Vector2 allyEnd, out _);
                 if (allyEnd.DistanceTo(end) < 50f)
                     score -= 100f;
             }

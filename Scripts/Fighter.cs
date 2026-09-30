@@ -63,6 +63,14 @@ public partial class Fighter : Node2D
     // Path distance applies to every maneuver; normal distance persists between turns.
     public float PlannedPathDistance = 230f;
     public float SelectedNormalMoveDistance = 230f;
+    /// <summary>
+    /// Share of a maneuver's distance the ship actually covers this turn.
+    /// Nebula gas around a ship when the turn starts cuts it; it is set before
+    /// planning and holds all turn, so every preview already shows the
+    /// shorter route. Throttle, turn limits and maneuver choice are unchanged.
+    /// </summary>
+    public float RouteScale = 1f;
+    public bool InNebula => RouteScale < 1f;
 
     // Per-fighter combat stats — tune freely (or vary per ship type later).
     public int MaxHp = 30;
@@ -805,35 +813,39 @@ public partial class Fighter : Node2D
 
     public void RecordAsteroidHit() => HitAsteroid = true;
 
-    /// <summary>Place the fighter at fraction s (0..1) along its planned maneuver.</summary>
-    public void SetExecuteProgress(float s)
+    /// <summary>Advance one slice of the execution clock along the maneuver.</summary>
+    public void AdvanceExecute(float dt)
     {
-        SetExecuteProgress(s, 1f);
+        SetExecuteProgress(AdvanceManeuverProgress(_execProgress, dt));
     }
 
-    /// <summary>Advance according to the local terrain speed multiplier.</summary>
-    public void AdvanceExecute(float dt, float speedMultiplier)
-    {
-        SetExecuteProgress(AdvanceManeuverProgress(_execProgress, dt, speedMultiplier), speedMultiplier);
-    }
-
-    /// <summary>Advances a maneuver's route fraction using the execution speed rule.</summary>
-    public static float AdvanceManeuverProgress(float progress, float dt, float speedMultiplier) =>
-        Mathf.Min(progress + dt / BattleManager.ExecTime * speedMultiplier, 1f);
+    /// <summary>Advances a maneuver's route fraction: every maneuver takes the whole execution clock.</summary>
+    public static float AdvanceManeuverProgress(float progress, float dt) =>
+        Mathf.Min(progress + dt / BattleManager.ExecTime, 1f);
 
     public bool IsExecutingMove => _execProgress < 1f;
 
-    void SetExecuteProgress(float s, float speedMultiplier)
+    /// <summary>Place the fighter at fraction s (0..1) along its planned maneuver.</summary>
+    public void SetExecuteProgress(float s)
     {
         _execProgress = s;
-        ManeuverPoint(_execManeuver, _startPos, _startHeading, _execTurn, _execDist, s,
+        float routeDistance = _execDist * RouteScale;
+        ManeuverPoint(_execManeuver, _startPos, _startHeading, _execTurn, routeDistance, s,
             out Vector2 pos, out float heading);
         Position = pos;
         Heading = heading;
         Rotation = heading;
         float travelHeading = _execManeuver == ManeuverType.UTurn ? _startHeading : heading;
-        Velocity = Vector2.FromAngle(travelHeading) * (_execDist / BattleManager.ExecTime) * speedMultiplier;
+        Velocity = Vector2.FromAngle(travelHeading) * (routeDistance / BattleManager.ExecTime);
     }
+
+    /// <summary>
+    /// Point at fraction s along one of this ship's maneuvers flown from where
+    /// it is now, nebula drag included. Every preview and plan goes through
+    /// here, so what the player sees is where the ship will fly.
+    /// </summary>
+    public void RoutePoint(ManeuverType maneuver, float turn, float distance, float s, out Vector2 pos, out float heading) =>
+        ManeuverPoint(maneuver, Position, Heading, turn, distance * RouteScale, s, out pos, out heading);
 
     /// <summary>
     /// Point at fraction s along a maneuver. U-turns thrust straight while rotating;

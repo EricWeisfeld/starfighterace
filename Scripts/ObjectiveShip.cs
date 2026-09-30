@@ -51,7 +51,7 @@ public partial class ObjectiveShip : Fighter
             float turn = Mathf.Lerp(-maxTurn, maxTurn, i / (float)turnSamples);
             float clearance = battle.PathAsteroidClearance(this, ManeuverType.Normal, turn, moveDistance);
 
-            Fighter.ArcPoint(Position, Heading, turn, moveDistance, 1f, out Vector2 end, out _);
+            RoutePoint(ManeuverType.Normal, turn, moveDistance, 1f, out Vector2 end, out _);
 
             // Make progress toward the authored destination while choosing a
             // safe arc around terrain instead of merely flying east.

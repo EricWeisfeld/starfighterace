@@ -126,7 +126,7 @@ public static class BattleMaps
     {
         Id = "cobalt-veil",
         DisplayName = "COBALT VEIL",
-        Briefing = "Ionized nebulae slow ships and make shots unreliable.",
+        Briefing = "Ionized nebulae drag at ships that start a turn inside them and scatter shots fired through them.",
         Terrain = new[]
         {
             new TerrainFeature(TerrainFeatureType.Nebula, 1010, 475, 230),

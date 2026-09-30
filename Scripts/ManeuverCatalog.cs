@@ -53,7 +53,8 @@ public static class ManeuverCatalog
         {
             Action = ManeuverAction.Normal, Maneuver = ManeuverType.Normal, Name = "FLY",
             Color = new Color(0.302f, 0.639f, 1f), Aimable = true,
-            Summary = f => $"Drag the ghost to steer. Throttle {f.NormalMoveMinDistance:0}–{f.NormalMoveMaxDistance:0}, turn up to {f.PlannedNormalTurnLimitDegrees:0}°.",
+            Summary = f => $"Drag the ghost to steer. Throttle {f.NormalMoveMinDistance:0}–{f.NormalMoveMaxDistance:0}, turn up to {f.PlannedNormalTurnLimitDegrees:0}°." +
+                (f.InNebula ? $" Nebula: every move is {(1f - f.RouteScale) * 100:0}% shorter this turn." : ""),
         },
         new()
         {

@@ -29,6 +29,10 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
   - Undo, Engage, and a pause menu with Retreat.
   - Engage asks for confirmation when any ship is on a course into an asteroid.
 - **`ManeuverCatalog`:** one place for maneuver names, colours and descriptions.
+- **Nebulae:**
+  - A ship that starts its turn inside gas flies every move 25% shorter that turn. It is tagged under its bars, and its path, ghost and reach fan already show the shorter route.
+  - Shots fired through gas have ×0.7 accuracy.
+  - Movement is never slowed partway through a move, so every ship ends its turn exactly where its preview showed. The earlier mid-move slowdown left ghosts and targeting previews wrong.
 
 ## Phase 2 and 3: runs and the lean squadron (done)
 

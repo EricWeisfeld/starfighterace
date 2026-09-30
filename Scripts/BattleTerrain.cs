@@ -420,47 +420,74 @@ public static class BattleMaps
     public static BattleMapDefinition ById(string id) => All.FirstOrDefault(map => map.Id == id) ?? BrokenRing;
 }
 
-/// <summary>Draws authored terrain below ships without requiring scene-node assets.</summary>
+/// <summary>
+/// Terrain below the ships: nebula gas first, then the rocks, then the
+/// planning marks that show each nebula's exact edge.
+/// </summary>
 public partial class TerrainLayer : Node2D
 {
     readonly IEnumerable<TerrainFeature> _terrain;
-    float _drawnScale = -1f;
 
     /// <summary>Engine-required parameterless constructor; use the terrain overload in code.</summary>
     public TerrainLayer() => _terrain = System.Array.Empty<TerrainFeature>();
 
     public TerrainLayer(IEnumerable<TerrainFeature> terrain) => _terrain = terrain;
 
-    // Labels keep a constant on-screen size, so redraw when the zoom changes.
+    public override void _Ready()
+    {
+        foreach (TerrainFeature gas in _terrain.Where(t => t.Type == TerrainFeatureType.Nebula))
+            AddChild(new NebulaCloud(gas));
+        foreach (TerrainFeature rock in _terrain.Where(t => t.Type == TerrainFeatureType.Asteroid))
+            AddChild(new AsteroidSprite(rock));
+        AddChild(new NebulaMarks(_terrain.Where(t => t.Type == TerrainFeatureType.Nebula).ToArray()));
+    }
+}
+
+/// <summary>
+/// While planning, each nebula's true edge as a dashed ring with a small
+/// label: the gas itself is soft, but whether a ship starts inside it is exact.
+/// </summary>
+public partial class NebulaMarks : Node2D
+{
+    readonly TerrainFeature[] _gas;
+    float _drawnScale = -1f;
+    bool _drawnPlanning;
+
+    /// <summary>Engine-required parameterless constructor; use the feature overload in code.</summary>
+    public NebulaMarks() => _gas = System.Array.Empty<TerrainFeature>();
+
+    public NebulaMarks(TerrainFeature[] gas) => _gas = gas;
+
+    static bool Planning => BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Planning;
+
+    // Labels keep a constant on-screen size, so redraw when the zoom or phase changes.
     public override void _Process(double delta)
     {
         float scale = BattleManager.Instance?.ScreenToWorldScale ?? 1f;
-        if (!Mathf.IsEqualApprox(scale, _drawnScale))
+        if (!Mathf.IsEqualApprox(scale, _drawnScale) || Planning != _drawnPlanning)
             QueueRedraw();
     }
 
     public override void _Draw()
     {
         _drawnScale = BattleManager.Instance?.ScreenToWorldScale ?? 1f;
+        _drawnPlanning = Planning;
+        if (!_drawnPlanning)
+            return;
         int labelSize = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontMicro * _drawnScale));
-        foreach (TerrainFeature feature in _terrain)
+        var ring = new Color(0.45f, 0.70f, 1f, 0.45f);
+        foreach (TerrainFeature feature in _gas)
         {
-            if (feature.Type == TerrainFeatureType.Nebula)
+            const int dashes = 36;
+            for (int i = 0; i < dashes; i++)
             {
-                DrawCircle(feature.Position, feature.Radius, new Color(0.20f, 0.42f, 0.72f, 0.10f));
-                DrawCircle(feature.Position, feature.Radius * 0.72f, new Color(0.36f, 0.24f, 0.72f, 0.11f));
-                DrawArc(feature.Position, feature.Radius, 0, Mathf.Tau, 48, new Color(0.38f, 0.65f, 1f, 0.42f), 2f, true);
-                Vector2 extent = ThemeDB.FallbackFont.GetStringSize("NEBULA", HorizontalAlignment.Left, -1f, labelSize);
-                DrawString(ThemeDB.FallbackFont, feature.Position + new Vector2(-extent.X / 2f, labelSize * 0.35f), "NEBULA",
-                    HorizontalAlignment.Left, -1f, labelSize, new Color(0.56f, 0.76f, 1f, 0.58f));
-                continue;
+                float from = i * Mathf.Tau / dashes;
+                DrawArc(feature.Position, feature.Radius, from, from + Mathf.Tau / dashes * 0.55f, 4, ring,
+                    1.5f * Mathf.Max(1f, _drawnScale), true);
             }
-
-            DrawCircle(feature.Position, feature.Radius + 5f, new Color(0f, 0f, 0f, 0.40f));
-            DrawCircle(feature.Position, feature.Radius, new Color(0.20f, 0.23f, 0.30f, 1f));
-            DrawCircle(feature.Position - new Vector2(feature.Radius * 0.20f, feature.Radius * 0.22f), feature.Radius * 0.50f,
-                new Color(0.30f, 0.34f, 0.42f, 1f));
-            DrawArc(feature.Position, feature.Radius, 0, Mathf.Tau, 32, new Color(0.62f, 0.68f, 0.78f, 0.52f), 1.5f * Mathf.Max(1f, _drawnScale), true);
+            Vector2 extent = ThemeDB.FallbackFont.GetStringSize("NEBULA", HorizontalAlignment.Left, -1f, labelSize);
+            DrawString(ThemeDB.FallbackFont, feature.Position + new Vector2(-extent.X / 2f, -feature.Radius + labelSize * 1.2f), "NEBULA",
+                HorizontalAlignment.Left, -1f, labelSize, new Color(0.62f, 0.80f, 1f, 0.6f));
         }
     }
 }

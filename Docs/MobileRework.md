@@ -33,11 +33,19 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
   - Ten battlefields plus the escort corridor. Runs pick any battlefield at random for each stop.
   - Shard Run, Cobalt Veil, Broken Ring: the originals, with the squadrons starting closer and Cobalt Veil's gas about 30% smaller.
   - Open Drift (a few rocks as cover), Rubble Belt (a rock wall with two gaps), Crossing (the enemy wing crosses ahead of you), Monolith (one huge central rock), Shallows (small gas pockets at the edges), Gravel Field (many small rocks) and Knife Fight (a close start with rocks ahead).
-  - The squadrons start about 850–950 apart (Knife Fight 640), so first contact comes on turn 2 rather than turn 3 or 4.
+  - The squadrons start about 850–950 apart (Knife Fight 700), so first contact comes on turn 2 rather than turn 3 or 4.
 - **Nebulae:**
   - A ship that starts its turn inside gas flies every move 25% shorter that turn. It is tagged under its bars, and its path, ghost and reach fan already show the shorter route.
   - Shots fired through gas have ×0.7 accuracy.
   - Movement is never slowed partway through a move, so every ship ends its turn exactly where its preview showed. The earlier mid-move slowdown left ghosts and targeting previews wrong.
+- **Battle visuals** (art only; collision, ranges and damage are unchanged):
+  - Ships are drawn at 1.6× (the escort transport at 1.15×), so their art roughly fills their collision circle. `Fighter.VisualRadius` places bars, rings, labels and callouts around the larger art.
+  - Enemy hulls are repainted in one hostile red by a brightness-ramp shader (`ShipPaint.Enemy`, colour `ShipPaint.EnemyHull`). Your ships sit on a faint cyan glow.
+  - Names, bars and status tags fade out while a turn plays. Floating damage numbers take their place: blue for shield, gold for hull, and hits close together add into one number.
+  - Shots use the packs' pixel bolts (Nairan for you, Kla'ed for the enemy), glowing in the team colour with a short tracer, plus muzzle flashes and sparks (orange on hull, blue on shields, grey on rock). A kill adds a debris burst, a shock ring and a small camera shake. The ship's own shield animation still plays when its shield takes a hit.
+  - `AsteroidSprite`: each rock is generated from its terrain circle as pixel art. It has a lumpy outline between 96% and 108% of the collision radius, craters and banded lighting from the top-left. The rock turns slowly while the light stays fixed.
+  - `NebulaCloud`: nebulas are drifting, banded gas drawn by a shader. While planning, a dashed ring marks the exact edge that decides who is inside.
+  - `BattleBackdrop`: a per-map colour wash, three pixel-star layers that drift with the camera at different speeds, and a dimmed, slowly turning planet at the screen edge (`MapLook` per map). The 12000px star sheets in `CelestialBodies` are skipped, because they exceed many phone GPUs' texture size.
 
 ## Phase 2 and 3: runs and the lean squadron (done)
 
@@ -200,4 +208,5 @@ new run. A run saved during the draft resumes on the draft page.
 - `EnemyAI` reads the player's queued maneuver when choosing its own, so enemies react to orders the player has not revealed yet. For a simultaneous-turn game this is worth reconsidering, together with difficulty.
 - Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many level-ups a run gives now that every ship has three slots, free docks, threat per layer, ejection and scar odds, and instinct strength.
 - Maps could be drawn from pools by stop type (open maps for skirmishes, dense ones for elites) and mirrored left to right for more variety.
-- An Android export preset and a device test pass are still to do.
+- An Android export preset and a device test pass are still to do. The device pass should check the nebula and asteroid shaders' frame rate on a low-end phone.
+- Visual follow-ups not yet done: a closer camera while a turn plays, a display font, and backdrops and art on the menu pages.

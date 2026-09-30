@@ -29,7 +29,9 @@ public class SkinDef
 
     public FighterSkin Load()
     {
-        return _cached ??= new FighterSkin
+        if (_cached != null)
+            return _cached;
+        _cached = new FighterSkin
         {
             Base = GD.Load<Texture2D>(BasePath),
             Engine = GD.Load<Texture2D>(EnginePath),
@@ -41,6 +43,12 @@ public class SkinDef
             Destruction = GD.Load<Texture2D>(DestructPath),
             DestructionFrames = DestructFrames,
         };
+        // Measure the drawn hull once: half its width plus height, halved again,
+        // sits between its short and long radius whichever way it faces.
+        Rect2I used = _cached.Base.GetImage()?.GetUsedRect() ?? new Rect2I(0, 0, 32, 32);
+        if (used.Size.X > 0 && used.Size.Y > 0)
+            _cached.HullRadius = (used.Size.X + used.Size.Y) / 4f;
+        return _cached;
     }
 }
 

@@ -16,6 +16,8 @@ public class FighterSkin
     public int WeaponFrames;
     public int ShieldFrames;
     public int DestructionFrames;
+    /// <summary>Rough radius of the hull art in texture pixels, for placing bars and rings around it.</summary>
+    public float HullRadius = 16f;
 }
 
 /// <summary>The move currently prepared for a fighter.</summary>
@@ -135,7 +137,17 @@ public partial class Fighter : Node2D
     public bool IsAlive => Hp > 0;
 
     Node2D _visual;
-    Sprite2D _baseSprite, _engineSprite, _weaponSprite, _shieldSprite, _destructSprite;
+    Sprite2D _baseSprite, _engineSprite, _weaponSprite, _shieldSprite, _destructSprite, _glowSprite;
+    float _hullRadius = 16f;
+
+    /// <summary>
+    /// Ship art is drawn larger than its source pixels so hulls read on a
+    /// phone. Only the picture grows: collision and shot ranges are unchanged.
+    /// </summary>
+    public const float FighterArtScale = 1.6f;
+    public virtual float ArtScale => FighterArtScale;
+    /// <summary>World-space radius of the drawn hull, for bars, rings and labels around it.</summary>
+    public float VisualRadius => _hullRadius * ArtScale;
     int _engineFrames, _weaponFrames, _shieldFrames, _destructFrames;
     double _enginePhase;
     float _fireAnimT = -1f;                   // <0 = weapon animation idle
@@ -673,9 +685,23 @@ public partial class Fighter : Node2D
         _weaponFrames = skin.WeaponFrames;
         _shieldFrames = skin.ShieldFrames;
         _destructFrames = skin.DestructionFrames;
+        _hullRadius = skin.HullRadius;
         _enginePhase = GD.RandRange(0.0, 10.0); // desync flame flicker across ships
 
-        _visual = new Node2D { RotationDegrees = 90 };
+        // Your ships sit on a faint cyan pool of light so they lift off the dark.
+        if (team == 0)
+        {
+            float glowSize = VisualRadius * 3.2f;
+            _glowSprite = new Sprite2D
+            {
+                Texture = ShipPaint.SoftDot,
+                Scale = Vector2.One * glowSize / ShipPaint.SoftDot.GetWidth(),
+                Modulate = new Color(ShipPaint.PlayerGlow, 0.22f),
+                Material = ShipPaint.Additive,
+            };
+            AddChild(_glowSprite);
+        }
+        _visual = new Node2D { RotationDegrees = 90, Scale = Vector2.One * ArtScale };
         AddChild(_visual);
         _engineSprite = new Sprite2D { Texture = skin.Engine, Hframes = skin.EngineFrames };
         _baseSprite = new Sprite2D { Texture = skin.Base };
@@ -687,6 +713,9 @@ public partial class Fighter : Node2D
         _visual.AddChild(_shieldSprite);
         _visual.AddChild(_weaponSprite);
         _visual.AddChild(_destructSprite);
+        // Enemy hulls are repainted in one hostile colour so they read at a glance.
+        if (team == 1)
+            _baseSprite.Material = _weaponSprite.Material = ShipPaint.Enemy;
     }
 
     public override void _Process(double delta)
@@ -724,7 +753,7 @@ public partial class Fighter : Node2D
         float bank = 0f;
         if (executing)
             bank = Mathf.Min(1f, Mathf.Abs(_execTurn) / Mathf.DegToRad(NormalTurnLimitDegrees)) * Mathf.Sin(Mathf.Pi * _execProgress);
-        _visual.Scale = new Vector2(1f - 0.25f * bank, 1f);
+        _visual.Scale = new Vector2(1f - 0.25f * bank, 1f) * ArtScale;
 
         // Weapon firing animation, one pass per barrage.
         if (_fireAnimT >= 0f)
@@ -930,10 +959,11 @@ public partial class Fighter : Node2D
             dmg -= shieldDamage;
             PlayShieldAnimation();
         }
+        int hullDamage = Mathf.Min(Hp, dmg);
+        BattleManager.Instance?.ShowDamage(this, shieldDamage, Mathf.Max(0, hullDamage));
         if (dmg <= 0)
             return;
 
-        int hullDamage = Mathf.Min(Hp, dmg);
         Hp -= dmg;
         if (isOpeningDamageTurn)
             TurnOneDamage += hullDamage;
@@ -987,9 +1017,12 @@ public partial class Fighter : Node2D
         _engineSprite.Visible = false;
         _weaponSprite.Visible = false;
         _shieldSprite.Visible = false;
-        _visual.Scale = Vector2.One;
+        if (_glowSprite != null)
+            _glowSprite.Visible = false;
+        _visual.Scale = Vector2.One * ArtScale;
         _destructSprite.Visible = true;
         _destructSprite.Frame = 0;
+        BattleManager.Instance?.ShowDestruction(this);
 
         // Campaign pilots roll to punch out as the ship goes up.
         if (Pilot != null && GD.Randf() < EjectChance)

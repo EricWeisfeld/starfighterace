@@ -10,6 +10,9 @@ public partial class ObjectiveShip : Fighter
     public float EscapeProgress { get; private set; }
     float _initialDistanceRemaining;
 
+    /// <summary>The transport's art is already large; it grows only a little.</summary>
+    public override float ArtScale => 1.15f;
+
     /// <summary>Configure the transport with the normal ship movement and visual systems.</summary>
     public void Setup(Vector2 position, Vector2 destination, float destinationRadius)
     {
@@ -111,7 +114,7 @@ public partial class ObjectiveShip : Fighter
         DrawSetTransform(Vector2.Zero, -Rotation, Vector2.One);
         Color hull = IsAlive ? new Color(0.72f, 0.9f, 1f) : new Color(0.35f, 0.12f, 0.12f);
         float width = Mathf.Max(64f, 72f * s);
-        float barY = -40f - 8f * s;
+        float barY = -Mathf.Max(40f, VisualRadius + 4f) - 8f * s;
         DrawRect(new Rect2(-width / 2f, barY, width, 7f * s), new Color(0.02f, 0.04f, 0.08f, 0.9f));
         DrawRect(new Rect2(-width / 2f, barY, width * Mathf.Clamp(Hp / (float)MaxHp, 0f, 1f), 7f * s), new Color(0.4f, 1f, 0.7f));
         string label = Escaped ? "JUMP ZONE REACHED" : "TRANSPORT";

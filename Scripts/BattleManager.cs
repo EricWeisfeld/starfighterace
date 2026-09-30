@@ -211,7 +211,7 @@ public partial class BattleManager : Node2D
             {
                 fighter.RecordAsteroidHit();
                 fighter.TakeDamage(additionalDamage);
-                SpawnFlash(fighter.Position);
+                SpawnImpact(fighter.Position, fighter.Velocity, ImpactSparks.Kind.Rock);
                 if (!fighter.IsAlive)
                     return;
             }
@@ -292,6 +292,7 @@ public partial class BattleManager : Node2D
 
         _fighterLayer = new Node2D();
         _bulletLayer = new Node2D();
+        AddChild(new BattleBackdrop(Map.Id));
         AddChild(new TerrainLayer(Map.Terrain));
         AddChild(_fighterLayer);
         AddChild(_bulletLayer);
@@ -1167,10 +1168,11 @@ public partial class BattleManager : Node2D
         }
 
         var b = new Bullet();
-        Color col = shooter.Team == 0 ? new Color(0.45f, 0.9f, 1f) : new Color(1f, 0.4f, 0.32f);
+        Color col = ShipPaint.TeamGlow(shooter.Team);
         b.Init(shooter, nose, dir * BulletSpeed, shooter.EffectiveFireRange * 1.4f, col, shooter.ShotDamage, hits,
             shooter.FireTimeDamageMultiplier(target.Position));
         _bulletLayer.AddChild(b);
+        _bulletLayer.AddChild(new MuzzleFlash { Shooter = shooter, Glow = ShipPaint.TeamGlow(shooter.Team) });
     }
 
     void FireShotAtObjective(Fighter shooter, ObjectiveShip target)
@@ -1183,13 +1185,30 @@ public partial class BattleManager : Node2D
             dir = dir.Rotated((float)GD.RandRange(3.5, 7.0) * Mathf.DegToRad(GD.Randf() < 0.5f ? -1 : 1));
         var bullet = new Bullet();
         bullet.InitObjective(shooter, target, nose, dir * BulletSpeed, shooter.EffectiveFireRange * 1.4f,
-            new Color(1f, 0.4f, 0.32f), shooter.ShotDamage, hits, shooter.FireTimeDamageMultiplier(target.Position));
+            ShipPaint.TeamGlow(shooter.Team), shooter.ShotDamage, hits, shooter.FireTimeDamageMultiplier(target.Position));
         _bulletLayer.AddChild(bullet);
+        _bulletLayer.AddChild(new MuzzleFlash { Shooter = shooter, Glow = ShipPaint.TeamGlow(shooter.Team) });
     }
 
     public void SpawnFlash(Vector2 pos)
     {
         _bulletLayer.AddChild(new Flash { Position = pos });
+    }
+
+    /// <summary>Sparks where a shot or a rock met something.</summary>
+    public void SpawnImpact(Vector2 pos, Vector2 incoming, ImpactSparks.Kind kind)
+    {
+        _bulletLayer?.AddChild(new ImpactSparks { Position = pos, Incoming = incoming, Type = kind });
+    }
+
+    /// <summary>Floats the damage a ship just took over it.</summary>
+    public void ShowDamage(Fighter fighter, int shield, int hull) => DamageNumber.Show(_bulletLayer, fighter, shield, hull);
+
+    /// <summary>A ship going up: a burst of debris, a shock ring and a jolt of the camera.</summary>
+    public void ShowDestruction(Fighter fighter)
+    {
+        SpawnImpact(fighter.Position, Vector2.Zero, ImpactSparks.Kind.Kill);
+        _camera?.Shake(fighter.Team == 0 ? 14f : 9f);
     }
 
     /// <summary>Floats a trait's name up from a ship, readable at any zoom.</summary>
@@ -1272,14 +1291,7 @@ public partial class BattleManager : Node2D
 
     public override void _Draw()
     {
-        // Static starfield + arena border, drawn behind everything.
-        var rng = new RandomNumberGenerator();
-        rng.Seed = 1234;
-        for (int i = 0; i < 140; i++)
-        {
-            var p = new Vector2(rng.RandfRange(0, ArenaW), rng.RandfRange(0, ArenaH));
-            DrawCircle(p, rng.RandfRange(0.6f, 1.6f), new Color(1, 1, 1, rng.RandfRange(0.12f, 0.45f)));
-        }
+        // The arena border; the sky behind it is BattleBackdrop.
         DrawRect(new Rect2(1, 1, ArenaW - 2, ArenaH - 2), new Color(1, 1, 1, 0.12f), false, 2f);
     }
 }

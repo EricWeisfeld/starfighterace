@@ -101,8 +101,27 @@ public partial class BattleCameraRig : Camera2D
         _follow = null;
     }
 
+    float _shake;
+    readonly RandomNumberGenerator _shakeRng = new();
+
+    /// <summary>Jolts the view by up to this many screen pixels, settling over a moment.</summary>
+    public void Shake(float screenPixels) => _shake = Mathf.Max(_shake, screenPixels);
+
+    void UpdateShake(float realDelta)
+    {
+        if (_shake <= 0.05f)
+        {
+            _shake = 0f;
+            Offset = Vector2.Zero;
+            return;
+        }
+        Offset = new Vector2(_shakeRng.RandfRange(-1f, 1f), _shakeRng.RandfRange(-1f, 1f)) * _shake / Zoom.X;
+        _shake *= Mathf.Exp(-9f * realDelta);
+    }
+
     public override void _Process(double delta)
     {
+        UpdateShake((float)delta / (float)Mathf.Max(Engine.TimeScale, 0.01));
         if (_follow != null)
             SetFrameTarget(_follow(), 1.1f);
         if (!_easing)

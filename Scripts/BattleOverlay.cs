@@ -83,7 +83,17 @@ public partial class BattleOverlay : Node2D
     int FontPx(int screenSize) => Mathf.Max(1, Mathf.RoundToInt(screenSize * _s));
     float W(float width) => width * Mathf.Max(1f, _s);
 
-    public override void _Process(double delta) => QueueRedraw();
+    // Names, bars and status tags fade out while a turn plays so the fight
+    // itself is what you watch; damage numbers carry the story meanwhile.
+    float _labelAlpha = 1f;
+
+    public override void _Process(double delta)
+    {
+        bool executing = BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing;
+        float realDelta = (float)delta / (float)Mathf.Max(Engine.TimeScale, 0.01);
+        _labelAlpha = Mathf.MoveToward(_labelAlpha, executing ? 0f : 1f, realDelta * 6f);
+        QueueRedraw();
+    }
 
     /// <summary>Draws a label centred on a world point at a constant on-screen size.</summary>
     void DrawLabel(Vector2 center, string text, int screenSize, Color color)
@@ -141,8 +151,10 @@ public partial class BattleOverlay : Node2D
         if (mgr.PriorityTarget != null && mgr.PriorityTarget.IsAlive)
         {
             Vector2 p = mgr.PriorityTarget.Position;
-            DrawArc(p, 34f, 0, Mathf.Tau, 28, SignalUi.Warning, W(2f), true);
-            DrawLabel(p + new Vector2(0f, -34f - Px(22f)), "PRIORITY TARGET", SignalUi.FontMicro, SignalUi.Warning);
+            float ring = Mathf.Max(34f, mgr.PriorityTarget.VisualRadius + 12f);
+            DrawArc(p, ring, 0, Mathf.Tau, 28, SignalUi.Warning, W(2f), true);
+            if (_labelAlpha > 0f)
+                DrawLabel(p + new Vector2(0f, -ring - Px(22f)), "PRIORITY TARGET", SignalUi.FontMicro, new Color(SignalUi.Warning, _labelAlpha));
         }
 
         if (targetingAnalysis != null)
@@ -170,7 +182,7 @@ public partial class BattleOverlay : Node2D
 
     void DrawSelection(BattleManager mgr, Fighter f)
     {
-        DrawArc(f.Position, 26f, 0, Mathf.Tau, 40, new Color(0.302f, 0.639f, 1f, 0.9f), W(2.5f), true);
+        DrawArc(f.Position, Mathf.Max(26f, f.VisualRadius + 6f), 0, Mathf.Tau, 40, new Color(0.302f, 0.639f, 1f, 0.9f), W(2.5f), true);
         if (f.PlannedManeuver is ManeuverType.Normal or ManeuverType.EngineBoost or ManeuverType.EmergencyThrusters or ManeuverType.PursuitBurn or ManeuverType.EcmJink or ManeuverType.GhostRun)
             DrawReachableFan(f);
         if (f.PlannedManeuver == ManeuverType.Normal)
@@ -260,7 +272,7 @@ public partial class BattleOverlay : Node2D
         Vector2 end = pts[samples];
         if (showCone)
             DrawFireCone(end, endHeading, f.EffectiveFireRange, f.EffectiveFireConeDeg);
-        Vector2 labelAt = end + new Vector2(0f, -24f - Px(16f));
+        Vector2 labelAt = end + new Vector2(0f, -Mathf.Max(24f, f.VisualRadius + 4f) - Px(16f));
         if (fatalAsteroidPath)
             DrawLabel(labelAt, "FATAL COLLISION", SignalUi.FontMicro, new Color(1f, 0.35f, 0.3f, alpha));
         else if (scrapeDamage > 0)
@@ -269,7 +281,7 @@ public partial class BattleOverlay : Node2D
             DrawThreatReadout(labelAt, threat, alpha);
 
         Texture2D tex = f.BaseTexture;
-        DrawSetTransform(end, endHeading + Mathf.Pi / 2f, Vector2.One);
+        DrawSetTransform(end, endHeading + Mathf.Pi / 2f, Vector2.One * f.ArtScale);
         DrawTexture(tex, -tex.GetSize() / 2f, new Color(1, 1, 1, alpha * 0.6f));
         DrawSetTransform(Vector2.Zero);
 
@@ -508,16 +520,17 @@ public partial class BattleOverlay : Node2D
     void DrawTargetReticle(Fighter shooter, Fighter target, TargetingAnalysis analysis, bool pinned)
     {
         Vector2 center = target.Position;
+        float ring = Mathf.Max(27f, target.VisualRadius + 7f);
         Color color = analysis.BestCoverage >= StrongCoverageThreshold
             ? StrongSolution
             : analysis.BestCoverage > 0f ? PossibleSolution : NoSolution;
 
         if (analysis.BestCoverage >= StrongCoverageThreshold)
-            DrawArc(center, 27f, 0f, Mathf.Tau, 32, color, W(2.5f), true);
+            DrawArc(center, ring, 0f, Mathf.Tau, 32, color, W(2.5f), true);
         else
-            DrawDashedArc(center, 27f, color);
+            DrawDashedArc(center, ring, color);
 
-        const float bracketX = 31f;
+        float bracketX = ring + 4f;
         const float bracketOuterY = 14f;
         const float bracketInnerY = 7f;
         const float bracketArm = 7f;
@@ -531,7 +544,7 @@ public partial class BattleOverlay : Node2D
         DrawLine(center + new Vector2(bracketX, bracketOuterY), center + new Vector2(bracketX - bracketArm, bracketOuterY), color, W(2.5f), true);
 
         if (pinned)
-            DrawCircle(center + new Vector2(0f, -31f), Px(4f), color);
+            DrawCircle(center + new Vector2(0f, -ring - 4f), Px(4f), color);
 
         string status;
         if (analysis.BestCoverage >= StrongCoverageThreshold)
@@ -556,7 +569,7 @@ public partial class BattleOverlay : Node2D
         }
 
         int size = FontPx(SignalUi.FontMicro);
-        DrawString(ThemeDB.FallbackFont, center + new Vector2(37f + Px(4f), size * 0.35f), status,
+        DrawString(ThemeDB.FallbackFont, center + new Vector2(bracketX + 6f + Px(4f), size * 0.35f), status,
             HorizontalAlignment.Left, -1f, size, color);
     }
 
@@ -658,35 +671,36 @@ public partial class BattleOverlay : Node2D
     /// </summary>
     void DrawHpBar(Fighter f, Color color)
     {
-        if (!f.IsAlive)
+        if (!f.IsAlive || _labelAlpha <= 0f)
             return;
+        float a = _labelAlpha;
         float width = Px(44f);
         float shieldHeight = Px(4f);
         float hullHeight = Px(6f);
-        Vector2 shieldTopLeft = f.Position + new Vector2(-width / 2f, 22f + Px(2f));
-        DrawRect(new Rect2(shieldTopLeft, new Vector2(width, shieldHeight)), new Color(0.2f, 0.5f, 1f, 0.2f));
+        Vector2 shieldTopLeft = f.Position + new Vector2(-width / 2f, Mathf.Max(22f, f.VisualRadius + 4f) + Px(2f));
+        DrawRect(new Rect2(shieldTopLeft, new Vector2(width, shieldHeight)), new Color(0.2f, 0.5f, 1f, 0.2f * a));
         float shieldFraction = f.MaxShield > 0 ? f.Shield / (float)f.MaxShield : 0f;
-        DrawRect(new Rect2(shieldTopLeft, new Vector2(width * shieldFraction, shieldHeight)), new Color(0.35f, 0.7f, 1f));
+        DrawRect(new Rect2(shieldTopLeft, new Vector2(width * shieldFraction, shieldHeight)), new Color(0.35f, 0.7f, 1f, a));
 
         Vector2 hullTopLeft = shieldTopLeft + new Vector2(0f, shieldHeight + Px(2f));
-        DrawRect(new Rect2(hullTopLeft, new Vector2(width, hullHeight)), new Color(1, 1, 1, 0.13f));
+        DrawRect(new Rect2(hullTopLeft, new Vector2(width, hullHeight)), new Color(1, 1, 1, 0.13f * a));
         float hullFraction = Mathf.Clamp(f.Hp / (float)f.MaxHp, 0f, 1f);
-        DrawRect(new Rect2(hullTopLeft, new Vector2(width * hullFraction, hullHeight)), color);
+        DrawRect(new Rect2(hullTopLeft, new Vector2(width * hullFraction, hullHeight)), new Color(color, color.A * a));
 
         if (f.Team == 0)
-            DrawLabel(f.Position + new Vector2(0f, -26f - Px(12f)), BattleManager.CallsignOf(f), SignalUi.FontMicro,
-                new Color(SignalUi.Body.R, SignalUi.Body.G, SignalUi.Body.B, 0.85f));
+            DrawLabel(f.Position + new Vector2(0f, -Mathf.Max(26f, f.VisualRadius + 6f) - Px(12f)), BattleManager.CallsignOf(f), SignalUi.FontMicro,
+                new Color(SignalUi.Body.R, SignalUi.Body.G, SignalUi.Body.B, 0.85f * a));
 
         // Status tags under the bars: Suppression Fire slows a ship's turning
         // until it gets out of the fire; nebula gas shortens this turn's move.
         Vector2 tagAt = hullTopLeft + new Vector2(width / 2f, hullHeight + Px(12f));
         if (f.IsSuppressed)
         {
-            DrawLabel(tagAt, $"SUPPRESSED −{f.NormalTurnLimitPenaltyDegrees:0}°", SignalUi.FontMicro, SignalUi.Warning);
+            DrawLabel(tagAt, $"SUPPRESSED −{f.NormalTurnLimitPenaltyDegrees:0}°", SignalUi.FontMicro, new Color(SignalUi.Warning, a));
             tagAt.Y += Px(16f);
         }
         if (f.InNebula && BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Planning)
-            DrawLabel(tagAt, $"NEBULA −{(1f - f.RouteScale) * 100:0}% MOVE", SignalUi.FontMicro, NebulaTag);
+            DrawLabel(tagAt, $"NEBULA −{(1f - f.RouteScale) * 100:0}% MOVE", SignalUi.FontMicro, new Color(NebulaTag, a));
     }
 }
 
@@ -702,8 +716,8 @@ public partial class TraitCallout : Node2D
     public static readonly Color ScarColor = SignalUi.Warning;
     const float Life = 1.6f;
     const int MaxRows = 3;
-    /// <summary>Screen pixels from the ship to the lowest callout: clear of the callsign label.</summary>
-    const float BaseOffset = 66f;
+    /// <summary>Screen pixels from the top of the hull art to the lowest callout: clear of the callsign label.</summary>
+    const float BaseOffset = 40f;
     const float RowHeight = 26f;
 
     public Fighter Anchor;
@@ -754,7 +768,8 @@ public partial class TraitCallout : Node2D
         Font font = ThemeDB.FallbackFont;
         int size = Mathf.Max(1, Mathf.RoundToInt(SignalUi.FontCaption * s));
         Vector2 extent = font.GetStringSize(Text, HorizontalAlignment.Left, -1f, size);
-        var baseline = new Vector2(-extent.X / 2f, -(BaseOffset + _shownRow * RowHeight + 10f * pop) * s);
+        float hullTop = IsInstanceValid(Anchor) ? Mathf.Max(26f, Anchor.VisualRadius + 6f) : 26f;
+        var baseline = new Vector2(-extent.X / 2f, -hullTop - (BaseOffset + _shownRow * RowHeight + 10f * pop) * s);
         // Keep the text on screen when the ship flies near the edge of the view.
         Transform2D toWorld = GetViewport().GetCanvasTransform().AffineInverse();
         float margin = SignalUi.ScreenGutter / 2f;

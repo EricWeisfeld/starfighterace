@@ -1,6 +1,9 @@
 using Godot;
 
-/// <summary>A fast tracer round. Hits the first enemy fighter it passes near.</summary>
+/// <summary>
+/// A fast round, drawn as its faction's pixel-art shot glowing in the team
+/// colour with a short tracer tail. Hits the first enemy fighter it passes near.
+/// </summary>
 public partial class Bullet : Node2D
 {
     Vector2 _vel;
@@ -13,6 +16,8 @@ public partial class Bullet : Node2D
     float _damageMultiplier = 1f; // fire-time bonuses, such as Long Shot
     bool _canHit; // misses are decided at fire time and just fly past
     ObjectiveShip _objectiveTarget;
+    Sprite2D _sprite;
+    float _age;
 
     public void Init(Fighter shooter, Vector2 pos, Vector2 vel, float maxDist, Color color, int damage, bool canHit,
         float damageMultiplier = 1f)
@@ -35,8 +40,29 @@ public partial class Bullet : Node2D
         _objectiveTarget = target;
     }
 
+    public override void _Ready()
+    {
+        Material = ShipPaint.Additive;
+        ZIndex = 4;
+        _sprite = new Sprite2D
+        {
+            Texture = ShotArt.Texture(_team),
+            Hframes = ShotArt.Frames(_team),
+            Material = ShipPaint.ShotGlow(_team),
+            Scale = Vector2.One * 2f,
+            Rotation = _vel.Angle() + Mathf.Pi / 2f,
+        };
+        AddChild(_sprite);
+    }
+
     public override void _Process(double delta)
     {
+        _age += (float)delta;
+        _sprite.Frame = (int)(_age * 16f) % _sprite.Hframes;
+        // Rounds that miss fade out at the end of their flight instead of popping.
+        _sprite.Modulate = new Color(1f, 1f, 1f, EndFade);
+        QueueRedraw();
+
         Vector2 previousPosition = Position;
         Vector2 step = _vel * (float)delta;
         Position += step;
@@ -45,7 +71,7 @@ public partial class Bullet : Node2D
         var mgr = BattleManager.Instance;
         if (mgr != null && mgr.ShotBlocked(previousPosition, Position))
         {
-            mgr.SpawnFlash(Position);
+            mgr.SpawnImpact(Position, _vel, ImpactSparks.Kind.Rock);
             QueueFree();
             return;
         }
@@ -54,9 +80,10 @@ public partial class Bullet : Node2D
         {
             if (_objectiveTarget != null && _objectiveTarget.IsAlive && Position.DistanceTo(_objectiveTarget.Position) < 24f)
             {
+                int hullBefore = _objectiveTarget.Hp;
                 _objectiveTarget.TakeDamage(_shooter?.RollShotDamage(null, _damageMultiplier) ?? _damage);
                 _shooter?.RecordHit(false);
-                mgr.SpawnFlash(Position);
+                mgr.SpawnImpact(Position, _vel, _objectiveTarget.Hp < hullBefore ? ImpactSparks.Kind.Hull : ImpactSparks.Kind.Shield);
                 QueueFree();
                 return;
             }
@@ -64,9 +91,10 @@ public partial class Bullet : Node2D
             {
                 if (f.IsAlive && Position.DistanceTo(f.Position) < 16f)
                 {
+                    int hullBefore = f.Hp;
                     f.TakeHit(_shooter?.RollShotDamage(f, _damageMultiplier) ?? _damage);
                     _shooter?.RecordHit(!f.IsAlive);
-                    mgr.SpawnFlash(Position);
+                    mgr.SpawnImpact(Position, _vel, f.Hp < hullBefore ? ImpactSparks.Kind.Hull : ImpactSparks.Kind.Shield);
                     QueueFree();
                     return;
                 }
@@ -77,9 +105,19 @@ public partial class Bullet : Node2D
             QueueFree();
     }
 
+    float EndFade => Mathf.Clamp((_maxDist - _traveled) / 70f, 0f, 1f);
+
     public override void _Draw()
     {
-        DrawLine(Vector2.Zero, -_vel.Normalized() * 12f, _color, 2.5f);
+        float s = BattleManager.Instance?.ScreenToWorldScale ?? 1f;
+        float fade = EndFade;
+        Vector2 back = -_vel.Normalized();
+        float length = Mathf.Min(_traveled, 54f);
+        var tail = new[] { Vector2.Zero, back * length };
+        DrawPolylineColors(tail, new[] { new Color(_color, 0.55f * fade), new Color(_color, 0f) }, Mathf.Max(5f, 4f * s));
+        DrawPolylineColors(tail, new[] { new Color(1f, 1f, 1f, 0.6f * fade), new Color(1f, 1f, 1f, 0f) }, Mathf.Max(1.5f, 1.4f * s));
+        float glow = Mathf.Max(11f, 9f * s);
+        DrawTextureRect(ShipPaint.SoftDot, new Rect2(-glow, -glow, glow * 2f, glow * 2f), false, new Color(_color, 0.45f * fade));
     }
 }
 

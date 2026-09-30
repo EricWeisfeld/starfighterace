@@ -29,6 +29,11 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
   - Undo, Engage, and a pause menu with Retreat.
   - Engage asks for confirmation when any ship is on a course into an asteroid.
 - **`ManeuverCatalog`:** one place for maneuver names, colours and descriptions.
+- **Maps (`BattleMaps`):**
+  - Ten battlefields plus the escort corridor. Runs pick any battlefield at random for each stop.
+  - Shard Run, Cobalt Veil, Broken Ring: the originals, with the squadrons starting closer and Cobalt Veil's gas about 30% smaller.
+  - Open Drift (a few rocks as cover), Rubble Belt (a rock wall with two gaps), Crossing (the enemy wing crosses ahead of you), Monolith (one huge central rock), Shallows (small gas pockets at the edges), Gravel Field (many small rocks) and Knife Fight (a close start with rocks ahead).
+  - The squadrons start about 850–950 apart (Knife Fight 640), so first contact comes on turn 2 rather than turn 3 or 4.
 - **Nebulae:**
   - A ship that starts its turn inside gas flies every move 25% shorter that turn. It is tagged under its bars, and its path, ghost and reach fan already show the shorter route.
   - Shots fired through gas have ×0.7 accuracy.
@@ -194,5 +199,5 @@ new run. A run saved during the draft resumes on the draft page.
 
 - `EnemyAI` reads the player's queued maneuver when choosing its own, so enemies react to orders the player has not revealed yet. For a simultaneous-turn game this is worth reconsidering, together with difficulty.
 - Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many level-ups a run gives now that every ship has three slots, free docks, threat per layer, ejection and scar odds, and instinct strength.
-- More battle maps would add variety; there are currently three regular maps plus the escort corridor.
+- Maps could be drawn from pools by stop type (open maps for skirmishes, dense ones for elites) and mirrored left to right for more variety.
 - An Android export preset and a device test pass are still to do.

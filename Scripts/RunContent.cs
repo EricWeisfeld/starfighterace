@@ -73,7 +73,7 @@ public static class RunContent
         "The Kla'ed ace wing guards the Helios gate. End this.",
     };
 
-    static readonly string[] BattleMapIds = { "shard-run", "cobalt-veil", "broken-ring" };
+    static readonly string[] BattleMapIds = BattleMaps.Battlefields.Select(map => map.Id).ToArray();
 
     // ---------------------------------------------------------------- maps
 

@@ -113,12 +113,12 @@ public static class BattleMaps
         },
         PlayerSpawns = new[]
         {
-            new BattleSpawn(500, 350, 48), new BattleSpawn(430, 675, 4), new BattleSpawn(520, 1000, -42),
+            new BattleSpawn(760, 350, 48), new BattleSpawn(690, 675, 4), new BattleSpawn(780, 1000, -42),
         },
         EnemySpawns = new[]
         {
-            new BattleSpawn(1900, 315, 132), new BattleSpawn(1970, 675, 176), new BattleSpawn(1880, 1035, 222),
-            new BattleSpawn(2140, 470, 152), new BattleSpawn(2140, 865, 208), new BattleSpawn(2070, 1160, 225),
+            new BattleSpawn(1640, 315, 132), new BattleSpawn(1710, 675, 176), new BattleSpawn(1620, 1035, 222),
+            new BattleSpawn(1880, 470, 152), new BattleSpawn(1880, 865, 208), new BattleSpawn(1810, 1160, 225),
         },
     };
 
@@ -129,19 +129,19 @@ public static class BattleMaps
         Briefing = "Ionized nebulae drag at ships that start a turn inside them and scatter shots fired through them.",
         Terrain = new[]
         {
-            new TerrainFeature(TerrainFeatureType.Nebula, 1010, 475, 230),
-            new TerrainFeature(TerrainFeatureType.Nebula, 1430, 850, 260),
+            new TerrainFeature(TerrainFeatureType.Nebula, 1010, 475, 165),
+            new TerrainFeature(TerrainFeatureType.Nebula, 1430, 850, 185),
             new TerrainFeature(TerrainFeatureType.Asteroid, 1215, 665, 58),
             new TerrainFeature(TerrainFeatureType.Asteroid, 1325, 740, 44),
         },
         PlayerSpawns = new[]
         {
-            new BattleSpawn(430, 450, 26), new BattleSpawn(570, 735, -28), new BattleSpawn(390, 1000, 52),
+            new BattleSpawn(690, 450, 26), new BattleSpawn(830, 735, -28), new BattleSpawn(650, 1000, 52),
         },
         EnemySpawns = new[]
         {
-            new BattleSpawn(1970, 340, 154), new BattleSpawn(1830, 690, 208), new BattleSpawn(2010, 930, 142),
-            new BattleSpawn(2140, 500, 164), new BattleSpawn(2150, 805, 196), new BattleSpawn(2070, 1120, 218),
+            new BattleSpawn(1750, 340, 154), new BattleSpawn(1610, 690, 208), new BattleSpawn(1790, 930, 142),
+            new BattleSpawn(1920, 500, 164), new BattleSpawn(1930, 805, 196), new BattleSpawn(1850, 1120, 218),
         },
     };
 
@@ -164,12 +164,199 @@ public static class BattleMaps
         },
         PlayerSpawns = new[]
         {
-            new BattleSpawn(510, 315, 62), new BattleSpawn(360, 675, -3), new BattleSpawn(500, 1030, -58),
+            new BattleSpawn(710, 315, 62), new BattleSpawn(560, 675, -3), new BattleSpawn(700, 1030, -20),
         },
         EnemySpawns = new[]
         {
-            new BattleSpawn(1890, 305, 118), new BattleSpawn(2040, 675, 183), new BattleSpawn(1900, 1045, 238),
-            new BattleSpawn(2150, 470, 145), new BattleSpawn(2160, 855, 215), new BattleSpawn(2060, 1170, 232),
+            new BattleSpawn(1690, 305, 150), new BattleSpawn(1840, 675, 183), new BattleSpawn(1700, 1045, 210),
+            new BattleSpawn(1950, 470, 145), new BattleSpawn(1960, 855, 215), new BattleSpawn(1860, 1170, 232),
+        },
+    };
+
+    public static readonly BattleMapDefinition OpenDrift = new()
+    {
+        Id = "open-drift",
+        DisplayName = "OPEN DRIFT",
+        Briefing = "Open space with a few drifting rocks to break line of fire.",
+        Terrain = new[]
+        {
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1270, 420, 70),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1360, 960, 58),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1010, 760, 44),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 960, 1110, 34),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 920, 250, 30),
+        },
+        PlayerSpawns = new[]
+        {
+            new BattleSpawn(760, 470, 0), new BattleSpawn(720, 675, 0), new BattleSpawn(760, 880, 0),
+        },
+        EnemySpawns = new[]
+        {
+            new BattleSpawn(1620, 470, 180), new BattleSpawn(1660, 675, 180), new BattleSpawn(1620, 880, 180),
+            new BattleSpawn(1770, 300, 170), new BattleSpawn(1770, 1050, 190), new BattleSpawn(1830, 675, 180),
+        },
+    };
+
+    public static readonly BattleMapDefinition RubbleBelt = new()
+    {
+        Id = "rubble-belt",
+        DisplayName = "RUBBLE BELT",
+        Briefing = "A wall of rubble splits the field. Thread one of its two gaps or scrape through.",
+        Terrain = new[]
+        {
+            new TerrainFeature(TerrainFeatureType.Asteroid, 971, 56, 30),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 982, 149, 46),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1036, 227, 30),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1072, 311, 40),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1066, 397, 30),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1178, 634, 40),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1202, 709, 36),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1206, 791, 40),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1319, 1027, 30),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1325, 1123, 40),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1357, 1208, 36),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1414, 1285, 40),
+        },
+        PlayerSpawns = new[]
+        {
+            new BattleSpawn(720, 470, 0), new BattleSpawn(680, 675, 0), new BattleSpawn(720, 880, 0),
+        },
+        EnemySpawns = new[]
+        {
+            new BattleSpawn(1640, 470, 180), new BattleSpawn(1680, 675, 180), new BattleSpawn(1640, 880, 180),
+            new BattleSpawn(1790, 300, 170), new BattleSpawn(1790, 1050, 190), new BattleSpawn(1850, 675, 180),
+        },
+    };
+
+    public static readonly BattleMapDefinition Crossing = new()
+    {
+        Id = "crossing",
+        DisplayName = "CROSSING",
+        Briefing = "The enemy wing crosses ahead of you from the right. Turn in to meet it.",
+        Terrain = new[]
+        {
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1140, 700, 55),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1440, 500, 40),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 870, 960, 42),
+        },
+        PlayerSpawns = new[]
+        {
+            new BattleSpawn(750, 250, 35), new BattleSpawn(670, 420, 35), new BattleSpawn(600, 150, 35),
+        },
+        EnemySpawns = new[]
+        {
+            new BattleSpawn(1380, 1060, 270), new BattleSpawn(1230, 1140, 270), new BattleSpawn(1520, 1000, 270),
+            new BattleSpawn(1640, 1190, 260), new BattleSpawn(1080, 1210, 280), new BattleSpawn(1780, 1150, 255),
+        },
+    };
+
+    public static readonly BattleMapDefinition Monolith = new()
+    {
+        Id = "monolith",
+        DisplayName = "MONOLITH",
+        Briefing = "One huge rock blocks the direct line. Pick a side and go around it.",
+        Terrain = new[]
+        {
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1200, 675, 150),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1440, 340, 38),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 960, 1010, 38),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1470, 1080, 26),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 930, 270, 26),
+        },
+        PlayerSpawns = new[]
+        {
+            new BattleSpawn(760, 470, 0), new BattleSpawn(720, 675, 0), new BattleSpawn(760, 880, 0),
+        },
+        EnemySpawns = new[]
+        {
+            new BattleSpawn(1630, 470, 180), new BattleSpawn(1670, 675, 180), new BattleSpawn(1630, 880, 180),
+            new BattleSpawn(1780, 300, 170), new BattleSpawn(1780, 1050, 190), new BattleSpawn(1840, 675, 180),
+        },
+    };
+
+    public static readonly BattleMapDefinition Shallows = new()
+    {
+        Id = "shallows",
+        DisplayName = "SHALLOWS",
+        Briefing = "Two small nebula pockets at the edges: cover from fire, at the cost of a shorter move.",
+        Terrain = new[]
+        {
+            new TerrainFeature(TerrainFeatureType.Nebula, 1250, 220, 140),
+            new TerrainFeature(TerrainFeatureType.Nebula, 1140, 1130, 140),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1290, 600, 50),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1070, 820, 40),
+        },
+        PlayerSpawns = new[]
+        {
+            new BattleSpawn(760, 470, 0), new BattleSpawn(720, 675, 0), new BattleSpawn(760, 880, 0),
+        },
+        EnemySpawns = new[]
+        {
+            new BattleSpawn(1620, 470, 180), new BattleSpawn(1660, 675, 180), new BattleSpawn(1620, 880, 180),
+            new BattleSpawn(1770, 300, 170), new BattleSpawn(1770, 1050, 190), new BattleSpawn(1830, 675, 180),
+        },
+    };
+
+    public static readonly BattleMapDefinition GravelField = new()
+    {
+        Id = "gravel-field",
+        DisplayName = "GRAVEL FIELD",
+        Briefing = "Small rocks scattered everywhere. Long, careless curves will scrape.",
+        Terrain = new[]
+        {
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1366, 127, 22),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1349, 307, 18),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1369, 471, 26),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1389, 677, 22),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1395, 838, 26),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1364, 1038, 22),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1361, 1238, 26),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1193, 229, 26),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1228, 374, 18),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1183, 586, 22),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1179, 756, 26),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1212, 924, 18),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1203, 1130, 22),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1027, 124, 18),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1041, 322, 18),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1058, 491, 26),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1036, 686, 22),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1003, 843, 26),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1047, 1000, 18),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1001, 1208, 22),
+        },
+        PlayerSpawns = new[]
+        {
+            new BattleSpawn(740, 470, 0), new BattleSpawn(700, 675, 0), new BattleSpawn(740, 880, 0),
+        },
+        EnemySpawns = new[]
+        {
+            new BattleSpawn(1640, 470, 180), new BattleSpawn(1680, 675, 180), new BattleSpawn(1640, 880, 180),
+            new BattleSpawn(1790, 300, 170), new BattleSpawn(1790, 1050, 190), new BattleSpawn(1850, 675, 180),
+        },
+    };
+
+    public static readonly BattleMapDefinition KnifeFight = new()
+    {
+        Id = "knife-fight",
+        DisplayName = "KNIFE FIGHT",
+        Briefing = "A close start with rocks straight ahead. Choose a side on the first turn.",
+        Terrain = new[]
+        {
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1210, 630, 48),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1165, 745, 38),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1260, 700, 30),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1200, 240, 40),
+            new TerrainFeature(TerrainFeatureType.Asteroid, 1220, 1110, 40),
+        },
+        PlayerSpawns = new[]
+        {
+            new BattleSpawn(850, 470, 0), new BattleSpawn(810, 675, 0), new BattleSpawn(850, 880, 0),
+        },
+        EnemySpawns = new[]
+        {
+            new BattleSpawn(1550, 470, 180), new BattleSpawn(1590, 675, 180), new BattleSpawn(1550, 880, 180),
+            new BattleSpawn(1700, 300, 170), new BattleSpawn(1700, 1050, 190), new BattleSpawn(1760, 675, 180),
         },
     };
 
@@ -211,7 +398,13 @@ public static class BattleMaps
         EscortDestinationRadius = 95f,
     };
 
-    public static readonly BattleMapDefinition[] All = { ShardRun, CobaltVeil, BrokenRing, EscortCorridor };
+    /// <summary>The maps ordinary battles are fought on.</summary>
+    public static readonly BattleMapDefinition[] Battlefields =
+    {
+        ShardRun, CobaltVeil, BrokenRing, OpenDrift, RubbleBelt, Crossing, Monolith, Shallows, GravelField, KnifeFight,
+    };
+
+    public static readonly BattleMapDefinition[] All = Battlefields.Append(EscortCorridor).ToArray();
 
     /// <summary>The portrait battlefield for the battle that is about to start.</summary>
     public static BattleMapDefinition ForCurrentBattle() => AuthoredForCurrentBattle().ToPortrait();
@@ -224,13 +417,7 @@ public static class BattleMaps
         return ById(GameSetup.Mission?.MapId);
     }
 
-    public static BattleMapDefinition ById(string id) => id switch
-    {
-        "shard-run" => ShardRun,
-        "cobalt-veil" => CobaltVeil,
-        EscortCorridorId => EscortCorridor,
-        _ => BrokenRing,
-    };
+    public static BattleMapDefinition ById(string id) => All.FirstOrDefault(map => map.Id == id) ?? BrokenRing;
 }
 
 /// <summary>Draws authored terrain below ships without requiring scene-node assets.</summary>

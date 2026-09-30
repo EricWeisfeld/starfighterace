@@ -45,7 +45,7 @@ public partial class TestBattleSelect : Node2D
         page.AddChild(header);
 
         page.AddChild(Text("BATTLEFIELD", FontCaption, Muted, 4));
-        var maps = new GridContainer { Columns = 2, MouseFilter = Control.MouseFilterEnum.Ignore };
+        var maps = new GridContainer { Columns = 3, MouseFilter = Control.MouseFilterEnum.Ignore };
         maps.AddThemeConstantOverride("h_separation", 12);
         maps.AddThemeConstantOverride("v_separation", 12);
         for (int i = 0; i < BattleMaps.All.Length; i++)

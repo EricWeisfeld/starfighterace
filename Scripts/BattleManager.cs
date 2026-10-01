@@ -334,6 +334,7 @@ public partial class BattleManager : Node2D
         AddChild(_camera);
 
         Map = BattleMaps.ForCurrentBattle();
+        _deployment = BattleOpenings.Deploy(Map, Forces?.Opening ?? BattleOpening.HeadOn, Forces?.OpeningMirrored ?? false);
 
         _fighterLayer = new Node2D();
         _bulletLayer = new Node2D();
@@ -347,7 +348,7 @@ public partial class BattleManager : Node2D
 
         // Pilots come from the quick-battle setup or the run's briefing; run
         // missions supply the enemy wing.
-        List<Pilot> squad = GameSetup.PlayerPilots.Where(p => p.Alive).Take(Map.PlayerSpawns.Length).ToList();
+        List<Pilot> squad = GameSetup.PlayerPilots.Where(p => p.Alive).Take(_deployment.PlayerSpawns.Length).ToList();
         if (squad.Count < 1)
         {
             GD.PushError("A battle requires at least one pilot.");
@@ -358,15 +359,15 @@ public partial class BattleManager : Node2D
         for (int i = 0; i < squad.Count; i++)
         {
             ShipType playerType = squad[i].Ship;
-            BattleSpawn playerSpawn = Map.PlayerSpawns[i];
+            BattleSpawn playerSpawn = _deployment.PlayerSpawns[i];
             SpawnFighter(0, playerSpawn.Position, Mathf.DegToRad(playerSpawn.HeadingDegrees), playerType, squad[i]);
         }
 
         ShipType[] enemySquad = Forces?.EnemySquad ?? new[] { ShipTypes.Scout, ShipTypes.Scout, ShipTypes.Scout };
         string[] aces = Forces?.Aces ?? System.Array.Empty<string>();
-        for (int i = 0; i < enemySquad.Length && i < Map.EnemySpawns.Length; i++)
+        for (int i = 0; i < enemySquad.Length && i < _deployment.EnemySpawns.Length; i++)
         {
-            BattleSpawn enemySpawn = Map.EnemySpawns[i];
+            BattleSpawn enemySpawn = _deployment.EnemySpawns[i];
             SpawnFighter(1, enemySpawn.Position, Mathf.DegToRad(enemySpawn.HeadingDegrees), enemySquad[i],
                 aceName: i < aces.Length ? aces[i] : null);
         }
@@ -378,6 +379,8 @@ public partial class BattleManager : Node2D
     }
 
     bool _initialFramePending;
+    /// <summary>Where both sides started, and where reinforcements come in.</summary>
+    BattleDeployment _deployment;
 
     void SpawnFighter(int team, Vector2 pos, float heading, ShipType type, Pilot pilot = null, string aceName = null)
     {
@@ -391,6 +394,8 @@ public partial class BattleManager : Node2D
         f.Setup(team, pos, heading, type.GetSkin(team));
         _fighterLayer.AddChild(f);
         GetTeam(team).Add(f);
+        if (team == 1)
+            EnemyAI.AssignTactic(f, EnemyFighters);
     }
 
     /// <summary>A timed wave is due: it is the reinforcement turn, or the first group is already gone.</summary>
@@ -400,25 +405,37 @@ public partial class BattleManager : Node2D
 
     /// <summary>
     /// Brings in a mission's reinforcements at the enemy's start positions
-    /// furthest from your ships, clear of anyone already there.
+    /// furthest from your ships, clear of anyone already there; in an ambush,
+    /// behind your squadron instead.
     /// </summary>
     void SpawnWave()
     {
         _waveSpawned = true;
         ShipType[] wave = Forces.Reinforcements;
-        var friendly = PlayerFighters.Where(f => f.IsAlive).Select(f => f.Position).ToList();
-        List<BattleSpawn> spots = Map.EnemySpawns
-            .Where(spawn => AllAlive().All(f => f.Position.DistanceTo(spawn.Position) > 120f))
-            .OrderByDescending(spawn => friendly.Count == 0 ? 0f : friendly.Min(p => p.DistanceTo(spawn.Position)))
-            .ToList();
-        if (spots.Count < wave.Length)
-            spots.AddRange(Map.EnemySpawns.Except(spots));
+        var squad = PlayerFighters.Where(f => f.IsAlive).ToList();
+        var friendly = squad.Select(f => f.Position).ToList();
+        List<BattleSpawn> spots;
+        if (_deployment.WaveSpawns == null && squad.Count > 0)
+        {
+            spots = BattleOpenings.BehindSquad(squad, wave.Length, Map, AllAlive().Select(f => f.Position)).ToList();
+        }
+        else
+        {
+            BattleSpawn[] options = _deployment.WaveSpawns ?? _deployment.EnemySpawns;
+            spots = options
+                .Where(spawn => AllAlive().All(f => f.Position.DistanceTo(spawn.Position) > 120f))
+                .OrderByDescending(spawn => friendly.Count == 0 ? 0f : friendly.Min(p => p.DistanceTo(spawn.Position)))
+                .ToList();
+            if (spots.Count < wave.Length)
+                spots.AddRange(options.Except(spots));
+        }
         for (int i = 0; i < wave.Length && i < spots.Count; i++)
         {
             SpawnFighter(1, spots[i].Position, Mathf.DegToRad(spots[i].HeadingDegrees), wave[i]);
             SpawnFlash(spots[i].Position);
         }
-        Announce($"REINFORCEMENTS · {Plural(wave.Length, "HOSTILE")} INBOUND", 5.0);
+        bool behind = _deployment.WaveSpawns == null;
+        Announce($"REINFORCEMENTS · {Plural(wave.Length, "HOSTILE")} {(behind ? "BEHIND YOU" : "INBOUND")}", 5.0);
     }
 
     /// <summary>Shows a short-lived message in the HUD's objective line.</summary>
@@ -1109,9 +1126,17 @@ public partial class BattleManager : Node2D
             f.RouteScale = IsInNebula(f.Position) ? NebulaRouteScale : 1f;
             f.TurnStartPathDistance = f.PlannedPathDistance;
         }
+        // The first turn calls out the opening, and any aces.
         string[] aces = EnemyFighters.Where(f => f.IsAce).Select(f => f.AceName).ToArray();
-        if (_turn == 1 && aces.Length > 0)
-            Announce($"{(aces.Length == 1 ? "ENEMY ACE" : "ENEMY ACES")} · {string.Join(" AND ", aces)}", 6.0);
+        if (_turn == 1)
+        {
+            BattleOpening opening = Forces?.Opening ?? BattleOpening.HeadOn;
+            bool mirrored = Forces?.OpeningMirrored ?? false;
+            if (aces.Length > 0)
+                Announce($"{BattleOpenings.Name(opening)} · {(aces.Length == 1 ? "ENEMY ACE" : "ENEMY ACES")} {string.Join(" AND ", aces)}", 6.0);
+            else
+                Announce(BattleOpenings.Callout(opening, mirrored), 6.0);
+        }
         PendingTargetAction = null;
         _camera.StopFollowing();
         Selected = PlayerFighters.FirstOrDefault(f => f.IsAlive);

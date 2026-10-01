@@ -291,6 +291,8 @@ public static class RunContent
         ShipType[] squad = Enumerable.Range(0, initial).Select(_ => Pick()).ToArray();
         ShipType[] reinforcements = Enumerable.Range(0, wave).Select(_ => Pick()).ToArray();
         string[] aces = Aces.Callsigns.OrderBy(_ => rng.Randi()).Take(Mathf.Min(Aces.CountFor(kind, sector), squad.Length)).ToArray();
+        BattleOpening opening = BattleOpenings.Pick(rng, sector, node.Layer, reinforcements.Length > 0);
+        bool mirrored = rng.Randf() < 0.5f;
 
         string name = kind switch
         {
@@ -309,6 +311,8 @@ public static class RunContent
             EnemyManeuvers = EnemyManeuvers(tier),
             Aces = aces,
             AceRefits = Aces.RefitsFor(sector),
+            Opening = opening,
+            OpeningMirrored = mirrored,
         };
     }
 

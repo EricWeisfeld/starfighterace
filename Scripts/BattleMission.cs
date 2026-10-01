@@ -24,6 +24,10 @@ public class BattleMission
     public string[] Aces = Array.Empty<string>();
     /// <summary>Refits on each ace's hull.</summary>
     public int AceRefits;
+    /// <summary>How the wings meet (see <see cref="BattleOpenings"/>).</summary>
+    public BattleOpening Opening = BattleOpening.HeadOn;
+    /// <summary>A one-sided opening comes from the other side.</summary>
+    public bool OpeningMirrored;
 
     /// <summary>"+2 ON TURN 3", or empty when nobody follows.</summary>
     public string ReinforcementLabel => Reinforcements.Length == 0 ? ""

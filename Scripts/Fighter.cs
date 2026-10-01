@@ -101,6 +101,16 @@ public partial class Fighter : Node2D
     /// <summary>An enemy ace's callsign; null for every other ship (see <see cref="Aces"/>).</summary>
     public string AceName;
     public bool IsAce => AceName != null;
+    /// <summary>How an enemy pilot fights (see <see cref="EnemyAI"/>). Player ships fly None.</summary>
+    public EnemyTactic Tactic;
+    /// <summary>A flanker's side of its target: 1 or -1.</summary>
+    public int FlankSide = 1;
+    /// <summary>The ship an enemy pilot is working on, kept between turns.</summary>
+    public Fighter AiTarget;
+    /// <summary>Turns in a row an enemy pilot has gone without firing; it grows bolder as they mount.</summary>
+    public int AiIdleTurns;
+    /// <summary><see cref="ShotsFired"/> when the enemy pilot last planned.</summary>
+    public int AiShotsSeen;
     public Texture2D BaseTexture;             // for ghost previews
     public int Team;                          // 0 = player, 1 = enemy
     public float Heading;

@@ -127,9 +127,9 @@ upgrades at levels 2, 4 and 6.)
 | Raptor | 110° | 145–210 | U-Turn | Engine Boost, Evasive Dodge, Hunter Lock |
 | ZT | 70° | 105–165 | Turret | Suppression Fire, Emergency Thrusters, Rear Guns |
 
-- **Evasive Spin** (Kestrel) is steered like normal flight, at half the throttle range and the normal turn limit. The ship barrel-rolls through the move with +60% evasion, and its guns stay silent all turn. Mastered, it flies the full throttle range.
+- **Evasive Spin** (Kestrel) is steered like normal flight, at half the throttle range and the normal turn limit. The ship barrel-rolls through the move with +55% evasion, and its guns stay silent all turn. On a Kestrel that is 90% evasion, near the 95% cap, because it can't fire. It can be used every third turn. Mastered, it flies the full throttle range.
 - **Rear Guns** (ZT) is steered like normal flight, with the guns facing astern for the turn at half damage. The ghost's firing cone points backward. Mastered, the rear guns hit for full damage.
-- Both are usable every other turn. The AI never flies them, and enemies can't learn them, since enemies only fly their line's first two maneuvers.
+- Rear Guns can be used every other turn. The AI never flies either, and enemies can't learn them, since enemies only fly their line's first two maneuvers.
 
 - **Frames.** Measured by firepower (damage × accuracy) and toughness ((hull + shield) ÷ (1 − evasion), since a hit lands at accuracy × (1 − evasion)):
 

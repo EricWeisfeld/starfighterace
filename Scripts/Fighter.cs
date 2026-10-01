@@ -48,6 +48,7 @@ public partial class Fighter : Node2D
 {
     public const int SpecialManeuverCooldownRounds = 1;
     public const int EngineBoostCooldownRounds = 2;
+    public const int EvasiveSpinCooldownRounds = 2;
     /// <summary>Barrel rolls the ship makes through one evasive spin.</summary>
     const float EvasiveSpinRolls = 3f;
     public const float FireRange = 280f;
@@ -327,6 +328,7 @@ public partial class Fighter : Node2D
         return maneuver switch
         {
             ManeuverType.EngineBoost => EngineBoostCooldownRounds,
+            ManeuverType.EvasiveSpin => EvasiveSpinCooldownRounds,
             _ => SpecialManeuverCooldownRounds,
         };
     }

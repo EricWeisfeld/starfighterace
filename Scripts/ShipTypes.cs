@@ -227,7 +227,7 @@ public static class ShipTypes
             SensorScrambleAccuracyPenalty = 0.20f,
             SensorScrambleDurationTurns = 2,
             SensorScrambleCooldownTurns = 4,
-            EvasiveSpinEvasionBonus = 0.60f,
+            EvasiveSpinEvasionBonus = 0.55f,
             EvasiveSpinDistanceScale = 0.5f,
             Pool = new[] { ShipAbility.BreakTurn, ShipAbility.PursuitBurn, ShipAbility.EcmJink,
                 ShipAbility.SensorScramble, ShipAbility.EvasiveSpin },

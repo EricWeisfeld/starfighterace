@@ -242,7 +242,7 @@ bump lumpy. So enemies now scale by count and pilots by refits.
 - **Reinforcements.** A "+N" wave arrives at the start of turn 3 at the enemy start positions furthest from your ships. If the first group is wiped out before then, the wave arrives at once instead of the battle ending. Briefings show the wave faded as INBOUND, and the map shows "3 HOSTILES +1".
 - **Quick battle** pits the max-level (Mk IV) squadron against a late sector 3 patrol (4 + 1) instead of three basic ships.
 - **Who sees your orders.** Enemies plan when you press Engage. Most can't see your orders: they lead each of your ships along its visible course, straight on at the throttle it started the turn with (`Fighter.TurnStartPathDistance`). Only aces read the move you actually queued. (Before aces were individuals, every ship in an elite wing read orders. Measured over 480 autopilot battles then: 46% overall, the same as when nobody reads orders and up from 38% when everyone did.)
-- **One mission type.** Strike stops and the sector 2 escort boss are gone; every battle is eliminate-all-hostiles. Strike stops became skirmishes, the sector 1 boss is a plain 3 + 1 fight and the sector 2 boss a 4 + 2 one whose wave arrives on turn 3. Enemies always shoot the nearest of your ships. Not yet measured in a win-rate batch.
+- **One mission type.** Strike stops and the sector 2 escort boss are gone; every battle is eliminate-all-hostiles. Strike stops became skirmishes, the sector 1 boss is a plain 3 + 1 fight and the sector 2 boss a 4 + 2 one whose wave arrives on turn 3. (Enemies then shot the nearest of your ships; see Phase 6 for how they pick targets now.)
 - **Aces (`Aces`).** An ace is one enemy pilot who makes a fight harder, and the biggest threat on the field. One flies with every elite stop (now called "ACE PILOT" on the map, titled with the ace's callsign) and every sector boss, two with the sector 3 boss. Aces take the place of a ship in the opening wing, so wing sizes are unchanged.
   - Hull: refitted one step ahead of your squadron (Mk II in sector 1, Mk III in sector 2, Mk IV in sector 3), plus +10% accuracy and +10% evasion. A sector 2 ace ZT has 720 hull and 65 damage against a plain ZT's 500 and 45.
   - Flying: its line's first two maneuvers from sector 1 on, both mastered, and it plans against the orders you actually gave. Every other enemy plans against your visible course.
@@ -271,6 +271,55 @@ bump lumpy. So enemies now scale by count and pilots by refits.
 
 Level now matters: across all stops a level 1 squadron wins 21% and a level 6 one 73%, against 28% and 41% before. Cells are 10 battles each, so ±30%.
 
+## Phase 6: fights that don't all start the same
+
+Every fight used to open the same way: both wings spawned about 820 apart,
+nose to nose, closing about 370 a turn, so everyone reached gun range (280)
+together on turn 2 and jousted. The enemy pilot had one rule (point at the
+nearest of your ships and end 170 from it), so its whole wing arrived as a
+wall, focused one ship, flew through, and wheeled back. Measured over 40
+autopilot battles: first contact on turn 2 in 29 of them, 96% of the
+contact turn's volleys hit the target's nose, half of all damage landed in
+those two turns, and 15 of 40 battles lost a ship there.
+
+### Enemy tactics (`EnemyAI`, `EnemyTactic`)
+
+Every enemy flies a tactic, shown over the ship while planning (aces keep
+their gold label).
+
+| Tactic | Who | How it flies |
+| --- | --- | --- |
+| STRIKER | Raptors first, then every second Kestrel and ZT | Goes straight for its target and takes an even trade of fire. |
+| FLANKER | Kestrels first, then every second Raptor | Swings out to its side of the target (420 off its course) while closing, and holds off to the side, at least 320 away, while the target faces it. It turns in once the target looks away, or after two turns without firing. Flankers alternate sides. |
+| SNIPER | ZTs first | Keeps about 250 from its target and backs off anyone who would end a move within 180. One caught within 180 at the start of a turn fights as a striker. |
+| Ace | Aces | Hunts your most worn-down ship, minds your guns, and reads your orders. |
+
+- **Guns along the route.** Each candidate route is scored on how much of the move the pilot's guns cover a foe and how much a foe's guns cover it (sampled at five points), weighted by the foe's firepower, plus where the move leaves it against its target: nose on, at its preferred range, and, for flankers and aces especially, off the target's nose.
+- **What they expect you to do.** Non-ace pilots still can't see your orders. They now expect each of your ships to turn toward the nearest of their wing, as far as it can; straight ahead along your visible course still counts for half. Aces see the move you actually queued.
+- **Spread targets.** Pilots pick the nearest of your ships, pulled toward worn-down ones and pushed off ships their allies are already on, and keep last turn's target unless another is clearly better. A wing no longer pours everything into one ship on the first pass.
+- **Patience.** A pilot that minds your guns could dodge forever. Each turn a pilot goes without firing it minds your guns less (30% a turn, down to a quarter) and cares less about getting on your tail, and a wing outnumbered two to one presses in. Below 35% hull a pilot is more careful.
+- **Measured** (40 sector 1 skirmishes, your squad flown by a striker autopilot): fights last a median 8 turns, as before. With the old charge autopilot flying your squad they ran a median 13.5 turns, because the new pilots read its turns perfectly and dodged it; a person is far less predictable. Hit chance still ignores angle, so when your ship charges an enemy, the first exchange is still mostly nose to nose (about 75% of volleys). Making angle matter is the next lever.
+
+### Openings (`BattleOpenings`)
+
+Each battle stop picks one of seven openings, named in the briefing (in
+orange under the objective) and called out at the start of the battle.
+
+| Opening | Start |
+| --- | --- |
+| HEAD-ON | The map's own starts, nose to nose. |
+| LONG APPROACH | The enemy wing starts 330 further off (about 1,150 away), so the approach is yours to shape. |
+| FLANKED | The enemy cuts in across your path from the left or right, about 600 off your front quarter. |
+| PINCER | The enemy splits between your two front quarters and closes from both. |
+| RUNNING FIGHT | Both wings fly the same way, side by side and about 550 apart, with the enemy on your left or right. |
+| BOUNCED | The enemy starts about 500–700 behind you, heading your way. |
+| AMBUSH | Head-on, but the reinforcements arrive 720 behind your squadron ("REINFORCEMENTS · 2 HOSTILES BEHIND YOU"). |
+
+- **Picking.** A run's first fight is head-on or a long approach. After that the opening is drawn by weight: long approach, flanked, pincer and running fight 2 each, head-on 1.5, bounced 1 (from a sector's third row, or sector 2 on), ambush 1.5 (only when the stop has reinforcements). One-sided openings come from either side.
+- **Starts are placed in arena coordinates** and moved to the nearest spot clear of rocks (75 clear) and gas, and at least 110 from any other ship. The map's own starts are used as authored.
+- **Reinforcements** come in at the enemy's starting spots furthest from your ships, the map's top spots when the wing started elsewhere, or behind you in an ambush.
+- **Measured** (10 battles each, sector 1, your squad flown by a striker autopilot): wins sit at 90–100% for every opening except the ambush. An ambush with two reinforcements wins 40%, against 60% when the same two come in from the front. A running fight is the quickest (median 5 turns: both wings turn in together); a pincer the longest (11).
+
 ## Known issues and next steps
 
 - Aces may be too strong where they lead a boss: the sector 1 boss wins 30% across all levels and the sector 3 boss (two Mk IV aces) never wins.
@@ -278,6 +327,7 @@ Level now matters: across all stops a level 1 squadron wins 21% and a level 6 on
 - The sector 2 boss is now an ordinary 4 + 2 fight; it has not been measured since the escort was removed.
 - Sector 2 elites (3 + 1) and the sector 3 boss (4 + 2) sat below the 50% and 40% targets; worth a second pass once humans have played the new curve.
 - Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many modules a ship ends a run with now that they stack, free docks, threat per layer, ejection and scar odds, and instinct strength.
-- Maps could be drawn from pools by stop type (open maps for skirmishes, dense ones for elites) and mirrored left to right for more variety.
+- Maps could be drawn from pools by stop type (open maps for skirmishes, dense ones for elites). Openings already mirror the one-sided starts; the terrain itself is never mirrored.
+- Hit chance ignores angle, so a charge still ends in a nose-to-nose exchange; rear and flank shots counting for more would give the new tactics and openings their full effect.
 - An Android export preset and a device test pass are still to do. The device pass should check the nebula and asteroid shaders' frame rate on a low-end phone.
 - Try both camera modes in real play and pick the default. Overview stays the default until then.

@@ -248,6 +248,7 @@ bump lumpy. So enemies now scale by count and pilots by refits.
   - Flying: its line's first two maneuvers from sector 1 on, both mastered, and it plans against the orders you actually gave. Every other enemy plans against your visible course.
   - Look: a black hull with gold highlights, a gold "ACE VEX" label over it, "ENEMY ACE · VEX" when the battle opens and "ACE DOWN · VEX" when it dies. The briefing shows its icon in the same paint with its callsign, and the map adds "· ACE" to the stop.
   - Winning an elite stop still opens a module crate ("ACE DEFEATED").
+- **Measured: aces and one mission type** (480 battles; before the five new maneuvers, with the level-up that always teaches a maneuver at level 2): 47% overall (was 52%). Level 1 23% (was 18%), level 3 34% (was 50%), level 5 56% (was 64%), level 6 73% (was 77%). Across all levels, the stops with aces fell: sector 1 elite 50% (was 62%), sector 1 boss 30% (was 68%, when it only took the marked command ship), sector 2 elite 28% (was 40%), sector 3 boss with two Mk IV aces 0% (was 15%). The sector 2 boss rose to 15% (was 2% as an escort). Level 3 squadrons also carry fewer modules now (0.6 a ship, was 0.9), since level 2 always teaches a maneuver.
 - **Five new maneuvers.** Air Brake and Chaff Screen for the Kestrel, Sideslip and Alpha Strike for the Raptor, Tractor Beam for the ZT (see Phase 4). Pilots still learn one maneuver beyond their signature one; the level-up now lists every option the line has. Unmeasured: the autopilot doesn't fly them.
 - **Maneuver pools reworked.** Snap Turn, Ghost Run and ECM Jink are gone, Hunter Lock moved from the Kestrel to the Raptor, the Kestrel gained Evasive Spin and the ZT Rear Guns (see Phase 4). Each line now picks its second maneuver from three, all offered together on the first level-up (it used to be one random maneuver card per level-up, so a given maneuver could go unseen for whole runs). Enemy Kestrels fly Pursuit Burn where they flew Snap Turn.
 - **Burn turn angles swapped.** Pursuit Burn (Kestrel, 370) turns up to 45° and Engine Boost (Raptor, 350) up to 20°; they were 20° and 45°. Engine Boost can now be used every other turn, like Pursuit Burn (it was every third). Their masteries swapped too: Pursuit Burn 90°, Boost 45°. The Kestrel's chase burn can now follow a target off its nose, and the Raptor's boost is the straight-line one.
@@ -272,7 +273,7 @@ Level now matters: across all stops a level 1 squadron wins 21% and a level 6 on
 
 ## Known issues and next steps
 
-- Aces are unmeasured: how much harder they make elite stops and bosses, and whether one refit ahead is the right strength.
+- Aces may be too strong where they lead a boss: the sector 1 boss wins 30% across all levels and the sector 3 boss (two Mk IV aces) never wins.
 - The player instinct called Ace shares a word with enemy aces; it may want a new name.
 - The sector 2 boss is now an ordinary 4 + 2 fight; it has not been measured since the escort was removed.
 - Sector 2 elites (3 + 1) and the sector 3 boss (4 + 2) sat below the 50% and 40% targets; worth a second pass once humans have played the new curve.

@@ -354,22 +354,17 @@ public static class RunContent
     // -------------------------------------------------------------- cards
 
     /// <summary>
-    /// Three distinct level-up choices. While a pilot can still learn a
-    /// maneuver (until they know <see cref="Pilot.MaxManeuvers"/>), the
-    /// level-up offers every maneuver their line could teach them, so the
-    /// second maneuver is chosen from all of them. After that, one each of a
-    /// module and a mastery while there are any, then any of those.
+    /// A level-up's choices. While a pilot can still learn a maneuver (until
+    /// they know <see cref="Pilot.MaxManeuvers"/>), the level-up offers every
+    /// maneuver their line could teach them, so the second maneuver is chosen
+    /// from all of them. Otherwise three cards: one each of a module and a
+    /// mastery while there are any, then any of those.
     /// </summary>
     public static List<PromotionCard> PromotionCards(Pilot pilot, RandomNumberGenerator rng)
     {
         var cards = new List<PromotionCard>();
-        if (pilot.Maneuvers.Count < Pilot.MaxManeuvers)
-        {
-            List<ShipAbility> learnable = pilot.UnlearnedManeuvers.ToList();
-            while (learnable.Count > 3)
-                learnable.RemoveAt(rng.RandiRange(0, learnable.Count - 1));
-            cards.AddRange(learnable.Select(a => new PromotionCard { Kind = CardKind.Maneuver, Id = a.ToString() }));
-        }
+        if (pilot.Maneuvers.Count < Pilot.MaxManeuvers && pilot.UnlearnedManeuvers.Any())
+            return pilot.UnlearnedManeuvers.Select(a => new PromotionCard { Kind = CardKind.Maneuver, Id = a.ToString() }).ToList();
         List<PromotionCard> modules = pilot.UnfittedModules
             .Select(module => new PromotionCard { Kind = CardKind.Module, Id = module.Id.ToString() }).ToList();
         List<PromotionCard> masteries = pilot.UnmasteredManeuvers

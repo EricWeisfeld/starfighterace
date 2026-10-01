@@ -252,15 +252,60 @@ public partial class BattleManager : Node2D
         return false;
     }
 
-    /// <summary>Whether a shot's line of fire passes through a nebula, reducing its accuracy.</summary>
-    public bool ShotPassesNebula(Vector2 from, Vector2 to)
+    /// <summary>
+    /// Whether a shot's line of fire passes through a nebula or a chaff
+    /// cloud, either of which reduces its accuracy.
+    /// </summary>
+    public bool ShotObscured(Vector2 from, Vector2 to)
     {
         foreach (TerrainFeature feature in Map.Terrain)
         {
             if (feature.Type == TerrainFeatureType.Nebula && SegmentIntersectsCircle(from, to, feature.Position, feature.Radius))
                 return true;
         }
-        return false;
+        return _chaff.Any(cloud => SegmentIntersectsCircle(from, to, cloud.Position, cloud.Radius));
+    }
+
+    readonly List<ChaffCloud> _chaff = new();
+    Node2D _chaffLayer;
+
+    /// <summary>Drops a chaff cloud where the ship starts its turn.</summary>
+    void DropChaff(Fighter fighter)
+    {
+        var cloud = new ChaffCloud { Position = fighter.Position, Radius = fighter.Moves.ChaffRadius, TurnsLeft = fighter.Moves.ChaffDurationTurns };
+        _chaff.Add(cloud);
+        _chaffLayer.AddChild(cloud);
+    }
+
+    /// <summary>Chaff thins out at the end of each turn and is gone after its last.</summary>
+    void AgeChaff()
+    {
+        foreach (ChaffCloud cloud in _chaff.Where(cloud => --cloud.TurnsLeft <= 0).ToList())
+        {
+            _chaff.Remove(cloud);
+            cloud.Dissipate();
+        }
+    }
+
+    /// <summary>
+    /// A tractor beam drags an enemy straight toward the ship, stopping short
+    /// of the ship itself and of any rock, and pins it out of its maneuvers
+    /// for the coming turn.
+    /// </summary>
+    void PullWithTractor(Fighter puller, Fighter enemy)
+    {
+        Vector2 from = enemy.Position;
+        Vector2 toward = (puller.Position - from).Normalized();
+        float pull = Mathf.Min(puller.Moves.TractorPullDistance, from.DistanceTo(puller.Position) - 3f * ShipCollisionRadius);
+        while (pull > 0f && SegmentHitsAsteroid(from, from + toward * pull, ShipCollisionRadius))
+            pull -= 10f;
+        if (pull > 0f)
+        {
+            enemy.Position = from + toward * pull;
+            enemy.RouteScale = IsInNebula(enemy.Position) ? NebulaRouteScale : 1f;
+        }
+        enemy.ManeuverLockTurns = 1;
+        _bulletLayer.AddChild(new TractorBeamFx { From = puller, To = enemy, Origin = from });
     }
 
     static bool SegmentIntersectsCircle(Vector2 from, Vector2 to, Vector2 center, float radius)
@@ -292,8 +337,10 @@ public partial class BattleManager : Node2D
 
         _fighterLayer = new Node2D();
         _bulletLayer = new Node2D();
+        _chaffLayer = new Node2D();
         AddChild(SpaceBackdrop.ForBattle(Map.Id));
         AddChild(new TerrainLayer(Map.Terrain));
+        AddChild(_chaffLayer);
         AddChild(_fighterLayer);
         AddChild(_bulletLayer);
         AddChild(new BattleOverlay());
@@ -761,6 +808,18 @@ public partial class BattleManager : Node2D
         if (fighter == null || !fighter.IsAlive)
             return;
         string enemyName = enemy.IsAce ? $"ACE {enemy.AceName}" : enemy.Type.DisplayName.ToUpper();
+        if (action == ManeuverAction.TractorBeam)
+        {
+            if (!fighter.CanTractor(enemy))
+            {
+                Announce($"TRACTOR BEAM · OUT OF RANGE ({fighter.Moves.TractorRange:0})");
+                return;
+            }
+            PullWithTractor(fighter, enemy);
+            fighter.TractorCooldownTurns = fighter.Moves.TractorCooldownTurns;
+            Announce($"TRACTOR BEAM · {CallsignOf(fighter)} PULLED {(enemy.IsAce ? "" : "A ")}{enemyName}");
+            return;
+        }
         if (action == ManeuverAction.HunterLock && fighter.SetHunterLock(enemy))
             Announce($"LOCK ON · {CallsignOf(fighter)} LOCKED {(enemy.IsAce ? "" : "A ")}{enemyName}");
         else if (action == ManeuverAction.SensorScramble && fighter.ApplySensorScramble(enemy, out Fighter splash))
@@ -842,7 +901,11 @@ public partial class BattleManager : Node2D
             case ManeuverType.Normal:
             case ManeuverType.EvasiveSpin:
             case ManeuverType.RearGuns:
+            case ManeuverType.AirBrake:
                 SetGhostManeuver(fighter, endpoint);
+                break;
+            case ManeuverType.Sideslip:
+                fighter.PlanSideslip(bearing);
                 break;
             case ManeuverType.EngineBoost:
             case ManeuverType.PursuitBurn:
@@ -867,7 +930,10 @@ public partial class BattleManager : Node2D
             case ManeuverType.EmergencyThrusters: fighter.PlanEmergencyThrusters(turn); break;
             case ManeuverType.RotatingGuns: fighter.PlanRotatingGuns(); break;
             case ManeuverType.EvasiveSpin:
-            case ManeuverType.RearGuns: fighter.PlanNormalStyle(maneuver, turn); break;
+            case ManeuverType.RearGuns:
+            case ManeuverType.AirBrake: fighter.PlanNormalStyle(maneuver, turn); break;
+            // Chosen from the bar, a sideslip starts off to the side the ship was steering toward.
+            case ManeuverType.Sideslip: fighter.PlanSideslip((turn < 0f ? -1f : 1f) * Mathf.Pi / 3f); break;
         }
     }
 
@@ -903,6 +969,11 @@ public partial class BattleManager : Node2D
             return;
         }
         PendingTargetAction = null;
+        if (info.Toggle)
+        {
+            fighter.ToggleArmed(action);
+            return;
+        }
 
         float currentTurn = fighter.PlannedTurnAngleRadians ?? 0f;
         bool alreadyActive = fighter.PlannedManeuver == info.Maneuver;
@@ -1003,6 +1074,8 @@ public partial class BattleManager : Node2D
         var enemyTargets = PlayerFighters.Where(f => f.IsAlive).ToList();
         foreach (Fighter e in EnemyFighters.Where(f => f.IsAlive))
             EnemyAI.Plan(e, enemyTargets, EnemyFighters, readOrders: e.IsAce);
+        foreach (Fighter f in AllAlive().Where(f => f.ChaffArmed))
+            DropChaff(f);
         foreach (Fighter f in AllAlive())
             f.BeginExecute();
 
@@ -1100,7 +1173,7 @@ public partial class BattleManager : Node2D
     {
         foreach (Fighter f in AllAlive())
         {
-            if (!f.CanFire || f.IsEvasiveSpinActive)
+            if (!f.CanFire || f.IsEvasiveSpinActive || f.GunsOffline)
                 continue;
             f.Cooldown -= dt;
 
@@ -1153,7 +1226,7 @@ public partial class BattleManager : Node2D
         Vector2 aim = target.Position + target.Velocity * travelTime; // basic lead
         Vector2 dir = (aim - nose).Normalized();
 
-        float terrainAccuracy = ShotPassesNebula(nose, target.Position) ? NebulaAccuracyMultiplier : 1f;
+        float terrainAccuracy = ShotObscured(nose, target.Position) ? NebulaAccuracyMultiplier : 1f;
         float hitChance = Mathf.Clamp(shooter.EffectiveAccuracyAgainst(target) * terrainAccuracy * (1f - target.EffectiveEvasion), 0.05f, 0.95f);
         bool hits = GD.Randf() < hitChance;
         shooter.NoteFiringTraits(target);
@@ -1250,6 +1323,7 @@ public partial class BattleManager : Node2D
             f.AdvanceTacticalEffects();
             f.RegenerateShield();
         }
+        AgeChaff();
         BeginPlanningPhase();
     }
 

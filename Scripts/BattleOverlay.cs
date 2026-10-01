@@ -164,6 +164,8 @@ public partial class BattleOverlay : Node2D
         if (Fighter.FliesLikeNormal(f.PlannedManeuver) ||
             f.PlannedManeuver is ManeuverType.EngineBoost or ManeuverType.EmergencyThrusters or ManeuverType.PursuitBurn)
             DrawReachableFan(f);
+        if (f.PlannedManeuver == ManeuverType.Sideslip)
+            DrawSlideArc(f);
         if (Fighter.FliesLikeNormal(f.PlannedManeuver))
             DrawThrottleGauge(f);
     }
@@ -184,6 +186,21 @@ public partial class BattleOverlay : Node2D
         DrawCircle(min, Px(4f), new Color(1f, 1f, 1f, 0.4f));
         DrawCircle(max, Px(4f), new Color(1f, 1f, 1f, 0.4f));
         DrawCircle(current, Px(6f), new Color(0.302f, 0.639f, 1f, 0.9f));
+    }
+
+    /// <summary>Where a sideslip can end: an arc at its fixed distance, as far round as it can slide.</summary>
+    void DrawSlideArc(Fighter f)
+    {
+        float max = Mathf.DegToRad(f.Moves.SideslipMaxAngleDegrees);
+        const int samples = 32;
+        var edge = new Vector2[samples + 1];
+        for (int i = 0; i <= samples; i++)
+            f.RoutePoint(ManeuverType.Sideslip, Mathf.Lerp(-max, max, i / (float)samples), f.PlannedPathDistance, 1f, out edge[i], out _);
+        var poly = new Vector2[samples + 2];
+        edge.CopyTo(poly, 0);
+        poly[samples + 1] = f.Position;
+        DrawColoredPolygon(poly, FanFill);
+        DrawPolyline(edge, FanEdge, W(1.5f), true);
     }
 
     void DrawReachableFan(Fighter f)
@@ -230,6 +247,8 @@ public partial class BattleOverlay : Node2D
             ManeuverType.PursuitBurn => new Color(0.4f, 1f, 0.7f, 0.92f),
             ManeuverType.EvasiveDodge => new Color(0.35f, 0.9f, 1f, 0.92f),
             ManeuverType.EvasiveSpin => new Color(0.6f, 0.95f, 1f, 0.92f),
+            ManeuverType.AirBrake => new Color(1f, 0.9f, 0.55f, 0.92f),
+            ManeuverType.Sideslip => new Color(0.55f, 1f, 0.55f, 0.92f),
             ManeuverType.RearGuns => new Color(0.95f, 0.55f, 1f, 0.92f),
             _ => PathColor,
         };
@@ -245,7 +264,7 @@ public partial class BattleOverlay : Node2D
             DrawPolyline(pts, new Color(pathColor, pathColor.A * alpha / 0.8f), W(2.5f), true);
 
         Vector2 end = pts[samples];
-        if (showCone && Fighter.GunsFireDuring(f.PlannedManeuver))
+        if (showCone && !f.GunsSilentDuring(f.PlannedManeuver))
             DrawFireCone(end, Fighter.GunHeadingFor(f.PlannedManeuver, endHeading), f.EffectiveFireRange, f.EffectiveFireConeDeg);
         Vector2 labelAt = end + new Vector2(0f, -Mathf.Max(24f, f.VisualRadius + 4f) - Px(16f));
         if (fatalAsteroidPath)
@@ -338,7 +357,7 @@ public partial class BattleOverlay : Node2D
 
     void DrawTimeSliceCones(BattleManager mgr, Fighter shooter)
     {
-        if (!Fighter.GunsFireDuring(shooter.PlannedManeuver))
+        if (shooter.GunsSilentDuring(shooter.PlannedManeuver))
             return;
         foreach (float progress in TimeSliceProgress)
         {
@@ -378,7 +397,7 @@ public partial class BattleOverlay : Node2D
     {
         var result = new TargetingAnalysis();
         // Silent guns have no firing window at all.
-        if (!Fighter.GunsFireDuring(shooter.PlannedManeuver))
+        if (shooter.GunsSilentDuring(shooter.PlannedManeuver))
             return result;
         float coneRadians = Mathf.DegToRad(shooter.EffectiveFireConeDeg);
         float range = shooter.EffectiveFireRange;
@@ -464,7 +483,7 @@ public partial class BattleOverlay : Node2D
                 {
                     PredictedPath enemyPath = source.Paths[plan];
                     ManeuverType enemyManeuver = source.Plans[plan].Maneuver;
-                    if (!Fighter.GunsFireDuring(enemyManeuver))
+                    if (source.Fighter.GunsSilentDuring(enemyManeuver))
                         continue;
                     Vector2 enemyPosition = enemyPath.Positions[i];
                     float enemyHeading = Fighter.GunHeadingFor(enemyManeuver, enemyPath.Headings[i]);
@@ -476,7 +495,7 @@ public partial class BattleOverlay : Node2D
                     {
                         firingPlans++;
                         Vector2 enemyNose = enemyPosition + Vector2.FromAngle(enemyHeading) * 20f;
-                        float terrainAccuracy = mgr.ShotPassesNebula(enemyNose, targetPosition)
+                        float terrainAccuracy = mgr.ShotObscured(enemyNose, targetPosition)
                             ? BattleManager.NebulaAccuracyMultiplier
                             : 1f;
                         sourceRisk += source.Fighter.EffectiveAccuracyAgainst(target) * terrainAccuracy
@@ -668,7 +687,8 @@ public partial class BattleOverlay : Node2D
                 new Color(ShipPaint.AceGold, a));
 
         // Status tags under the bars: Suppression Fire slows a ship's turning
-        // until it gets out of the fire; nebula gas shortens this turn's move.
+        // until it gets out of the fire; nebula gas shortens this turn's move;
+        // guns cool after an alpha strike; a tractor beam pins a ship's maneuvers.
         Vector2 tagAt = hullTopLeft + new Vector2(width / 2f, hullHeight + Px(12f));
         if (f.IsSuppressed)
         {
@@ -676,7 +696,17 @@ public partial class BattleOverlay : Node2D
             tagAt.Y += Px(16f);
         }
         if (f.InNebula && BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Planning)
+        {
             DrawLabel(tagAt, $"NEBULA −{(1f - f.RouteScale) * 100:0}% MOVE", SignalUi.FontMicro, new Color(NebulaTag, a));
+            tagAt.Y += Px(16f);
+        }
+        if (f.GunsOffline)
+        {
+            DrawLabel(tagAt, "GUNS OFFLINE", SignalUi.FontMicro, new Color(SignalUi.Warning, a));
+            tagAt.Y += Px(16f);
+        }
+        if (f.IsTractored && BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Planning)
+            DrawLabel(tagAt, "TRACTORED · NO MANEUVERS", SignalUi.FontMicro, new Color(0.4f, 0.95f, 0.9f, a));
     }
 }
 

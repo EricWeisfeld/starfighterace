@@ -398,6 +398,10 @@ public partial class BattleHud : CanvasLayer
 
         ManeuverInfo info = ManeuverCatalog.ForManeuver(fighter.PlannedManeuver);
         string summary = info.Summary(fighter) + (info.Directional ? " Tap again to switch sides." : "");
+        foreach (ManeuverInfo armed in ManeuverCatalog.ActionsFor(fighter).Where(a => a.Toggle && fighter.IsArmed(a.Action)))
+            summary += $" {armed.Name} ARMED.";
+        if (fighter.GunsOffline)
+            summary += " Guns offline this turn.";
         if (fighter.IsSuppressed)
         {
             // Maneuvers keep their own angles, so they are the way out.
@@ -511,8 +515,8 @@ public partial class ManeuverButton : Button
     public void Refresh(Fighter fighter, ManeuverAction? pendingTarget)
     {
         int cooldown = ManeuverCatalog.CooldownTurns(fighter, Info);
-        bool active = Info.TargetsEnemy
-            ? pendingTarget == Info.Action
+        bool active = Info.TargetsEnemy ? pendingTarget == Info.Action
+            : Info.Toggle ? fighter.IsArmed(Info.Action)
             : fighter.PlannedManeuver == Info.Maneuver;
         float side = Mathf.Sign(fighter.PlannedTurnAngleRadians ?? 0f);
 
@@ -538,6 +542,10 @@ public partial class ManeuverButton : Button
         else if (active && Info.TargetsEnemy)
         {
             status = "TAP ENEMY";
+        }
+        else if (active && Info.Toggle)
+        {
+            status = "ARMED";
         }
         else if (Info.Action == ManeuverAction.HunterLock && fighter.HunterLockTarget != null && fighter.HunterLockTarget.IsAlive)
         {

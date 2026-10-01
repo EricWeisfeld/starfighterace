@@ -124,13 +124,18 @@ upgrades at levels 2, 4 and 6.)
 
 | Line | Turn | Speed | Signature maneuver | Learns one of |
 | --- | --- | --- | --- | --- |
-| Kestrel | 120° | 170–235 | Break Turn | Pursuit Burn, Sensor Scramble, Evasive Spin |
-| Raptor | 110° | 145–210 | U-Turn | Engine Boost, Evasive Dodge, Hunter Lock |
-| ZT | 70° | 105–165 | Turret | Suppression Fire, Emergency Thrusters, Rear Guns |
+| Kestrel | 120° | 170–235 | Break Turn | Pursuit Burn, Sensor Scramble, Evasive Spin, Air Brake, Chaff Screen |
+| Raptor | 110° | 145–210 | U-Turn | Engine Boost, Evasive Dodge, Hunter Lock, Sideslip, Alpha Strike |
+| ZT | 70° | 105–165 | Turret | Suppression Fire, Emergency Thrusters, Rear Guns, Tractor Beam |
 
 - **Evasive Spin** (Kestrel) is steered like normal flight, at half the throttle range and the normal turn limit. The ship barrel-rolls through the move with +55% evasion, and its guns stay silent all turn. On a Kestrel that is 90% evasion, near the 95% cap, because it can't fire. It can be used every third turn. Mastered, it flies the full throttle range.
 - **Rear Guns** (ZT) is steered like normal flight, with the guns facing astern for the turn at half damage. The ghost's firing cone points backward. Mastered, the rear guns hit for full damage.
-- Rear Guns can be used every other turn. The AI never flies either, and enemies can't learn them, since enemies only fly their line's first two maneuvers.
+- **Air Brake** (Kestrel) is steered like normal flight but crawls only 40–80, with the normal turn limit, so pursuers overshoot. Every other turn; mastered, no cooldown.
+- **Chaff Screen** (Kestrel) is armed on top of the turn's move (the button shows ARMED). When the turn starts, the ship drops a 90-wide chaff cloud where it is; shots through it lose 30% accuracy, as through a nebula, whichever side fires them. It lasts 2 turns (3 mastered) and comes back every third turn.
+- **Sideslip** (Raptor) slides 120 in a straight line, up to 90° off the nose, without turning the nose: drag the ghost to aim it. Every other turn; mastered, it slides 180.
+- **Alpha Strike** (Raptor) is armed on top of the turn's move: +2 shots in every volley that turn (+3 mastered), then the guns are offline for the next turn ("GUNS OFFLINE" under the bars), so it comes round every other turn.
+- **Tractor Beam** (ZT) is used by tapping an enemy within 280: it is dragged 80 toward the ZT (140 mastered), stopping short of the ZT and of rocks, and can't fly any maneuver but normal flight that turn ("TRACTORED" under its bars). Every third turn.
+- Rear Guns can be used every other turn. The AI never flies any of these, and enemies can't learn them, since enemies only fly their line's first two maneuvers.
 
 - **Frames.** Measured by firepower (damage × accuracy) and toughness ((hull + shield) ÷ (1 − evasion), since a hit lands at accuracy × (1 − evasion)):
 
@@ -158,14 +163,14 @@ upgrades at levels 2, 4 and 6.)
 ### Level-ups (`RunContent.PromotionCards`, `Masteries`, `Perks`)
 
 While a pilot knows only their signature maneuver, a level-up offers every
-maneuver their line can teach (three cards, "CHOOSE A MANEUVER TO LEARN"), so
-the second maneuver is picked from the whole list. After that, a level-up
+maneuver their line can teach (four or five cards, "CHOOSE A MANEUVER TO
+LEARN"), so the second maneuver is picked from the whole list. After that, a level-up
 offers three cards: modules and masteries, one of each while there are any.
 Frames and instincts never appear.
 
 - **Module** (ship): any module the ship doesn't already carry. It is added to the ones fitted.
-- **New maneuver** from the class pool, up to two: the class's signature maneuver and one more, chosen from all three the line offers on the first level-up. Once a pilot knows two, level-ups stop offering maneuvers and offer modules and masteries instead. The ZT line's **Suppression Fire** is always on: each hit takes 8° (16° mastered) off the target's normal-flight turning, felt in full on its next turn. Under continued fire, older suppression halves each turn; a turn without being suppressed clears it. It never takes a ship below 25°, and maneuvers keep their own angles. Enemy ZT-line ships have it too. A suppressed ship shows "SUPPRESSED −X°" under its bars, and the HUD hint says so.
-- **Mastery** of a maneuver the pilot knows. It only matters on turns that maneuver is flown: Pursuit Burn turns 90° (45° unmastered), Boost 45° (20°), U-Turn and Break Turn lose their cooldown, Lock On +25%, Scramble jams a second enemy, Evasive Spin flies at full throttle, Rear Guns hit for full damage, and so on (`Masteries.Describe`).
+- **New maneuver** from the class pool, up to two: the class's signature maneuver and one more, chosen from everything the line offers on the first level-up. Once a pilot knows two, level-ups stop offering maneuvers and offer modules and masteries instead. The ZT line's **Suppression Fire** is always on: each hit takes 8° (16° mastered) off the target's normal-flight turning, felt in full on its next turn. Under continued fire, older suppression halves each turn; a turn without being suppressed clears it. It never takes a ship below 25°, and maneuvers keep their own angles. Enemy ZT-line ships have it too. A suppressed ship shows "SUPPRESSED −X°" under its bars, and the HUD hint says so.
+- **Mastery** of a maneuver the pilot knows. It only matters on turns that maneuver is flown: Pursuit Burn turns 90° (45° unmastered), Boost 45° (20°), U-Turn and Break Turn lose their cooldown, Lock On +25%, Scramble jams a second enemy, Evasive Spin flies at full throttle, Rear Guns hit for full damage, Air Brake loses its cooldown, chaff lasts a turn longer, Sideslip slides 180, Alpha Strike adds 3 shots, Tractor Beam drags 140, and so on (`Masteries.Describe`).
 
 
 Each pilot has exactly one **instinct**, picked in the draft (recruits bring a
@@ -243,6 +248,7 @@ bump lumpy. So enemies now scale by count and pilots by refits.
   - Flying: its line's first two maneuvers from sector 1 on, both mastered, and it plans against the orders you actually gave. Every other enemy plans against your visible course.
   - Look: a black hull with gold highlights, a gold "ACE VEX" label over it, "ENEMY ACE · VEX" when the battle opens and "ACE DOWN · VEX" when it dies. The briefing shows its icon in the same paint with its callsign, and the map adds "· ACE" to the stop.
   - Winning an elite stop still opens a module crate ("ACE DEFEATED").
+- **Five new maneuvers.** Air Brake and Chaff Screen for the Kestrel, Sideslip and Alpha Strike for the Raptor, Tractor Beam for the ZT (see Phase 4). Pilots still learn one maneuver beyond their signature one; the level-up now lists every option the line has. Unmeasured: the autopilot doesn't fly them.
 - **Maneuver pools reworked.** Snap Turn, Ghost Run and ECM Jink are gone, Hunter Lock moved from the Kestrel to the Raptor, the Kestrel gained Evasive Spin and the ZT Rear Guns (see Phase 4). Each line now picks its second maneuver from three, all offered together on the first level-up (it used to be one random maneuver card per level-up, so a given maneuver could go unseen for whole runs). Enemy Kestrels fly Pursuit Burn where they flew Snap Turn.
 - **Burn turn angles swapped.** Pursuit Burn (Kestrel, 370) turns up to 45° and Engine Boost (Raptor, 350) up to 20°; they were 20° and 45°. Engine Boost can now be used every other turn, like Pursuit Burn (it was every third). Their masteries swapped too: Pursuit Burn 90°, Boost 45°. The Kestrel's chase burn can now follow a target off its nose, and the Raptor's boost is the straight-line one.
 - **Attack and guard frames shelved.** Players and enemies fly only the S1 Kestrel, Raptor and ZT Class (see Phase 4).

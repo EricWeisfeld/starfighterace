@@ -35,6 +35,8 @@ public enum ManeuverType
     EvasiveDodge,
     EvasiveSpin,
     RearGuns,
+    AirBrake,
+    Sideslip,
 }
 
 /// <summary>
@@ -47,6 +49,8 @@ public partial class Fighter : Node2D
 {
     public const int SpecialManeuverCooldownRounds = 1;
     public const int EvasiveSpinCooldownRounds = 2;
+    /// <summary>An alpha strike leaves the guns offline next turn, so it comes round every other turn.</summary>
+    const int AlphaStrikeCooldownRounds = 2;
     /// <summary>Barrel rolls the ship makes through one evasive spin.</summary>
     const float EvasiveSpinRolls = 3f;
     public const float FireRange = 280f;
@@ -123,6 +127,18 @@ public partial class Fighter : Node2D
     public int SensorScrambleCooldownTurns;
     public int SensorScrambleTurns;
     public float SensorScrambleAccuracyPenalty;
+    public int ChaffCooldownTurns;
+    public int AlphaStrikeCooldownTurns;
+    public int TractorCooldownTurns;
+    /// <summary>Chaff to drop and an alpha strike to fire this turn, armed while planning.</summary>
+    public bool ChaffArmed, AlphaStrikeArmed;
+    bool _alphaStrikeThisTurn;
+    int _gunsOfflineTurns;
+    /// <summary>The guns are cooling after an alpha strike and won't fire this turn.</summary>
+    public bool GunsOffline => _gunsOfflineTurns > 0;
+    /// <summary>Turns a tractor beam still stops this ship from flying any maneuver but normal flight.</summary>
+    public int ManeuverLockTurns;
+    public bool IsTractored => ManeuverLockTurns > 0;
     /// <summary>Degrees taken off normal-flight turning by enemy Suppression Fire.</summary>
     public float NormalTurnLimitPenaltyDegrees;
     /// <summary>The part of the suppression penalty added during the turn being flown.</summary>
@@ -264,18 +280,23 @@ public partial class Fighter : Node2D
         maneuver == ManeuverType.RearGuns ? heading + Mathf.Pi : heading;
     /// <summary>Maneuvers whose guns can fire: all but the evasive spin.</summary>
     public static bool GunsFireDuring(ManeuverType maneuver) => maneuver != ManeuverType.EvasiveSpin;
+    /// <summary>Whether this ship's guns stay silent while flying a maneuver: a spin, or guns offline after an alpha strike.</summary>
+    public bool GunsSilentDuring(ManeuverType maneuver) => !GunsFireDuring(maneuver) || GunsOffline;
 
     /// <summary>
     /// Maneuvers steered like normal flight: dragging the ghost sets the
     /// throttle and the turn, within the normal turn limit.
     /// </summary>
     public static bool FliesLikeNormal(ManeuverType maneuver) =>
-        maneuver is ManeuverType.Normal or ManeuverType.EvasiveSpin or ManeuverType.RearGuns;
+        maneuver is ManeuverType.Normal or ManeuverType.EvasiveSpin or ManeuverType.RearGuns or ManeuverType.AirBrake;
     /// <summary>Share of the normal throttle range a maneuver flown like normal flight covers.</summary>
     public float ThrottleScale(ManeuverType maneuver) =>
         maneuver == ManeuverType.EvasiveSpin ? Moves.EvasiveSpinDistanceScale : 1f;
-    public float MinMoveFor(ManeuverType maneuver) => NormalMoveMinDistance * ThrottleScale(maneuver);
-    public float MaxMoveFor(ManeuverType maneuver) => NormalMoveMaxDistance * ThrottleScale(maneuver);
+    /// <summary>The throttle range of normal flight or a maneuver flown like it. An air brake has its own crawl.</summary>
+    public float MinMoveFor(ManeuverType maneuver) => maneuver == ManeuverType.AirBrake
+        ? Moves.AirBrakeMinDistance : NormalMoveMinDistance * ThrottleScale(maneuver);
+    public float MaxMoveFor(ManeuverType maneuver) => maneuver == ManeuverType.AirBrake
+        ? Moves.AirBrakeMaxDistance : NormalMoveMaxDistance * ThrottleScale(maneuver);
     public float EffectiveFireConeDeg => IsRotatingGunsActive ? Moves.RotatingGunsFireConeDeg : BaseFireConeDeg;
     public float EffectiveEvasion => Mathf.Clamp(Evasion
         - (IsEmergencyThrustersActive ? Moves.EmergencyThrustersEvasionPenalty : 0f)
@@ -298,9 +319,12 @@ public partial class Fighter : Node2D
     /// </summary>
     public int ManeuverAccess = Pilot.MaxManeuvers;
 
-    /// <summary>Special maneuvers cannot be repeated during their per-fighter cooldown.</summary>
+    /// <summary>
+    /// Special maneuvers cannot be repeated during their per-fighter cooldown,
+    /// and none can be flown while a tractor beam holds the ship.
+    /// </summary>
     public bool IsManeuverReady(ManeuverType maneuver) =>
-        maneuver == ManeuverType.Normal || GetManeuverCooldownTurns(maneuver) == 0;
+        maneuver == ManeuverType.Normal || (!IsTractored && GetManeuverCooldownTurns(maneuver) == 0);
 
     public int GetManeuverCooldownTurns(ManeuverType maneuver) =>
         _maneuverCooldownTurns.GetValueOrDefault(ManeuverCooldownKey(maneuver));
@@ -387,6 +411,9 @@ public partial class Fighter : Node2D
             _maneuverCooldownTurns.Clear();
             HunterLockCooldownTurns = 0;
             SensorScrambleCooldownTurns = 0;
+            ChaffCooldownTurns = 0;
+            AlphaStrikeCooldownTurns = 0;
+            TractorCooldownTurns = 0;
             _aceResetThisTurn = true;
             Shield = MaxShield;
             PlayShieldAnimation();
@@ -403,6 +430,8 @@ public partial class Fighter : Node2D
         _volleySwitchedTarget = _lastVolleyTarget != null && target != _lastVolleyTarget;
         _lastVolleyTarget = target;
         int shots = GD.RandRange(BarrageMin, BarrageMax);
+        if (_alphaStrikeThisTurn)
+            shots += Moves.AlphaStrikeExtraShots;
         if (target != null && BrawlerActiveAgainst(target.Position))
         {
             shots += Perks.BrawlerExtraShots;
@@ -474,7 +503,8 @@ public partial class Fighter : Node2D
     {
         ManeuverType maneuver = FliesLikeNormal(PlannedManeuver) ? PlannedManeuver : ManeuverType.Normal;
         PlannedPathDistance = Mathf.Clamp(distance, MinMoveFor(maneuver), MaxMoveFor(maneuver));
-        if (FliesLikeNormal(PlannedManeuver))
+        // An air brake's crawl is its own range, so it leaves the throttle alone.
+        if (FliesLikeNormal(PlannedManeuver) && maneuver != ManeuverType.AirBrake)
             SelectedNormalMoveDistance = PlannedPathDistance / ThrottleScale(maneuver);
     }
 
@@ -514,17 +544,51 @@ public partial class Fighter : Node2D
     }
 
     /// <summary>
-    /// Prepare a maneuver flown like normal flight (an evasive spin or rear
-    /// guns) at the current throttle, scaled to its range, and the current
-    /// turn within the normal limit.
+    /// Prepare a maneuver flown like normal flight (an evasive spin, rear
+    /// guns or an air brake) at the current throttle, scaled to its range,
+    /// and the current turn within the normal limit.
     /// </summary>
     public void PlanNormalStyle(ManeuverType maneuver, float turn)
     {
         PlannedManeuver = maneuver;
-        PlannedPathDistance = SelectedNormalMoveDistance * ThrottleScale(maneuver);
+        PlannedPathDistance = Mathf.Clamp(SelectedNormalMoveDistance * ThrottleScale(maneuver), MinMoveFor(maneuver), MaxMoveFor(maneuver));
         float maxTurn = Mathf.DegToRad(GetNormalTurnLimitDegrees(PlannedPathDistance));
         PlannedTurnAngleRadians = Mathf.Clamp(turn, -maxTurn, maxTurn);
     }
+
+    /// <summary>
+    /// Prepare a sideslip: the ship slides in a straight line up to its
+    /// maximum angle off the nose, and the nose doesn't turn. The planned
+    /// "turn" holds the slide's angle.
+    /// </summary>
+    public void PlanSideslip(float angle)
+    {
+        float max = Mathf.DegToRad(Moves.SideslipMaxAngleDegrees);
+        PlannedManeuver = ManeuverType.Sideslip;
+        PlannedPathDistance = Moves.SideslipDistance;
+        PlannedTurnAngleRadians = Mathf.Clamp(angle, -max, max);
+    }
+
+    /// <summary>Arms or disarms chaff or an alpha strike for this turn.</summary>
+    public void ToggleArmed(ManeuverAction action)
+    {
+        if (action == ManeuverAction.ChaffScreen)
+            ChaffArmed = !ChaffArmed;
+        else if (action == ManeuverAction.AlphaStrike)
+            AlphaStrikeArmed = !AlphaStrikeArmed;
+    }
+
+    public bool IsArmed(ManeuverAction action) => action switch
+    {
+        ManeuverAction.ChaffScreen => ChaffArmed,
+        ManeuverAction.AlphaStrike => AlphaStrikeArmed,
+        _ => false,
+    };
+
+    /// <summary>Whether this ship can catch an enemy in its tractor beam right now.</summary>
+    public bool CanTractor(Fighter target) =>
+        HasAbility(ShipAbility.TractorBeam) && TractorCooldownTurns == 0 && target != null && target.IsAlive &&
+        target.Team != Team && Position.DistanceTo(target.Position) <= Moves.TractorRange;
 
     /// <summary>Prepare the Raptor line's fixed sharp turn and short forward burst.</summary>
     public void PlanEvasiveDodge(float direction)
@@ -586,6 +650,17 @@ public partial class Fighter : Node2D
         SensorScrambleCooldownTurns = Mathf.Max(0, SensorScrambleCooldownTurns - 1);
         if (SensorScrambleTurns > 0 && --SensorScrambleTurns == 0)
             SensorScrambleAccuracyPenalty = 0f;
+        ChaffCooldownTurns = Mathf.Max(0, ChaffCooldownTurns - 1);
+        AlphaStrikeCooldownTurns = Mathf.Max(0, AlphaStrikeCooldownTurns - 1);
+        TractorCooldownTurns = Mathf.Max(0, TractorCooldownTurns - 1);
+        ManeuverLockTurns = Mathf.Max(0, ManeuverLockTurns - 1);
+        // The turn after an alpha strike, the guns are offline.
+        _gunsOfflineTurns = Mathf.Max(0, _gunsOfflineTurns - 1);
+        if (_alphaStrikeThisTurn)
+        {
+            _alphaStrikeThisTurn = false;
+            _gunsOfflineTurns = 1;
+        }
     }
 
     /// <summary>Prepare a short straight advance while the turret tracks a broad firing arc.</summary>
@@ -865,6 +940,17 @@ public partial class Fighter : Node2D
             NoteTrait(Perks.EngineShy); // a hard turn at full throttle is where the scar bites
         _volleysThisTurn = 0;
         _aceResetThisTurn = false;
+        if (ChaffArmed)
+        {
+            ChaffArmed = false;
+            ChaffCooldownTurns = Moves.ChaffCooldownTurns;
+        }
+        _alphaStrikeThisTurn = AlphaStrikeArmed;
+        if (AlphaStrikeArmed)
+        {
+            AlphaStrikeArmed = false;
+            AlphaStrikeCooldownTurns = AlphaStrikeCooldownRounds;
+        }
         Cooldown = (float)GD.RandRange(0.0, 0.15); // stagger opening barrages
         BarrageShotsLeft = 0;
         BarrageTarget = null;
@@ -905,7 +991,12 @@ public partial class Fighter : Node2D
         Position = pos;
         Heading = heading;
         Rotation = heading;
-        float travelHeading = _execManeuver == ManeuverType.UTurn ? _startHeading : heading;
+        float travelHeading = _execManeuver switch
+        {
+            ManeuverType.UTurn => _startHeading,
+            ManeuverType.Sideslip => _startHeading + _execTurn,
+            _ => heading,
+        };
         Velocity = Vector2.FromAngle(travelHeading) * (routeDistance / BattleManager.ExecTime);
     }
 
@@ -919,8 +1010,8 @@ public partial class Fighter : Node2D
 
     /// <summary>
     /// Point at fraction s along a maneuver. U-turns thrust straight while rotating;
-    /// evasive dodges curve sharply, then make a short straight advance; all other
-    /// turns follow constant-rate arcs.
+    /// sideslips slide straight without turning; evasive dodges curve sharply, then
+    /// make a short straight advance; all other turns follow constant-rate arcs.
     /// </summary>
     public static void ManeuverPoint(ManeuverType maneuver, Vector2 p0, float h0, float turn, float dist, float s,
         out Vector2 pos, out float heading)
@@ -929,6 +1020,13 @@ public partial class Fighter : Node2D
         {
             pos = p0 + Vector2.FromAngle(h0) * dist * s;
             heading = h0 + turn * s;
+            return;
+        }
+        if (maneuver == ManeuverType.Sideslip)
+        {
+            // "turn" is the slide's angle off the nose; the nose never turns.
+            pos = p0 + Vector2.FromAngle(h0 + turn) * dist * s;
+            heading = h0;
             return;
         }
         if (maneuver == ManeuverType.EvasiveDodge)

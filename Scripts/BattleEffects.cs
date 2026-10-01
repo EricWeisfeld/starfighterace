@@ -341,3 +341,98 @@ public partial class DamageNumber : Node2D
         live.Add(shield, hull);
     }
 }
+
+/// <summary>
+/// A chaff cloud: a ring of metal glints that twinkle where a ship dropped
+/// it. Shots through it lose accuracy as through a nebula (see
+/// <see cref="BattleManager.ShotObscured"/>); it lasts a set number of turns.
+/// </summary>
+public partial class ChaffCloud : Node2D
+{
+    public float Radius = 90f;
+    public int TurnsLeft = 2;
+    Vector2[] _glints;
+    float[] _phase;
+    float _time;
+    bool _fading;
+
+    public override void _Ready()
+    {
+        var rng = new RandomNumberGenerator { Seed = (ulong)GetInstanceId() };
+        _glints = new Vector2[70];
+        _phase = new float[_glints.Length];
+        for (int i = 0; i < _glints.Length; i++)
+        {
+            // Square root keeps the scatter even across the disc.
+            _glints[i] = Vector2.FromAngle(rng.Randf() * Mathf.Tau) * Radius * Mathf.Sqrt(rng.Randf());
+            _phase[i] = rng.Randf() * Mathf.Tau;
+        }
+        Modulate = new Color(1, 1, 1, 0);
+        CreateTween().TweenProperty(this, "modulate:a", 1f, 0.4f);
+    }
+
+    /// <summary>Fades the cloud out and removes it.</summary>
+    public void Dissipate()
+    {
+        if (_fading)
+            return;
+        _fading = true;
+        Tween fade = CreateTween();
+        fade.TweenProperty(this, "modulate:a", 0f, 0.6f);
+        fade.TweenCallback(Callable.From(QueueFree));
+    }
+
+    public override void _Process(double delta)
+    {
+        _time += (float)delta;
+        QueueRedraw();
+    }
+
+    public override void _Draw()
+    {
+        var silver = new Color(0.82f, 0.88f, 1f);
+        DrawCircle(Vector2.Zero, Radius, new Color(silver, 0.05f));
+        DrawArc(Vector2.Zero, Radius, 0f, Mathf.Tau, 48, new Color(silver, 0.22f), 1.5f, true);
+        for (int i = 0; i < _glints.Length; i++)
+        {
+            float twinkle = 0.5f + 0.5f * Mathf.Sin(_time * 5f + _phase[i]);
+            Vector2 drift = new Vector2(Mathf.Sin(_time * 0.7f + _phase[i]), Mathf.Cos(_time * 0.6f + _phase[i])) * 3f;
+            float size = 1.5f + twinkle * 1.5f;
+            DrawRect(new Rect2(_glints[i] + drift - Vector2.One * size / 2f, Vector2.One * size), new Color(silver, 0.25f + 0.65f * twinkle));
+        }
+    }
+}
+
+/// <summary>
+/// A tractor beam's flash: a pulsing beam from the ship to the enemy it
+/// caught, and a fading trail from where the enemy was dragged from.
+/// </summary>
+public partial class TractorBeamFx : Node2D
+{
+    public Fighter From, To;
+    public Vector2 Origin;
+    float _age;
+    const float Lifetime = 1.1f;
+
+    public override void _Process(double delta)
+    {
+        _age += (float)delta;
+        if (_age >= Lifetime || !IsInstanceValid(From) || !IsInstanceValid(To))
+        {
+            QueueFree();
+            return;
+        }
+        QueueRedraw();
+    }
+
+    public override void _Draw()
+    {
+        float fade = 1f - _age / Lifetime;
+        var beam = new Color(0.4f, 0.95f, 0.9f);
+        float pulse = 0.6f + 0.4f * Mathf.Sin(_age * 30f);
+        DrawLine(From.Position, To.Position, new Color(beam, 0.25f * fade), 10f, true);
+        DrawLine(From.Position, To.Position, new Color(beam, 0.85f * fade * pulse), 3f, true);
+        DrawLine(Origin, To.Position, new Color(beam, 0.4f * fade), 2f, true);
+        DrawArc(Origin, 14f, 0f, Mathf.Tau, 20, new Color(beam, 0.5f * fade), 2f, true);
+    }
+}

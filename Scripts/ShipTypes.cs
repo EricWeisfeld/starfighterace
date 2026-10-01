@@ -17,6 +17,11 @@ public enum ShipAbility
     EvasiveDodge,
     EvasiveSpin,
     RearGuns,
+    AirBrake,
+    ChaffScreen,
+    Sideslip,
+    AlphaStrike,
+    TractorBeam,
 }
 
 /// <summary>Texture paths + sheet layout for one ship type on one team; loads lazily.</summary>
@@ -91,6 +96,22 @@ public sealed record ShipManeuverProfile
     public float EvasiveSpinDistanceScale { get; init; }
     /// <summary>Damage of a shot from the rear guns, as a share of a normal shot.</summary>
     public float RearGunsDamageMultiplier { get; init; }
+    /// <summary>An air brake's throttle range: a crawl that lets pursuers overshoot.</summary>
+    public float AirBrakeMinDistance { get; init; }
+    public float AirBrakeMaxDistance { get; init; }
+    /// <summary>Chaff dropped where the ship starts its turn: shots through it lose accuracy as in a nebula.</summary>
+    public float ChaffRadius { get; init; }
+    public int ChaffDurationTurns { get; init; }
+    public int ChaffCooldownTurns { get; init; }
+    /// <summary>A sideslip moves the ship this far, up to this angle off its nose, without turning it.</summary>
+    public float SideslipDistance { get; init; }
+    public float SideslipMaxAngleDegrees { get; init; }
+    /// <summary>Extra shots in each volley of an alpha strike.</summary>
+    public int AlphaStrikeExtraShots { get; init; }
+    /// <summary>A tractor beam reaches enemies this far away and drags them this far toward the ship.</summary>
+    public float TractorRange { get; init; }
+    public float TractorPullDistance { get; init; }
+    public int TractorCooldownTurns { get; init; }
     /// <summary>All maneuvers this class can equip; pilots choose their loadout from this pool.</summary>
     public ShipAbility[] Pool { get; init; } = System.Array.Empty<ShipAbility>();
 }
@@ -219,7 +240,13 @@ public static class ShipTypes
             SensorScrambleCooldownTurns = 4,
             EvasiveSpinEvasionBonus = 0.55f,
             EvasiveSpinDistanceScale = 0.5f,
-            Pool = new[] { ShipAbility.BreakTurn, ShipAbility.PursuitBurn, ShipAbility.SensorScramble, ShipAbility.EvasiveSpin },
+            AirBrakeMinDistance = 40f,
+            AirBrakeMaxDistance = 80f,
+            ChaffRadius = 90f,
+            ChaffDurationTurns = 2,
+            ChaffCooldownTurns = 3,
+            Pool = new[] { ShipAbility.BreakTurn, ShipAbility.PursuitBurn, ShipAbility.SensorScramble, ShipAbility.EvasiveSpin,
+                ShipAbility.AirBrake, ShipAbility.ChaffScreen },
         },
         SkinsByTeam = new[]
         {
@@ -268,7 +295,11 @@ public static class ShipTypes
             EvasiveDodgeEvasionBonus = 0.40f,
             HunterLockAccuracyBonus = 0.12f,
             HunterLockCooldownTurns = 4,
-            Pool = new[] { ShipAbility.UTurn, ShipAbility.EngineBoost, ShipAbility.EvasiveDodge, ShipAbility.HunterLock },
+            SideslipDistance = 120f,
+            SideslipMaxAngleDegrees = 90f,
+            AlphaStrikeExtraShots = 2,
+            Pool = new[] { ShipAbility.UTurn, ShipAbility.EngineBoost, ShipAbility.EvasiveDodge, ShipAbility.HunterLock,
+                ShipAbility.Sideslip, ShipAbility.AlphaStrike },
         },
         SkinsByTeam = new[]
         {
@@ -316,7 +347,11 @@ public static class ShipTypes
             EmergencyThrustersTurnLimitDegrees = 35f,
             EmergencyThrustersEvasionPenalty = 0.10f,
             RearGunsDamageMultiplier = 0.5f,
-            Pool = new[] { ShipAbility.RotatingGuns, ShipAbility.SuppressionFire, ShipAbility.EmergencyThrusters, ShipAbility.RearGuns },
+            TractorRange = 280f,
+            TractorPullDistance = 80f,
+            TractorCooldownTurns = 3,
+            Pool = new[] { ShipAbility.RotatingGuns, ShipAbility.SuppressionFire, ShipAbility.EmergencyThrusters, ShipAbility.RearGuns,
+                ShipAbility.TractorBeam },
         },
         SkinsByTeam = new[]
         {

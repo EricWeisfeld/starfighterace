@@ -1052,7 +1052,7 @@ public partial class BattleManager : Node2D
             enemyTargets.Add(EscortShip);
         MissionAITuning aiTuning = CurrentMission?.EnemyAITuning ?? new MissionAITuning();
         foreach (Fighter e in EnemyFighters.Where(f => f.IsAlive))
-            EnemyAI.Plan(e, enemyTargets, EnemyFighters, aiTuning);
+            EnemyAI.Plan(e, enemyTargets, EnemyFighters, aiTuning, readOrders: Forces?.EnemiesReadOrders ?? false);
         foreach (Fighter f in AllAlive())
             f.BeginExecute();
         if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped)
@@ -1081,9 +1081,15 @@ public partial class BattleManager : Node2D
         CurrentPhase = Phase.Planning;
         if (WaveDue(enemiesWiped: false))
             SpawnWave();
-        // Nebula drag is fixed for the whole turn by where each ship starts it.
+        // Nebula drag is fixed for the whole turn by where each ship starts it,
+        // and the throttle a ship starts with is what most enemies can see of it.
         foreach (Fighter f in AllAlive())
+        {
             f.RouteScale = IsInNebula(f.Position) ? NebulaRouteScale : 1f;
+            f.TurnStartPathDistance = f.PlannedPathDistance;
+        }
+        if (_turn == 1 && Forces?.EnemiesReadOrders == true)
+            Announce("ACE PILOTS · SHARPER THAN ANY PATROL", 6.0);
         if (EscortShip != null && EscortShip.IsAlive)
             EscortShip.RouteScale = IsInNebula(EscortShip.Position) ? NebulaRouteScale : 1f;
         PendingTargetAction = null;

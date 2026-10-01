@@ -46,6 +46,12 @@ public class BattleMission
     public int ReinforcementTurn = 3;
     /// <summary>How many of its line's maneuvers each enemy can fly, in pool order.</summary>
     public int EnemyManeuvers = int.MaxValue;
+    /// <summary>
+    /// Ace pilots see your orders before they move. Everyone else plans
+    /// against your ships' visible course. Players are only told they face
+    /// aces, not why aces are better.
+    /// </summary>
+    public bool EnemiesReadOrders;
     public MissionAITuning EnemyAITuning = new();
 
     /// <summary>"+2 ON TURN 3", "+2 MID-ESCORT", or empty when nobody follows.</summary>

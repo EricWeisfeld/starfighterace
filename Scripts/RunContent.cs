@@ -217,7 +217,7 @@ public static class RunContent
     {
         RunNodeKind.Skirmish => "Destroy an enemy patrol.",
         RunNodeKind.Strike => "Destroy a marked command ship. The rest of the wing can live.",
-        RunNodeKind.Elite => "A veteran wing. Win it to open a module crate.",
+        RunNodeKind.Elite => "An ace wing, sharper than any patrol. Win it to open a module crate.",
         RunNodeKind.Repair => "Every ship repaired to full, and a medic who can treat one scar.",
         RunNodeKind.Recruit => "Pilots looking for a squadron. One can join.",
         RunNodeKind.Event => "An unknown signal. Could be a prize, could be trouble.",
@@ -309,7 +309,7 @@ public static class RunContent
         string name = kind switch
         {
             RunNodeKind.Boss => sector switch { 1 => "BLOCKADE BREAKER", 2 => "CONVOY ESCORT", _ => "ACE WING" },
-            RunNodeKind.Elite => "VETERAN INTERCEPTORS",
+            RunNodeKind.Elite => "ACE INTERCEPTORS",
             RunNodeKind.Strike => "COMMAND STRIKE",
             _ => "PATROL CLASH",
         };
@@ -323,6 +323,7 @@ public static class RunContent
             EnemySquad = squad,
             Reinforcements = reinforcements,
             EnemyManeuvers = EnemyManeuvers(tier),
+            EnemiesReadOrders = kind == RunNodeKind.Elite,
             EnemyAITuning = MissionAITuning.ForObjective(objective),
         };
     }

@@ -74,8 +74,14 @@ public static class EnemyAI
         return tuning.PriorityFor(target) * bias / (bias + distance);
     }
 
+    /// <summary>
+    /// Plans one ship's move against its chosen target. Most enemy pilots
+    /// can't see your orders: they lead your ship along its visible course,
+    /// straight on at the throttle it started the turn with. Pilots who
+    /// <paramref name="readOrders"/> lead the move you actually queued.
+    /// </summary>
     public static void Plan(Fighter self, IReadOnlyList<Fighter> foes, IReadOnlyList<Fighter> allies,
-        MissionAITuning tuning = null)
+        MissionAITuning tuning = null, bool readOrders = true)
     {
         Fighter target = SelectTarget(self, foes, tuning);
         if (target == null)
@@ -85,10 +91,13 @@ public static class EnemyAI
             return;
         }
 
-        // Predict the maneuver the target actually has queued, rather than
-        // always treating a tight turn or ability move as a straight line.
-        target.RoutePoint(target.PlannedManeuver, target.PlannedTurnAngleRadians ?? 0f, target.PlannedPathDistance, 1f,
-            out Vector2 targetEnd, out _);
+        // The transport's lumbering course is always plain to see.
+        Vector2 targetEnd;
+        if (readOrders || target is ObjectiveShip)
+            target.RoutePoint(target.PlannedManeuver, target.PlannedTurnAngleRadians ?? 0f, target.PlannedPathDistance, 1f,
+                out targetEnd, out _);
+        else
+            target.RoutePoint(ManeuverType.Normal, 0f, target.TurnStartPathDistance, 1f, out targetEnd, out _);
 
         var arena = new Rect2(30, 30, BattleManager.ArenaW - 60, BattleManager.ArenaH - 60);
         var choices = new PlanChoices();

@@ -66,6 +66,8 @@ public partial class Fighter : Node2D
     public float NormalMoveMaxDistance = 230f;
     // Path distance applies to every maneuver; normal distance persists between turns.
     public float PlannedPathDistance = 230f;
+    /// <summary>The throttle the ship started this turn's planning with: all an enemy who can't read orders sees.</summary>
+    public float TurnStartPathDistance = 230f;
     public float SelectedNormalMoveDistance = 230f;
     /// <summary>
     /// Share of a maneuver's distance the ship actually covers this turn.

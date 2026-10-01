@@ -69,7 +69,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | --- | --- |
 | Skirmish | Destroy the enemy patrol. |
 | Strike | Destroy a marked command ship; the rest of the wing can live. |
-| Elite wing | +2 threat. A win opens a module crate: pick one of three modules, each matched to a surviving ship. |
+| Elite wing | +2 threat. Ace pilots, who quietly read your orders (see Phase 5). A win opens a module crate: pick one of three modules, each matched to a surviving ship. |
 | Repair dock | Every hull is repaired to full on arrival, and the medic treats one scar per visit. |
 | Recruit | Two candidates at the squadron's level minus one, each with a random ship and instinct, already promoted to that level. One can join. |
 | Signal | One of six events. Rewards are XP, module crates, repairs, a recruit or a faded scar. Some turn into a fight. |
@@ -234,6 +234,7 @@ bump lumpy. So enemies now scale by count and pilots by refits.
 - **Hull mix and maneuvers (composition).** Wings draw from balanced frames in sector 1, add attack frames in sector 2, and use attack and guard frames in sector 3 (elites and bosses use the next sector's mix). Enemies fly none of their line's maneuvers in sector 1, the first two in sector 2 and all of them in sector 3, and they now weigh those maneuvers alongside normal flight when lining up a shot, not only to escape rocks.
 - **Reinforcements.** A "+N" wave arrives at the start of turn 3 at the enemy start positions furthest from your ships. If the first group is wiped out before then, the wave arrives at once instead of the battle ending. The escort's wave still arrives partway along the corridor. Briefings show the wave faded as INBOUND, and the map shows "3 HOSTILES +1".
 - **Quick battle** pits the max-level (Mk IV) squadron against a late sector 3 patrol (4 + 1) instead of three basic ships.
+- **Who sees your orders.** Enemies plan when you press Engage. Most can't see your orders: they lead each of your ships along its visible course, straight on at the throttle it started the turn with (`Fighter.TurnStartPathDistance`). Only elite wings, the Ace Interceptors, read the move you actually queued (`BattleMission.EnemiesReadOrders`). The player is told only that they are aces: the briefing calls them "an ace wing, sharper than any patrol" and the battle opens with "ACE PILOTS · SHARPER THAN ANY PATROL". The escort transport's course is always visible to enemies. Measured over 480 autopilot battles: 46% overall, the same as when nobody reads orders and up from 38% when everyone did. Elite stops sit 6–13 points below their blind rates, about where they were when every enemy read orders.
 
 **Measured.** In the same 960-battle batch as before, the enemy AI flies both sides, neither side sees the other's orders, and each stop is fought at the pilot level a run reaches there:
 
@@ -251,7 +252,7 @@ Level now matters: across all stops a level 1 squadron wins 21% and a level 6 on
 
 ## Known issues and next steps
 
-- `EnemyAI` reads the player's queued maneuver when choosing its own, so enemies react to orders the player has not revealed yet. For a simultaneous-turn game this is worth reconsidering, together with difficulty.
+- Only elite wings read your orders now; everyone else plans against your visible course. Whether bosses (the sector 3 ace wing especially) should read orders too is open.
 - The escort boss still loses every autopilot battle: the transport dies in about five turns while the squadron is mostly intact. It needs its own look (transport toughness, attacker focus, wave timing), ideally with human play.
 - Sector 2 elites (3 + 1 with every maneuver) and the sector 3 boss (4 + 2) sit below the 50% and 40% targets; worth a second pass once humans have played the new curve.
 - Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many level-ups a run gives now that every ship has three slots, free docks, threat per layer, ejection and scar odds, and instinct strength.

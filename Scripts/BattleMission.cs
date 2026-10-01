@@ -18,11 +18,12 @@ public class BattleMission
     /// <summary>How many of its line's maneuvers each enemy can fly, in pool order. Never more than a pilot can know.</summary>
     public int EnemyManeuvers = Pilot.MaxManeuvers;
     /// <summary>
-    /// Ace pilots see your orders before they move. Everyone else plans
-    /// against your ships' visible course. Players are only told they face
-    /// aces, not why aces are better.
+    /// Callsigns of the aces flying the first ships of <see cref="EnemySquad"/>,
+    /// one per ace (see <see cref="global::Aces"/>).
     /// </summary>
-    public bool EnemiesReadOrders;
+    public string[] Aces = Array.Empty<string>();
+    /// <summary>Refits on each ace's hull.</summary>
+    public int AceRefits;
 
     /// <summary>"+2 ON TURN 3", or empty when nobody follows.</summary>
     public string ReinforcementLabel => Reinforcements.Length == 0 ? ""

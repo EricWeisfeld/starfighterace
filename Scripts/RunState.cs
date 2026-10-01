@@ -415,7 +415,7 @@ public class RunState
         RandomNumberGenerator rng = NextRng();
         // A crate comes before the level-ups, which are rerolled around
         // whatever module it fits.
-        string crateReason = kind == RunNodeKind.Elite ? "ELITE WING" : node?.CrateReward;
+        string crateReason = kind == RunNodeKind.Elite ? "ACE DEFEATED" : node?.CrateReward;
         if (won && crateReason != null && QueueCrate(crateReason, results.Where(r => r.Survived).Select(r => r.Pilot), rng))
             report.Promotions.Add($"{crateReason} · MODULE CRATE");
         foreach (PilotResult result in results.Where(r => r.Survived))

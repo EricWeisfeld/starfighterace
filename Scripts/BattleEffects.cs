@@ -9,6 +9,9 @@ public static class ShipPaint
 {
     /// <summary>The colour every enemy hull is repainted in.</summary>
     public static readonly Color EnemyHull = new(1f, 0.30f, 0.20f);
+    /// <summary>An enemy ace's livery: a near-black hull whose highlights are gold.</summary>
+    public static readonly Color AceHull = new(0.32f, 0.10f, 0.12f);
+    public static readonly Color AceGold = new(1f, 0.82f, 0.32f);
     /// <summary>Your squadron's shots, glows and sparks.</summary>
     public static readonly Color PlayerGlow = new(0.40f, 0.88f, 1f);
     /// <summary>Enemy shots and sparks.</summary>
@@ -16,12 +19,13 @@ public static class ShipPaint
 
     public static Color TeamGlow(int team) => team == 0 ? PlayerGlow : EnemyGlow;
 
-    // Repaints a sprite along a dark-to-colour-to-white ramp by brightness,
-    // so the pixel shading survives but the whole hull reads as one colour.
-    // Modulate still applies, so hit flashes keep working.
+    // Repaints a sprite along a dark-to-colour-to-highlight ramp by
+    // brightness, so the pixel shading survives but the whole hull reads as
+    // one colour. Modulate still applies, so hit flashes keep working.
     const string RecolourCode = @"
 shader_type canvas_item;
 uniform vec3 paint : source_color = vec3(1.0, 0.3, 0.2);
+uniform vec3 highlight : source_color = vec3(1.0);
 uniform float strength = 0.85;
 uniform float gain = 1.35;
 varying vec4 tint;
@@ -29,7 +33,7 @@ void vertex() { tint = COLOR; }
 void fragment() {
     vec4 tex = texture(TEXTURE, UV);
     float l = clamp(dot(tex.rgb, vec3(0.299, 0.587, 0.114)) * gain, 0.0, 1.0);
-    vec3 ramp = l < 0.5 ? paint * (l * 2.0) : mix(paint, vec3(1.0), (l - 0.5) * 1.7);
+    vec3 ramp = l < 0.5 ? paint * (l * 2.0) : mix(paint, highlight, (l - 0.5) * 1.7);
     COLOR = vec4(mix(tex.rgb, ramp, strength), tex.a) * tint;
 }";
 
@@ -47,17 +51,19 @@ void fragment() {
     COLOR = vec4(ramp * tex.a, tex.a) * tint;
 }";
 
-    static ShaderMaterial _enemy;
+    static ShaderMaterial _enemy, _ace;
     static ShaderMaterial _playerShot, _enemyShot;
     static CanvasItemMaterial _additive;
     static Texture2D _softDot;
 
-    public static ShaderMaterial Enemy => _enemy ??= Recolour(EnemyHull);
+    public static ShaderMaterial Enemy => _enemy ??= Recolour(EnemyHull, Colors.White);
+    public static ShaderMaterial Ace => _ace ??= Recolour(AceHull, AceGold);
 
-    public static ShaderMaterial Recolour(Color paint)
+    public static ShaderMaterial Recolour(Color paint, Color highlight)
     {
         var material = new ShaderMaterial { Shader = new Shader { Code = RecolourCode } };
         material.SetShaderParameter("paint", new Vector3(paint.R, paint.G, paint.B));
+        material.SetShaderParameter("highlight", new Vector3(highlight.R, highlight.G, highlight.B));
         return material;
     }
 

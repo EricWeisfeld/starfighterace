@@ -316,10 +316,12 @@ public partial class BattleManager : Node2D
         }
 
         ShipType[] enemySquad = Forces?.EnemySquad ?? new[] { ShipTypes.Scout, ShipTypes.Scout, ShipTypes.Scout };
+        string[] aces = Forces?.Aces ?? System.Array.Empty<string>();
         for (int i = 0; i < enemySquad.Length && i < Map.EnemySpawns.Length; i++)
         {
             BattleSpawn enemySpawn = Map.EnemySpawns[i];
-            SpawnFighter(1, enemySpawn.Position, Mathf.DegToRad(enemySpawn.HeadingDegrees), enemySquad[i]);
+            SpawnFighter(1, enemySpawn.Position, Mathf.DegToRad(enemySpawn.HeadingDegrees), enemySquad[i],
+                aceName: i < aces.Length ? aces[i] : null);
         }
 
         _hud = new BattleHud();
@@ -330,13 +332,15 @@ public partial class BattleManager : Node2D
 
     bool _initialFramePending;
 
-    void SpawnFighter(int team, Vector2 pos, float heading, ShipType type, Pilot pilot = null)
+    void SpawnFighter(int team, Vector2 pos, float heading, ShipType type, Pilot pilot = null, string aceName = null)
     {
         var f = new Fighter();
         f.ApplyType(type);
         f.ApplyPilot(pilot);
         if (team == 1)
             f.ManeuverAccess = Forces?.EnemyManeuvers ?? Pilot.MaxManeuvers;
+        if (aceName != null)
+            f.MakeAce(aceName, Forces?.AceRefits ?? 0);
         f.Setup(team, pos, heading, type.GetSkin(team));
         _fighterLayer.AddChild(f);
         GetTeam(team).Add(f);
@@ -756,11 +760,12 @@ public partial class BattleManager : Node2D
         PendingTargetAction = null;
         if (fighter == null || !fighter.IsAlive)
             return;
+        string enemyName = enemy.IsAce ? $"ACE {enemy.AceName}" : enemy.Type.DisplayName.ToUpper();
         if (action == ManeuverAction.HunterLock && fighter.SetHunterLock(enemy))
-            Announce($"LOCK ON · {CallsignOf(fighter)} LOCKED A {enemy.Type.DisplayName.ToUpper()}");
+            Announce($"LOCK ON · {CallsignOf(fighter)} LOCKED {(enemy.IsAce ? "" : "A ")}{enemyName}");
         else if (action == ManeuverAction.SensorScramble && fighter.ApplySensorScramble(enemy, out Fighter splash))
             Announce(splash == null
-                ? $"SCRAMBLE · {enemy.Type.DisplayName.ToUpper()} ACCURACY DOWN FOR {fighter.Moves.SensorScrambleDurationTurns} TURNS"
+                ? $"SCRAMBLE · {enemyName} ACCURACY DOWN FOR {fighter.Moves.SensorScrambleDurationTurns} TURNS"
                 : $"SCRAMBLE · 2 ENEMIES' ACCURACY DOWN FOR {fighter.Moves.SensorScrambleDurationTurns} TURNS");
     }
 
@@ -997,7 +1002,7 @@ public partial class BattleManager : Node2D
 
         var enemyTargets = PlayerFighters.Where(f => f.IsAlive).ToList();
         foreach (Fighter e in EnemyFighters.Where(f => f.IsAlive))
-            EnemyAI.Plan(e, enemyTargets, EnemyFighters, readOrders: Forces?.EnemiesReadOrders ?? false);
+            EnemyAI.Plan(e, enemyTargets, EnemyFighters, readOrders: e.IsAce);
         foreach (Fighter f in AllAlive())
             f.BeginExecute();
 
@@ -1031,8 +1036,9 @@ public partial class BattleManager : Node2D
             f.RouteScale = IsInNebula(f.Position) ? NebulaRouteScale : 1f;
             f.TurnStartPathDistance = f.PlannedPathDistance;
         }
-        if (_turn == 1 && Forces?.EnemiesReadOrders == true)
-            Announce("ACE PILOTS · SHARPER THAN ANY PATROL", 6.0);
+        string[] aces = EnemyFighters.Where(f => f.IsAce).Select(f => f.AceName).ToArray();
+        if (_turn == 1 && aces.Length > 0)
+            Announce($"{(aces.Length == 1 ? "ENEMY ACE" : "ENEMY ACES")} · {string.Join(" AND ", aces)}", 6.0);
         PendingTargetAction = null;
         _camera.StopFollowing();
         Selected = PlayerFighters.FirstOrDefault(f => f.IsAlive);
@@ -1192,7 +1198,9 @@ public partial class BattleManager : Node2D
     {
         NoteAction(fighter);
         SpawnImpact(fighter.Position, Vector2.Zero, ImpactSparks.Kind.Kill);
-        _camera?.Shake(fighter.Team == 0 ? 14f : 9f);
+        _camera?.Shake(fighter.Team == 0 || fighter.IsAce ? 14f : 9f);
+        if (fighter.IsAce)
+            Announce($"ACE DOWN · {fighter.AceName}", 5.0);
     }
 
     /// <summary>Floats a trait's name up from a ship, readable at any zoom.</summary>

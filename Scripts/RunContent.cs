@@ -70,7 +70,7 @@ public static class RunContent
     {
         "Kla'ed raiders have cut the Orion lanes. Break their blockade.",
         "Raiders are hunting Haven's evacuation convoy. Clear the lanes for it.",
-        "The Kla'ed ace wing guards the Helios gate. End this.",
+        "Kla'ed aces guard the Helios gate. End this.",
     };
 
     static readonly string[] BattleMapIds = BattleMaps.All.Select(map => map.Id).ToArray();
@@ -202,7 +202,7 @@ public static class RunContent
     public static string KindName(RunNodeKind kind) => kind switch
     {
         RunNodeKind.Skirmish => "SKIRMISH",
-        RunNodeKind.Elite => "ELITE WING",
+        RunNodeKind.Elite => "ACE PILOT",
         RunNodeKind.Repair => "REPAIR DOCK",
         RunNodeKind.Recruit => "RECRUIT",
         RunNodeKind.Event => "SIGNAL",
@@ -213,7 +213,7 @@ public static class RunContent
     public static string KindSummary(RunNodeKind kind, int sector) => kind switch
     {
         RunNodeKind.Skirmish => "Destroy an enemy patrol.",
-        RunNodeKind.Elite => "An ace wing, sharper than any patrol. Win it to open a module crate.",
+        RunNodeKind.Elite => "An enemy ace flies with this wing, tougher and sharper than anyone else out there. Win to open a module crate.",
         RunNodeKind.Repair => "Every ship repaired to full, and a medic who can treat one scar.",
         RunNodeKind.Recruit => "Pilots looking for a squadron. One can join.",
         RunNodeKind.Event => "An unknown signal. Could be a prize, could be trouble.",
@@ -225,7 +225,7 @@ public static class RunContent
     {
         1 => "The blockade wing",
         2 => "The convoy raiders",
-        _ => "The Kla'ed ace wing",
+        _ => "The Helios gate guard",
     };
 
     /// <summary>Enemy combat level for a battle stop, from 1 to 10.</summary>
@@ -290,11 +290,12 @@ public static class RunContent
         ShipType Pick() => pool[rng.RandiRange(0, pool.Length - 1)];
         ShipType[] squad = Enumerable.Range(0, initial).Select(_ => Pick()).ToArray();
         ShipType[] reinforcements = Enumerable.Range(0, wave).Select(_ => Pick()).ToArray();
+        string[] aces = Aces.Callsigns.OrderBy(_ => rng.Randi()).Take(Mathf.Min(Aces.CountFor(kind, sector), squad.Length)).ToArray();
 
         string name = kind switch
         {
-            RunNodeKind.Boss => sector switch { 1 => "BLOCKADE BREAKER", 2 => "CONVOY RAIDERS", _ => "ACE WING" },
-            RunNodeKind.Elite => "ACE INTERCEPTORS",
+            RunNodeKind.Boss => sector switch { 1 => "BLOCKADE BREAKER", 2 => "CONVOY RAIDERS", _ => "GATE GUARD" },
+            RunNodeKind.Elite => aces[0],
             _ => "PATROL CLASH",
         };
         return new BattleMission
@@ -306,7 +307,8 @@ public static class RunContent
             EnemySquad = squad,
             Reinforcements = reinforcements,
             EnemyManeuvers = EnemyManeuvers(tier),
-            EnemiesReadOrders = kind == RunNodeKind.Elite,
+            Aces = aces,
+            AceRefits = Aces.RefitsFor(sector),
         };
     }
 

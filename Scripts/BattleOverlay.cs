@@ -663,6 +663,9 @@ public partial class BattleOverlay : Node2D
         if (f.Team == 0)
             DrawLabel(f.Position + new Vector2(0f, -Mathf.Max(26f, f.VisualRadius + 6f) - Px(12f)), BattleManager.CallsignOf(f), SignalUi.FontMicro,
                 new Color(SignalUi.Body.R, SignalUi.Body.G, SignalUi.Body.B, 0.85f * a));
+        else if (f.IsAce)
+            DrawLabel(f.Position + new Vector2(0f, -Mathf.Max(26f, f.VisualRadius + 6f) - Px(12f)), $"ACE {f.AceName}", SignalUi.FontMicro,
+                new Color(ShipPaint.AceGold, a));
 
         // Status tags under the bars: Suppression Fire slows a ship's turning
         // until it gets out of the fire; nebula gas shortens this turn's move.

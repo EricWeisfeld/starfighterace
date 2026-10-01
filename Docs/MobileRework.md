@@ -68,11 +68,11 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | Stop | What it does |
 | --- | --- |
 | Skirmish | Destroy the enemy patrol. |
-| Elite wing | +2 threat. Ace pilots, who quietly read your orders (see Phase 5). A win opens a module crate: pick one of three modules, each matched to a surviving ship. |
+| Ace pilot (elite) | +2 threat. An enemy ace flies with the wing (see Aces in Phase 5). A win opens a module crate: pick one of three modules, each matched to a surviving ship. |
 | Repair dock | Every hull is repaired to full on arrival, and the medic treats one scar per visit. |
 | Recruit | Two candidates at the squadron's level minus one, each with a random ship and instinct, already promoted to that level. One can join. |
 | Signal | One of six events. Rewards are XP, module crates, repairs, a recruit or a faded scar. Some turn into a fight. |
-| Boss | Sector 1: the blockade wing. Sector 2: the convoy raiders. Sector 3: the ace wing. |
+| Boss | Sector 1: the blockade wing. Sector 2: the convoy raiders. Sector 3: the Helios gate guard. One ace flies with each boss, two with the last. |
 
 - **Every battle is won by destroying every enemy ship**, reinforcements included. Strike stops (destroy a marked command ship) and the escort boss (bring a transport to a jump zone) were removed, along with the escort's corridor map; other mission types may come later.
 
@@ -236,8 +236,13 @@ bump lumpy. So enemies now scale by count and pilots by refits.
 - **Hull mix and maneuvers (composition).** Sector 1 wings are mostly Kestrels; later wings draw evenly from the three lines (elites and bosses use the next sector's mix). (Sector 2 used to add attack frames and sector 3 to fly only attack and guard frames; those are shelved.) Enemies fly none of their line's maneuvers in sector 1. From sector 2 on they fly two, the same cap as your pilots: the line's signature maneuver and the next in its pool (Break Turn and Pursuit Burn, U-Turn and Boost, Turret and Suppression Fire). They weigh those maneuvers alongside normal flight when lining up a shot, not only to escape rocks.
 - **Reinforcements.** A "+N" wave arrives at the start of turn 3 at the enemy start positions furthest from your ships. If the first group is wiped out before then, the wave arrives at once instead of the battle ending. Briefings show the wave faded as INBOUND, and the map shows "3 HOSTILES +1".
 - **Quick battle** pits the max-level (Mk IV) squadron against a late sector 3 patrol (4 + 1) instead of three basic ships.
-- **Who sees your orders.** Enemies plan when you press Engage. Most can't see your orders: they lead each of your ships along its visible course, straight on at the throttle it started the turn with (`Fighter.TurnStartPathDistance`). Only elite wings, the Ace Interceptors, read the move you actually queued (`BattleMission.EnemiesReadOrders`). The player is told only that they are aces: the briefing calls them "an ace wing, sharper than any patrol" and the battle opens with "ACE PILOTS · SHARPER THAN ANY PATROL". Measured over 480 autopilot battles: 46% overall, the same as when nobody reads orders and up from 38% when everyone did. Elite stops sit 6–13 points below their blind rates, about where they were when every enemy read orders.
+- **Who sees your orders.** Enemies plan when you press Engage. Most can't see your orders: they lead each of your ships along its visible course, straight on at the throttle it started the turn with (`Fighter.TurnStartPathDistance`). Only aces read the move you actually queued. (Before aces were individuals, every ship in an elite wing read orders. Measured over 480 autopilot battles then: 46% overall, the same as when nobody reads orders and up from 38% when everyone did.)
 - **One mission type.** Strike stops and the sector 2 escort boss are gone; every battle is eliminate-all-hostiles. Strike stops became skirmishes, the sector 1 boss is a plain 3 + 1 fight and the sector 2 boss a 4 + 2 one whose wave arrives on turn 3. Enemies always shoot the nearest of your ships. Not yet measured in a win-rate batch.
+- **Aces (`Aces`).** An ace is one enemy pilot who makes a fight harder, and the biggest threat on the field. One flies with every elite stop (now called "ACE PILOT" on the map, titled with the ace's callsign) and every sector boss, two with the sector 3 boss. Aces take the place of a ship in the opening wing, so wing sizes are unchanged.
+  - Hull: refitted one step ahead of your squadron (Mk II in sector 1, Mk III in sector 2, Mk IV in sector 3), plus +10% accuracy and +10% evasion. A sector 2 ace ZT has 720 hull and 65 damage against a plain ZT's 500 and 45.
+  - Flying: its line's first two maneuvers from sector 1 on, both mastered, and it plans against the orders you actually gave. Every other enemy plans against your visible course.
+  - Look: a black hull with gold highlights, a gold "ACE VEX" label over it, "ENEMY ACE · VEX" when the battle opens and "ACE DOWN · VEX" when it dies. The briefing shows its icon in the same paint with its callsign, and the map adds "· ACE" to the stop.
+  - Winning an elite stop still opens a module crate ("ACE DEFEATED").
 - **Maneuver pools reworked.** Snap Turn, Ghost Run and ECM Jink are gone, Hunter Lock moved from the Kestrel to the Raptor, the Kestrel gained Evasive Spin and the ZT Rear Guns (see Phase 4). Each line now picks its second maneuver from three, all offered together on the first level-up (it used to be one random maneuver card per level-up, so a given maneuver could go unseen for whole runs). Enemy Kestrels fly Pursuit Burn where they flew Snap Turn.
 - **Burn turn angles swapped.** Pursuit Burn (Kestrel, 370) turns up to 45° and Engine Boost (Raptor, 350) up to 20°; they were 20° and 45°. Engine Boost can now be used every other turn, like Pursuit Burn (it was every third). Their masteries swapped too: Pursuit Burn 90°, Boost 45°. The Kestrel's chase burn can now follow a target off its nose, and the Raptor's boost is the straight-line one.
 - **Attack and guard frames shelved.** Players and enemies fly only the S1 Kestrel, Raptor and ZT Class (see Phase 4).
@@ -261,7 +266,8 @@ Level now matters: across all stops a level 1 squadron wins 21% and a level 6 on
 
 ## Known issues and next steps
 
-- Only elite wings read your orders now; everyone else plans against your visible course. Whether bosses (the sector 3 ace wing especially) should read orders too is open.
+- Aces are unmeasured: how much harder they make elite stops and bosses, and whether one refit ahead is the right strength.
+- The player instinct called Ace shares a word with enemy aces; it may want a new name.
 - The sector 2 boss is now an ordinary 4 + 2 fight; it has not been measured since the escort was removed.
 - Sector 2 elites (3 + 1) and the sector 3 boss (4 + 2) sat below the 50% and 40% targets; worth a second pass once humans have played the new curve.
 - Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many modules a ship ends a run with now that they stack, free docks, threat per layer, ejection and scar odds, and instinct strength.

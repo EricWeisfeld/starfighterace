@@ -136,14 +136,17 @@ public partial class RunScreen
         content.AddChild(Text($"ENEMY WING · {Plural(mission.EnemySquad.Length, "SHIP")}{waveNote}", FontCaption, Muted, 4));
         var wing = new HFlowContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         wing.AddThemeConstantOverride("h_separation", 12);
-        // Reinforcements are shown faded after the opening wing, captioned with when they arrive.
-        foreach ((ShipType enemy, bool later) in mission.EnemySquad.Select(s => (s, false))
-                     .Concat(mission.Reinforcements.Select(s => (s, true))))
+        // Aces lead the opening wing in black and gold, named. Reinforcements
+        // are shown faded after it, captioned with when they arrive.
+        var ships = mission.EnemySquad.Select((s, i) => (Ship: s, Later: false, Ace: i < mission.Aces.Length ? mission.Aces[i] : null))
+            .Concat(mission.Reinforcements.Select(s => (Ship: s, Later: true, Ace: (string)null)));
+        foreach ((ShipType enemy, bool later, string ace) in ships)
         {
             VBoxContainer box = Stack(0);
-            TextureRect icon = ShipIcon(enemy, 72f, team: 1, faded: later);
+            TextureRect icon = ShipIcon(enemy, 72f, team: 1, faded: later, ace: ace != null);
             box.AddChild(icon);
-            Label name = Text(later ? "INBOUND" : enemy.DisplayName.ToUpper(), FontMicro, later ? Warning : Muted, 1);
+            Label name = Text(later ? "INBOUND" : ace != null ? $"ACE {ace}" : enemy.DisplayName.ToUpper(), FontMicro,
+                later ? Warning : ace != null ? ShipPaint.AceGold : Muted, 1);
             name.HorizontalAlignment = HorizontalAlignment.Center;
             box.AddChild(name);
             wing.AddChild(box);

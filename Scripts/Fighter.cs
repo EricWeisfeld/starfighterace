@@ -94,6 +94,9 @@ public partial class Fighter : Node2D
     /// <summary>The maneuver numbers this ship flies with: its hull's, adjusted by its pilot's masteries.</summary>
     public ShipManeuverProfile Moves = ShipManeuverProfile.None;
     public Pilot Pilot;                       // persistent campaign pilot; null for enemies
+    /// <summary>An enemy ace's callsign; null for every other ship (see <see cref="Aces"/>).</summary>
+    public string AceName;
+    public bool IsAce => AceName != null;
     public Texture2D BaseTexture;             // for ghost previews
     public int Team;                          // 0 = player, 1 = enemy
     public float Heading;
@@ -177,7 +180,8 @@ public partial class Fighter : Node2D
     readonly Dictionary<Perk, int> _calloutTurn = new();
 
     public bool HasPerk(Perk perk) => Pilot != null && Pilot.Perks.Contains(perk);
-    public bool HasMastered(ShipAbility ability) => Pilot != null && Pilot.HasMastered(ability);
+    /// <summary>A pilot's masteries; an enemy ace has mastered every maneuver it flies.</summary>
+    public bool HasMastered(ShipAbility ability) => Pilot != null ? Pilot.HasMastered(ability) : IsAce && HasAbility(ability);
 
     // ------------------------------------------------ situational traits
     // Each check below is true only in the moment its instinct or scar
@@ -655,7 +659,6 @@ public partial class Fighter : Node2D
         PlannedPathDistance = NormalMoveMaxDistance;
     }
 
-    /// <summary>Attach the campaign pilot flying this hull. Call after ApplyType, before Setup.</summary>
     /// <summary>
     /// Attach the campaign pilot flying this hull. Call after ApplyType, before
     /// Setup. The ship's modules change its numbers here; the pilot's
@@ -683,6 +686,25 @@ public partial class Fighter : Node2D
         Moves = Masteries.Apply(Type.Maneuvers, Pilot.Masteries);
         SelectedNormalMoveDistance = NormalMoveMaxDistance;
         PlannedPathDistance = NormalMoveMaxDistance;
+    }
+
+    /// <summary>
+    /// Makes this enemy an ace: its hull refitted like a pilot's, sharper aim
+    /// and evasion, and its line's first two maneuvers, both mastered. Call
+    /// after ApplyType, before Setup.
+    /// </summary>
+    public void MakeAce(string callsign, int refits)
+    {
+        AceName = callsign;
+        ShipStats stats = ShipStats.Frame(Type).Refitted(refits);
+        MaxHp = stats.MaxHull;
+        MaxShield = stats.MaxShield;
+        ShieldRegenPerTurn = stats.ShieldRegen;
+        ShotDamage = stats.ShotDamage;
+        Accuracy = stats.Accuracy + Aces.AccuracyBonus;
+        Evasion = stats.Evasion + Aces.EvasionBonus;
+        ManeuverAccess = Pilot.MaxManeuvers;
+        Moves = Masteries.Apply(Type.Maneuvers, Type.ManeuverPool.Take(Pilot.MaxManeuvers).ToList());
     }
 
     public void Setup(int team, Vector2 pos, float heading, FighterSkin skin)
@@ -728,7 +750,7 @@ public partial class Fighter : Node2D
         _visual.AddChild(_destructSprite);
         // Enemy hulls are repainted in one hostile colour so they read at a glance.
         if (team == 1)
-            _baseSprite.Material = _weaponSprite.Material = ShipPaint.Enemy;
+            _baseSprite.Material = _weaponSprite.Material = IsAce ? ShipPaint.Ace : ShipPaint.Enemy;
     }
 
     public override void _Process(double delta)

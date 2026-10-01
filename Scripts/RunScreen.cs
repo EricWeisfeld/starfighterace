@@ -153,11 +153,11 @@ public partial class RunScreen : Node2D
         return row;
     }
 
-    /// <summary>A ship's hull, cropped to fill the box; enemies in their hostile red.</summary>
-    static TextureRect ShipIcon(ShipType ship, float size = 88f, int team = 0, bool faded = false) => new()
+    /// <summary>A ship's hull, cropped to fill the box; enemies in their hostile red, aces in black and gold.</summary>
+    static TextureRect ShipIcon(ShipType ship, float size = 88f, int team = 0, bool faded = false, bool ace = false) => new()
     {
         Texture = ship.GetSkin(team).Icon,
-        Material = team == 1 ? ShipPaint.Enemy : null,
+        Material = ace ? ShipPaint.Ace : team == 1 ? ShipPaint.Enemy : null,
         CustomMinimumSize = new Vector2(size, size),
         ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
         StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,

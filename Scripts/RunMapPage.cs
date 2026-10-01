@@ -198,7 +198,8 @@ public partial class RunScreen
         {
             BattleMission mission = RunContent.BuildMission(node, Run.Sector, kind);
             string waves = mission.Reinforcements.Length > 0 ? $" +{mission.Reinforcements.Length}" : "";
-            string detail = $"THREAT {mission.Threat} · {Plural(mission.EnemySquad.Length, "HOSTILE")}{waves}";
+            string aces = mission.Aces.Length switch { 0 => "", 1 => " · ACE", _ => $" · {mission.Aces.Length} ACES" };
+            string detail = $"THREAT {mission.Threat} · {Plural(mission.EnemySquad.Length, "HOSTILE")}{waves}{aces}";
             return kind == RunNodeKind.Elite ? detail + " · MODULE CRATE" : detail;
         }
         return node.Kind switch

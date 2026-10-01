@@ -96,7 +96,7 @@ public partial class RunScreen
             _shipPickerSlot = null;
             Render();
         }));
-        page.AddChild(Text("Every ship has an engine, guns and shields slot. Ships in a line fly alike; attack and guard frames trade firepower for toughness or back.",
+        page.AddChild(Text("Ships in a line fly alike; attack and guard frames trade firepower for toughness or back. Every frame can fit any module.",
             FontCaption, Body, 0, wrap: true));
         (TouchScroll scroll, VBoxContainer content) = ScrollBody(12);
         page.AddChild(scroll);
@@ -104,7 +104,7 @@ public partial class RunScreen
         {
             ShipAbility[] pool = line.First().ManeuverPool;
             content.AddChild(Text($"{ShipTypes.ClassName(line.Key).ToUpper()} LINE · {HandlingStats(line.First())}", FontCaption, Muted, 4));
-            content.AddChild(Text($"Starts with {ManeuverCatalog.AbilityName(pool[0])}. Learns " +
+            content.AddChild(Text($"Starts with {ManeuverCatalog.AbilityName(pool[0])}. Learns one of " +
                 string.Join(", ", pool.Skip(1).Select(ManeuverCatalog.AbilityName)) + ".", FontMicro, Muted, 0, wrap: true));
             foreach (ShipType frame in line)
                 content.AddChild(ShipOption(slot, frame, frame == draft.Frame));

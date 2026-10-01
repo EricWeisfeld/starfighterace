@@ -371,8 +371,8 @@ public static class RunContent
 
     /// <summary>
     /// Three distinct level-up choices, pilot and ship side by side: one each
-    /// of a new maneuver, a module for an empty slot and a mastery while there
-    /// are any, then any of those or a module swap.
+    /// of a new maneuver (until the pilot knows <see cref="Pilot.MaxManeuvers"/>),
+    /// a module and a mastery while there are any, then any of those.
     /// </summary>
     public static List<PromotionCard> PromotionCards(Pilot pilot, RandomNumberGenerator rng)
     {
@@ -380,18 +380,15 @@ public static class RunContent
         var maneuvers = new List<PromotionCard>();
         if (pilot.Maneuvers.Count < Pilot.MaxManeuvers)
             maneuvers.AddRange(pilot.UnlearnedManeuvers.Select(a => new PromotionCard { Kind = CardKind.Maneuver, Id = a.ToString() }));
-        List<PromotionCard> ModuleCards(bool emptySlot) => ShipUpgrades.All
-            .Where(module => pilot.CanInstall(module.Id) && (pilot.ModuleIn(module.Slot) == null) == emptySlot)
+        List<PromotionCard> modules = pilot.UnfittedModules
             .Select(module => new PromotionCard { Kind = CardKind.Module, Id = module.Id.ToString() }).ToList();
-        List<PromotionCard> fits = ModuleCards(emptySlot: true);
-        List<PromotionCard> swaps = ModuleCards(emptySlot: false);
         List<PromotionCard> masteries = pilot.UnmasteredManeuvers
             .Select(a => new PromotionCard { Kind = CardKind.Mastery, Id = a.ToString() }).ToList();
 
-        foreach (List<PromotionCard> kind in new[] { maneuvers, fits, masteries })
+        foreach (List<PromotionCard> kind in new[] { maneuvers, modules, masteries })
             if (kind.Count > 0)
                 cards.Add(TakeRandom(kind, rng));
-        var rest = maneuvers.Concat(fits).Concat(masteries).Concat(swaps).ToList();
+        var rest = maneuvers.Concat(modules).Concat(masteries).ToList();
         while (cards.Count < 3 && rest.Count > 0)
             cards.Add(TakeRandom(rest, rng));
         return cards;
@@ -399,33 +396,28 @@ public static class RunContent
 
     /// <summary>
     /// A bonus reward (an elite win, some signals): three modules, each
-    /// already matched to a pilot's ship, one of which is fitted. Empty slots
-    /// are favoured so the crate usually adds rather than swaps.
+    /// already matched to a pilot's ship, one of which is fitted. The offer is
+    /// spread across pilots and modules where it can be.
     /// </summary>
     public static List<PromotionCard> ModuleCrate(IEnumerable<Pilot> survivors, RandomNumberGenerator rng)
     {
         var options = survivors
-            .SelectMany(pilot => ShipUpgrades.All
-                .Where(module => pilot.CanInstall(module.Id))
-                .Select(module => (Pilot: pilot, Module: module, Empty: pilot.ModuleIn(module.Slot) == null)))
+            .SelectMany(pilot => pilot.UnfittedModules.Select(module => (Pilot: pilot, Module: module)))
             .ToList();
         var cards = new List<PromotionCard>();
         var usedPilots = new HashSet<string>();
         var usedModules = new HashSet<ShipUpgrade>();
         while (cards.Count < 3 && options.Count > 0)
         {
-            // Spread the offer: a pilot and a module not yet on offer, an
-            // empty slot if possible, relaxing one preference at a time.
-            var pool = options.Where(o => !usedPilots.Contains(o.Pilot.Callsign) && !usedModules.Contains(o.Module.Id) && o.Empty).ToList();
-            if (pool.Count == 0)
-                pool = options.Where(o => !usedPilots.Contains(o.Pilot.Callsign) && !usedModules.Contains(o.Module.Id)).ToList();
+            // Spread the offer: a pilot and a module not yet on offer,
+            // relaxing one preference at a time.
+            var pool = options.Where(o => !usedPilots.Contains(o.Pilot.Callsign) && !usedModules.Contains(o.Module.Id)).ToList();
             if (pool.Count == 0)
                 pool = options.Where(o => !usedModules.Contains(o.Module.Id)).ToList();
             if (pool.Count == 0)
                 pool = options;
             var pick = pool[rng.RandiRange(0, pool.Count - 1)];
             options.Remove(pick);
-            options.RemoveAll(o => o.Pilot == pick.Pilot && o.Module.Id == pick.Module.Id);
             usedPilots.Add(pick.Pilot.Callsign);
             usedModules.Add(pick.Module.Id);
             cards.Add(new PromotionCard { Kind = CardKind.Module, Id = pick.Module.Id.ToString(), Callsign = pick.Pilot.Callsign });
@@ -469,8 +461,6 @@ public static class RunContent
             case CardKind.Module when ShipUpgrades.TryParse(card.Id, out ShipUpgrade module):
                 ShipUpgradeDefinition definition = ShipUpgrades.Get(module);
                 string text = definition.Description;
-                if (pilot.ModuleIn(definition.Slot) is ShipUpgrade replaced)
-                    text += $" Replaces {ShipUpgrades.Get(replaced).Name}.";
                 string category = $"{ShipUpgrades.SlotName(definition.Slot)} MODULE";
                 if (!string.IsNullOrEmpty(card.Callsign))
                     category += $" · {card.Callsign}";
@@ -553,14 +543,13 @@ public static class RunContent
             {
                 new()
                 {
-                    Label = "CRACK IT OPEN", Detail = "A free module for an empty slot. It might go off.",
-                    Available = run => run.Living.Any(HasEmptySlot),
+                    Label = "CRACK IT OPEN", Detail = "A free module for one of your ships. It might go off.",
+                    Available = run => run.Living.Any(CanTakeModule),
                     Resolve = (run, rng) =>
                     {
-                        Pilot[] candidates = run.Living.Where(HasEmptySlot).ToArray();
+                        Pilot[] candidates = run.Living.Where(CanTakeModule).ToArray();
                         Pilot pilot = candidates[rng.RandiRange(0, candidates.Length - 1)];
-                        ShipUpgradeDefinition[] upgrades = ShipUpgrades.All
-                            .Where(u => pilot.HasSlot(u.Slot) && pilot.ModuleIn(u.Slot) == null).ToArray();
+                        ShipUpgradeDefinition[] upgrades = pilot.UnfittedModules.ToArray();
                         ShipUpgradeDefinition upgrade = upgrades[rng.RandiRange(0, upgrades.Length - 1)];
                         pilot.InstallUpgrade(upgrade.Id);
                         string text = $"{pilot.Callsign} fits a {upgrade.Name}.";
@@ -629,7 +618,7 @@ public static class RunContent
     const int EventXpSmall = 50;
     const int EventXpLarge = 70;
 
-    static bool HasEmptySlot(Pilot pilot) => pilot.Ship.UpgradeSlots.Any(slot => pilot.ModuleIn(slot) == null);
+    static bool CanTakeModule(Pilot pilot) => pilot.UnfittedModules.Any();
 
     /// <summary>XP for every living pilot; the text names anyone who levels up.</summary>
     static EventOutcome SquadXp(RunState run, int amount, RandomNumberGenerator rng, string text)

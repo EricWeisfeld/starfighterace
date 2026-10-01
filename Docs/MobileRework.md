@@ -98,7 +98,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 ### Screens
 
 - `Run.tscn` / `RunScreen` shows one page chosen from run state: the starting draft (and its ship picker), sector map, squadron, briefing, promotion or crate cards, repair dock, recruit, signal, or run end. A signal's outcome is shown before any crate or level-up it brought.
-- **Pilot page** (`RunPilotPage`): tap a pilot on the squadron page, the pilot at the top of a level-up, or STATS on a recruit. It shows the ship's numbers with modules fitted (and what each module adds), the three slots, maneuvers and masteries (including what an unmastered one would gain), the instinct, scars and the pilot's record. It opens over the current page and Back returns to it. The numbers come from `ShipStats`, the same frame-plus-modules calculation the fighter uses in battle.
+- **Pilot page** (`RunPilotPage`): tap a pilot on the squadron page, the pilot at the top of a level-up, or STATS on a recruit. It shows the ship's numbers with modules fitted (and what each module adds), every fitted module, maneuvers and masteries (including what an unmastered one would gain), the instinct, scars and the pilot's record. It opens over the current page and Back returns to it. The numbers come from `ShipStats`, the same frame-plus-modules calculation the fighter uses in battle.
 - Home offers New Run, Continue Run and Quick Battle.
 
 ### Removed
@@ -119,7 +119,7 @@ upgrades at levels 2, 4 and 6.)
 
 ### Ship growth (`ShipUpgrades`, `ShipTypes`)
 
-- **The line decides how a ship flies and what its pilot can learn; the frame decides how it fights.** Every frame has the same three slots (engine, guns, shields), and every frame in a line has the line's handling:
+- **The line decides how a ship flies and what its pilot can learn; the frame decides how it fights.** Every frame can fit any module, and every frame in a line has the line's handling:
 
 | Line | Turn | Speed | Maneuvers it can learn |
 | --- | --- | --- | --- |
@@ -143,26 +143,26 @@ upgrades at levels 2, 4 and 6.)
 
 - The lines are not balanced against each other on paper: the Kestrel line's firepower × toughness is about a third of the ZT line's. It relies on speed, turning and its larger maneuver pool.
 
-- **Modules**, one per slot, three choices per slot:
+- **Modules** stack: a ship can carry any number, each module once. There are nine, three for each ship system:
 
-| Slot | Modules |
+| System | Modules |
 | --- | --- |
 | Engine | Overdrive (+30 max move) · Vector Nozzles (+15° turn) · Retro Thrusters (-40 min move) |
 | Guns | Burst Loader (+1 shot per volley) · Targeting Array (+8% accuracy) · Wide Mount (cone 24° → 32°) |
 | Shields | Shield Capacitor (+35% shields) · Flux Recycler (+50% regen) · Armor Plating (+30% hull, -15 max move) |
 
-- Shield-slot modules are percentages, so they matter as much on a Bulwark as on a Kestrel.
+- Shield-system modules are percentages, so they matter as much on a Bulwark as on a Kestrel.
 - Modules come from level-up cards and from module crates (elite wins and some signals). A crate offers three modules, each matched to a pilot's ship.
-- Fitting a module to a filled slot replaces the old one.
+- Nothing is ever replaced: every module you take is added. (Ships used to have one engine, guns and shields slot each, and a new module replaced the old one in its slot.)
 
 ### Level-ups (`RunContent.PromotionCards`, `Masteries`, `Perks`)
 
-A level-up offers three cards: one each of a new maneuver, a module for an
-empty slot and a mastery while there are any, then any of those or a module
-swap. Frames and instincts never appear.
+A level-up offers three cards: one each of a new maneuver (until the pilot
+knows two), a module and a mastery while there are any, then any of those.
+Frames and instincts never appear.
 
-- **Module** (ship): for an empty slot, or a swap for a filled one.
-- **New maneuver** from the class pool, up to three. The ZT line's **Suppression Fire** is always on: each hit takes 8° (16° mastered) off the target's normal-flight turning, felt in full on its next turn. Under continued fire, older suppression halves each turn; a turn without being suppressed clears it. It never takes a ship below 25°, and maneuvers keep their own angles. Enemy ZT-line ships have it too. A suppressed ship shows "SUPPRESSED −X°" under its bars, and the HUD hint says so.
+- **Module** (ship): any module the ship doesn't already carry. It is added to the ones fitted.
+- **New maneuver** from the class pool, up to two: the class's signature maneuver and one more. Once a pilot knows two, level-ups stop offering maneuvers and offer modules and masteries instead. The ZT line's **Suppression Fire** is always on: each hit takes 8° (16° mastered) off the target's normal-flight turning, felt in full on its next turn. Under continued fire, older suppression halves each turn; a turn without being suppressed clears it. It never takes a ship below 25°, and maneuvers keep their own angles. Enemy ZT-line ships have it too. A suppressed ship shows "SUPPRESSED −X°" under its bars, and the HUD hint says so.
 - **Mastery** of a maneuver the pilot knows. It only matters on turns that maneuver is flown: Snap Turn to 180°, Boost turns 90°, U-Turn and Break Turn lose their cooldown, Lock On +25%, Scramble jams a second enemy, and so on (`Masteries.Describe`).
 
 
@@ -177,7 +177,7 @@ matter in most battles, and never be a flat number (that is the ship's job):
 | Brawler | +2 shots on volleys from the inner third of range. | Close in. |
 | Finisher | +25% damage against enemies below 40% hull. | Pick off the wounded. |
 | Ace | A kill resets all maneuver cooldowns and refills shields. | Chase kills. |
-| Steady | +2 shield regen after a turn of normal flight. | Fly plain turns instead of maneuvers. |
+| Steady | +20 shield regen after a turn of normal flight. | Fly plain turns instead of maneuvers. |
 | Stalker | +20% evasion each turn until you open fire. | Hold fire, or fire late in the turn. |
 | Daredevil | +15% evasion on turns flown at full throttle or faster. | Fly flat out. |
 | Cool Under Fire | +20% accuracy below half hull. | Keep flying hurt; always on in a 1-hull wreck. |
@@ -255,7 +255,7 @@ Level now matters: across all stops a level 1 squadron wins 21% and a level 6 on
 - Only elite wings read your orders now; everyone else plans against your visible course. Whether bosses (the sector 3 ace wing especially) should read orders too is open.
 - The escort boss still loses every autopilot battle: the transport dies in about five turns while the squadron is mostly intact. It needs its own look (transport toughness, attacker focus, wave timing), ideally with human play.
 - Sector 2 elites (3 + 1 with every maneuver) and the sector 3 boss (4 + 2) sit below the 50% and 40% targets; worth a second pass once humans have played the new curve.
-- Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many level-ups a run gives now that every ship has three slots, free docks, threat per layer, ejection and scar odds, and instinct strength.
+- Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many modules a ship ends a run with now that they stack, free docks, threat per layer, ejection and scar odds, and instinct strength.
 - Maps could be drawn from pools by stop type (open maps for skirmishes, dense ones for elites) and mirrored left to right for more variety.
 - An Android export preset and a device test pass are still to do. The device pass should check the nebula and asteroid shaders' frame rate on a low-end phone.
 - Try both camera modes in real play and pick the default. Overview stays the default until then.

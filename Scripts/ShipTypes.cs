@@ -96,8 +96,6 @@ public sealed record ShipManeuverProfile
     public float EvasiveDodgeEvasionBonus { get; init; }
     /// <summary>All maneuvers this class can equip; pilots choose their loadout from this pool.</summary>
     public ShipAbility[] Pool { get; init; } = System.Array.Empty<ShipAbility>();
-    /// <summary>Levels at which a pilot earns one maneuver loadout slot.</summary>
-    public int[] SlotLevels { get; init; } = System.Array.Empty<int>();
 }
 
 /// <summary>
@@ -162,21 +160,14 @@ public class ShipType
     public float EvasiveDodgeAngleDegrees => Maneuvers.EvasiveDodgeAngleDegrees;
     public float EvasiveDodgeEvasionBonus => Maneuvers.EvasiveDodgeEvasionBonus;
     public ShipAbility[] ManeuverPool => Maneuvers.Pool;
-    public int[] ManeuverSlotLevels => Maneuvers.SlotLevels;
-    /// <summary>Permanent hardware hardpoints supplied by this hull.</summary>
-    public ShipUpgradeSlot[] UpgradeSlots = System.Array.Empty<ShipUpgradeSlot>();
     public SkinDef[] SkinsByTeam;   // [0] = player (Nairan), [1] = enemy (Kla'ed)
 
     public FighterSkin GetSkin(int team) => SkinsByTeam[team].Load();
     public bool OffersManeuver(ShipAbility ability) => ManeuverPool.Contains(ability);
-    public int ManeuverSlotsAtLevel(int level) => Mathf.Min(3, ManeuverSlotLevels.Count(slotLevel => level >= slotLevel));
 }
 
 public static class ShipTypes
 {
-    /// <summary>Every player frame carries the same three slots.</summary>
-    static readonly ShipUpgradeSlot[] AllSlots = { ShipUpgradeSlot.Engine, ShipUpgradeSlot.Guns, ShipUpgradeSlot.Shields };
-
     // Handling belongs to the class line: every frame in a line turns and
     // moves alike, and frames differ only in how they fight.
     const float KestrelTurn = 120f, KestrelMinMove = 170f, KestrelMaxMove = 235f;
@@ -214,7 +205,6 @@ public static class ShipTypes
         },
     };
 
-    /// <summary>The Kestrel line's generalist: plain numbers, but a slot for every module type.</summary>
     /// <summary>The Kestrel line's balanced frame.</summary>
     public static readonly ShipType Scout = new()
     {
@@ -250,9 +240,7 @@ public static class ShipTypes
             GhostRunEvasionBonus = 0.25f,
             Pool = new[] { ShipAbility.BreakTurn, ShipAbility.SnapTurn, ShipAbility.HunterLock, ShipAbility.PursuitBurn,
                 ShipAbility.EcmJink, ShipAbility.SensorScramble, ShipAbility.GhostRun },
-            SlotLevels = new[] { 2, 4, 6 },
         },
-        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -291,7 +279,6 @@ public static class ShipTypes
         NormalMoveMinDistance = KestrelMinMove,
         NormalMoveMaxDistance = KestrelMaxMove,
         Maneuvers = Scout.Maneuvers,
-        UpgradeSlots = AllSlots,
         SkinsByTeam = Scout.SkinsByTeam,
     };
 
@@ -312,14 +299,9 @@ public static class ShipTypes
         NormalMoveMinDistance = KestrelMinMove,
         NormalMoveMaxDistance = KestrelMaxMove,
         Maneuvers = Scout.Maneuvers,
-        UpgradeSlots = AllSlots,
         SkinsByTeam = Scout.SkinsByTeam,
     };
 
-    /// <summary>
-    /// The Raptor line's generalist: plain numbers, but a slot for every
-    /// module type. It uses the Black Hawk art.
-    /// </summary>
     /// <summary>The Raptor line's balanced frame. It uses the Black Hawk art.</summary>
     public static readonly ShipType Raptor = new()
     {
@@ -344,9 +326,7 @@ public static class ShipTypes
             EvasiveDodgeAngleDegrees = 135f,
             EvasiveDodgeEvasionBonus = 0.40f,
             Pool = new[] { ShipAbility.UTurn, ShipAbility.EngineBoost, ShipAbility.EvasiveDodge },
-            SlotLevels = new[] { 2, 4, 6 },
         },
-        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -384,7 +364,6 @@ public static class ShipTypes
         NormalMoveMinDistance = RaptorMinMove,
         NormalMoveMaxDistance = RaptorMaxMove,
         Maneuvers = Raptor.Maneuvers,
-        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -423,7 +402,6 @@ public static class ShipTypes
         NormalMoveMinDistance = RaptorMinMove,
         NormalMoveMaxDistance = RaptorMaxMove,
         Maneuvers = Raptor.Maneuvers,
-        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -445,7 +423,6 @@ public static class ShipTypes
         },
     };
 
-    /// <summary>The ZT line's generalist: plain numbers, but a slot for every module type.</summary>
     /// <summary>The ZT line's balanced frame.</summary>
     public static readonly ShipType Zt = new()
     {
@@ -470,9 +447,7 @@ public static class ShipTypes
             EmergencyThrustersTurnLimitDegrees = 35f,
             EmergencyThrustersEvasionPenalty = 0.10f,
             Pool = new[] { ShipAbility.RotatingGuns, ShipAbility.SuppressionFire, ShipAbility.EmergencyThrusters },
-            SlotLevels = new[] { 2, 4, 6 },
         },
-        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -510,7 +485,6 @@ public static class ShipTypes
         NormalMoveMinDistance = ZtMinMove,
         NormalMoveMaxDistance = ZtMaxMove,
         Maneuvers = Zt.Maneuvers,
-        UpgradeSlots = AllSlots,
         SkinsByTeam = new[]
         {
             new SkinDef
@@ -550,7 +524,6 @@ public static class ShipTypes
         NormalMoveMinDistance = ZtMinMove,
         NormalMoveMaxDistance = ZtMaxMove,
         Maneuvers = Zt.Maneuvers,
-        UpgradeSlots = AllSlots,
         SkinsByTeam = Zt.SkinsByTeam,
     };
 

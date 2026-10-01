@@ -16,13 +16,12 @@ public partial class RunScreen
 
     /// <summary>
     /// Everything about one pilot and their ship: the ship's numbers with its
-    /// modules fitted, each slot, maneuvers and masteries, the instinct, any
+    /// modules fitted, each module, maneuvers and masteries, the instinct, any
     /// scars, and their record.
     /// </summary>
     Control BuildPilotPage()
     {
         Pilot pilot = _detailPilot;
-        ShipType frame = pilot.Ship;
         VBoxContainer page = Stack(16);
         page.AddChild(Header($"LV {pilot.Level} PILOT", pilot.Callsign, () =>
         {
@@ -37,12 +36,15 @@ public partial class RunScreen
         content.AddChild(Text("SHIP STATS", FontCaption, Muted, 4));
         content.AddChild(ShipStatsCard(pilot));
 
-        content.AddChild(Text("MODULES", FontCaption, Muted, 4));
+        content.AddChild(Text($"MODULES · {pilot.Upgrades.Count}", FontCaption, Muted, 4));
         PanelContainer modules = Card();
         VBoxContainer moduleRows = Stack(14);
         modules.AddChild(moduleRows);
-        foreach (ShipUpgradeSlot slot in frame.UpgradeSlots)
-            moduleRows.AddChild(ModuleRow(pilot, slot));
+        foreach (ShipUpgradeDefinition module in pilot.Upgrades.Select(ShipUpgrades.Get).OrderBy(module => module.Slot))
+            moduleRows.AddChild(ModuleRow(module));
+        if (pilot.Upgrades.Count == 0)
+            moduleRows.AddChild(Text("No modules yet. Level-ups and module crates fit them, as many as you take.",
+                FontCaption, Muted, 0, wrap: true));
         content.AddChild(modules);
 
         content.AddChild(Text($"MANEUVERS · {pilot.Maneuvers.Count} OF {Pilot.MaxManeuvers}", FontCaption, Muted, 4));
@@ -53,7 +55,7 @@ public partial class RunScreen
             maneuverRows.AddChild(ManeuverRow(pilot, ability));
         List<ShipAbility> unlearned = pilot.UnlearnedManeuvers.ToList();
         if (pilot.Maneuvers.Count < Pilot.MaxManeuvers && unlearned.Count > 0)
-            maneuverRows.AddChild(Text("CAN STILL LEARN · " + string.Join(" · ", unlearned.Select(a => ManeuverCatalog.AbilityName(a).ToUpper())),
+            maneuverRows.AddChild(Text("CAN LEARN ONE OF · " + string.Join(" · ", unlearned.Select(a => ManeuverCatalog.AbilityName(a).ToUpper())),
                 FontMicro, Muted, 2, wrap: true));
         content.AddChild(maneuvers);
 
@@ -209,21 +211,11 @@ public partial class RunScreen
         return card;
     }
 
-    static Control ModuleRow(Pilot pilot, ShipUpgradeSlot slot)
+    static Control ModuleRow(ShipUpgradeDefinition module)
     {
         VBoxContainer row = Stack(4);
-        string slotName = ShipUpgrades.SlotName(slot);
-        if (pilot.ModuleIn(slot) is ShipUpgrade module)
-        {
-            ShipUpgradeDefinition definition = ShipUpgrades.Get(module);
-            row.AddChild(Text($"{slotName} · {definition.Name.ToUpper()}", FontCaption, Positive, 2));
-            row.AddChild(Text(definition.Description, FontCaption, Body, 0, wrap: true));
-        }
-        else
-        {
-            row.AddChild(Text($"{slotName} · EMPTY", FontCaption, Dim, 2));
-            row.AddChild(Text("Fit one from a level-up or a module crate.", FontCaption, Muted, 0, wrap: true));
-        }
+        row.AddChild(Text($"{ShipUpgrades.SlotName(module.Slot)} · {module.Name.ToUpper()}", FontCaption, Positive, 2));
+        row.AddChild(Text(module.Description, FontCaption, Body, 0, wrap: true));
         return row;
     }
 

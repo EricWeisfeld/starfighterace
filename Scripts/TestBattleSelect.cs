@@ -143,7 +143,7 @@ public partial class TestBattleSelect : Node2D
         info.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         info.AddChild(Text(ship.DisplayName.ToUpper(), FontBody, TextBright, 2));
         info.AddChild(Text($"HULL {ship.MaxHp} · SHIELD {ship.MaxShield} · DMG {ship.ShotDamage} · EVA {ship.Evasion * 100:0}%", FontMicro, Body, 1));
-        string maneuvers = string.Join(" · ", ship.ManeuverPool.Take(3).Select(a => ManeuverCatalog.AbilityName(a).ToUpper()));
+        string maneuvers = string.Join(" · ", ship.ManeuverPool.Take(Pilot.MaxManeuvers).Select(a => ManeuverCatalog.AbilityName(a).ToUpper()));
         Label pool = Text(maneuvers, FontMicro, Muted, 1, wrap: true);
         info.AddChild(pool);
         row.AddChild(info);

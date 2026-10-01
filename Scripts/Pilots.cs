@@ -10,7 +10,8 @@ using System.Linq;
 /// </summary>
 public class Pilot
 {
-    public const int MaxManeuvers = 3;
+    /// <summary>The class's signature maneuver and one more learned on a level-up.</summary>
+    public const int MaxManeuvers = 2;
     public const int MaxLevel = 6;
 
     public string Callsign;
@@ -19,7 +20,7 @@ public class Pilot
     public string ClassId { get; }
     /// <summary>Maneuvers learned from this class's pool, at most <see cref="MaxManeuvers"/>.</summary>
     public readonly List<ShipAbility> Maneuvers = new();
-    /// <summary>Modules fitted to the ship: at most one per slot the frame provides.</summary>
+    /// <summary>Modules fitted to the ship: any number, each at most once.</summary>
     public readonly List<ShipUpgrade> Upgrades = new();
     /// <summary>Known maneuvers the pilot has mastered.</summary>
     public readonly List<ShipAbility> Masteries = new();
@@ -95,23 +96,19 @@ public class Pilot
     /// <summary>Hull damage from outside a battle (events). It never takes a ship below 1 hull.</summary>
     public void TakeHullDamage(int amount) => HullDamage = Mathf.Min(MaxHull - 1, HullDamage + amount);
 
-    public bool HasSlot(ShipUpgradeSlot slot) => Ship.UpgradeSlots.Contains(slot);
     public bool HasUpgrade(ShipUpgrade upgrade) => Upgrades.Contains(upgrade);
 
-    /// <summary>The module in a slot, or null when it is empty.</summary>
-    public ShipUpgrade? ModuleIn(ShipUpgradeSlot slot) =>
-        Upgrades.Select(upgrade => (ShipUpgrade?)upgrade).FirstOrDefault(upgrade => ShipUpgrades.Get(upgrade.Value).Slot == slot);
+    /// <summary>True while the module is not already fitted. There is no limit on how many a ship carries.</summary>
+    public bool CanInstall(ShipUpgrade upgrade) => !HasUpgrade(upgrade);
 
-    /// <summary>True when the frame has the module's slot and the module is not already fitted.</summary>
-    public bool CanInstall(ShipUpgrade upgrade) => HasSlot(ShipUpgrades.Get(upgrade).Slot) && !HasUpgrade(upgrade);
+    /// <summary>Modules this ship could still be offered.</summary>
+    public IEnumerable<ShipUpgradeDefinition> UnfittedModules => ShipUpgrades.All.Where(module => CanInstall(module.Id));
 
-    /// <summary>Fits a module, replacing whatever was in its slot.</summary>
+    /// <summary>Fits a module alongside the ones already fitted.</summary>
     public bool InstallUpgrade(ShipUpgrade upgrade)
     {
         if (!CanInstall(upgrade))
             return false;
-        ShipUpgradeSlot slot = ShipUpgrades.Get(upgrade).Slot;
-        Upgrades.RemoveAll(existing => ShipUpgrades.Get(existing).Slot == slot);
         Upgrades.Add(upgrade);
         HullDamage = Mathf.Min(HullDamage, MaxHull - 1);
         return true;

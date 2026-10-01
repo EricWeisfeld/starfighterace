@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-/// <summary>The three physical hardpoint types carried by player hulls.</summary>
+/// <summary>The ship system a module works on. It groups modules; it does not limit them.</summary>
 public enum ShipUpgradeSlot
 {
     Engine,
@@ -11,9 +11,9 @@ public enum ShipUpgradeSlot
 }
 
 /// <summary>
-/// Ship modules. Each fits one slot type, and a ship carries at most one per
-/// slot its frame provides. Modules are hardware: always on, and fitted from
-/// level-up cards or module crates.
+/// Ship modules. A ship carries any number, each at most once, and they
+/// stack. Modules are hardware: always on, and fitted from level-up cards or
+/// module crates.
 /// </summary>
 public enum ShipUpgrade
 {
@@ -43,7 +43,7 @@ public static class ShipUpgrades
     public const int ExtraShots = 1;
     public const float AccuracyBonus = 0.08f;
     public const float WideMountConeBonusDegrees = 4f;
-    // Shield-slot modules scale with the ship, so they matter as much on a
+    // Shield-system modules scale with the ship, so they matter as much on a
     // Bulwark as on a Kestrel.
     public const float ShieldCapacityBonus = 0.35f;
     public const float ShieldRegenBonus = 0.50f;

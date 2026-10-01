@@ -68,17 +68,14 @@ public partial class RunScreen
         return flow;
     }
 
-    /// <summary>The ship's slots: the fitted module in each, or EMPTY.</summary>
+    /// <summary>The ship's fitted modules, engine first, or NO MODULES.</summary>
     static Control ShipLoadout(Pilot pilot)
     {
         HFlowContainer flow = TagFlow();
-        foreach (ShipUpgradeSlot slot in pilot.Ship.UpgradeSlots)
-        {
-            string slotName = ShipUpgrades.SlotName(slot);
-            flow.AddChild(pilot.ModuleIn(slot) is ShipUpgrade module
-                ? Tag($"{slotName} · {ShipUpgrades.Get(module).Name.ToUpper()}", ChipRole.Gain)
-                : Tag($"{slotName} · EMPTY", ChipRole.Dormant));
-        }
+        foreach (ShipUpgradeDefinition module in pilot.Upgrades.Select(ShipUpgrades.Get).OrderBy(module => module.Slot))
+            flow.AddChild(Tag(module.Name.ToUpper(), ChipRole.Gain));
+        if (pilot.Upgrades.Count == 0)
+            flow.AddChild(Tag("NO MODULES", ChipRole.Dormant));
         return flow;
     }
 

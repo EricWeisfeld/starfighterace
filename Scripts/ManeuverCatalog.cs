@@ -153,12 +153,12 @@ public static class ManeuverCatalog
     {
         ShipAbility.UTurn => "Flip to face the way you came in a short, sharp reversal.",
         ShipAbility.BreakTurn => "Swing through a wide 180° arc.",
-        ShipAbility.EngineBoost => "A long burn that covers ground fast.",
+        ShipAbility.EngineBoost => "A long, nearly straight burn that covers ground fast.",
         ShipAbility.RotatingGuns => "Creep forward while the guns sweep a wide arc.",
         ShipAbility.SuppressionFire => "Always on: your hits make the target turn less sharply next turn, until it gets out of your fire.",
         ShipAbility.EmergencyThrusters => "A fast escape sprint, at the cost of some evasion.",
         ShipAbility.HunterLock => "Lock an enemy for extra accuracy against it.",
-        ShipAbility.PursuitBurn => "A long, straight chase burn.",
+        ShipAbility.PursuitBurn => "A long chase burn that can bend after its target.",
         ShipAbility.SensorScramble => "Scramble an enemy's sensors to spoil its aim.",
         ShipAbility.EvasiveDodge => "A hard jink and a short burst that is hard to hit.",
         ShipAbility.EvasiveSpin => "Barrel-roll through your move: very hard to hit, but your guns fall silent.",
@@ -298,8 +298,8 @@ public partial class ManeuverGlyph : Control
             ManeuverAction.UTurn => new[] { (0f, 1.0f), (180f, 0.55f), (0f, 0.25f) },
             ManeuverAction.BreakTurn => new[] { (0f, 0.4f), (180f, 2.2f) },
             ManeuverAction.EvasiveDodge => new[] { (0f, 0.7f), (135f, 0.6f), (0f, 0.6f) },
-            ManeuverAction.EngineBoost => new[] { (18f, 2.4f) },
-            ManeuverAction.PursuitBurn => new[] { (0f, 2.5f) },
+            ManeuverAction.EngineBoost => new[] { (0f, 2.4f) },
+            ManeuverAction.PursuitBurn => new[] { (18f, 2.5f) },
             ManeuverAction.EmergencyThrusters => new[] { (28f, 2.2f) },
             ManeuverAction.EvasiveSpin => new[] { (60f, 1.1f) },
             ManeuverAction.RotatingGuns => new[] { (0f, 1.1f) },
@@ -344,8 +344,8 @@ public partial class ManeuverGlyph : Control
 /// </summary>
 public static class Masteries
 {
-    public const float EngineBoostTurnLimitDegrees = 90f;
-    public const float PursuitBurnTurnLimitDegrees = 45f;
+    public const float EngineBoostTurnLimitDegrees = 45f;
+    public const float PursuitBurnTurnLimitDegrees = 90f;
     public const float EvasionBonus = 0.15f;
     public const float RotatingGunsFireConeDegrees = 65f;
     public const float HunterLockAccuracyBonus = 0.25f;

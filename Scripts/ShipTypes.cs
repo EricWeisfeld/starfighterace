@@ -213,7 +213,7 @@ public static class ShipTypes
         {
             BreakTurnMoveDistance = 180f,
             PursuitBurnMoveDistance = 370f,
-            PursuitBurnTurnLimitDegrees = 20f,
+            PursuitBurnTurnLimitDegrees = 45f,
             SensorScrambleAccuracyPenalty = 0.20f,
             SensorScrambleDurationTurns = 2,
             SensorScrambleCooldownTurns = 4,
@@ -262,7 +262,7 @@ public static class ShipTypes
         {
             UTurnMoveDistance = 75f,
             EngineBoostMoveDistance = 350f,
-            EngineBoostTurnLimitDegrees = 45f,
+            EngineBoostTurnLimitDegrees = 20f,
             EvasiveDodgeMoveDistance = 110f,
             EvasiveDodgeAngleDegrees = 135f,
             EvasiveDodgeEvasionBonus = 0.40f,

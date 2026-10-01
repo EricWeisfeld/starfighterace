@@ -277,9 +277,9 @@ public static class RunContent
 
     /// <summary>
     /// How many of its line's maneuvers an enemy can fly, by hull tier: none
-    /// for sector 1's raiders, the first two from sector 2, all of them in sector 3.
+    /// for sector 1's raiders, then the same two a pilot can know.
     /// </summary>
-    public static int EnemyManeuvers(int tier) => tier switch { 1 => 0, 2 => 2, _ => int.MaxValue };
+    public static int EnemyManeuvers(int tier) => tier == 1 ? 0 : Pilot.MaxManeuvers;
 
     /// <summary>A quick battle's opposition for a max-level squadron: a late sector 3 patrol.</summary>
     public static BattleMission QuickBattleForces(ulong seed) =>

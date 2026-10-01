@@ -44,8 +44,8 @@ public class BattleMission
     /// <summary>Ships that join later: on <see cref="ReinforcementTurn"/>, or partway along an escort.</summary>
     public ShipType[] Reinforcements = Array.Empty<ShipType>();
     public int ReinforcementTurn = 3;
-    /// <summary>How many of its line's maneuvers each enemy can fly, in pool order.</summary>
-    public int EnemyManeuvers = int.MaxValue;
+    /// <summary>How many of its line's maneuvers each enemy can fly, in pool order. Never more than a pilot can know.</summary>
+    public int EnemyManeuvers = Pilot.MaxManeuvers;
     /// <summary>
     /// Ace pilots see your orders before they move. Everyone else plans
     /// against your ships' visible course. Players are only told they face

@@ -270,10 +270,14 @@ public partial class Fighter : Node2D
     public bool HasAbility(ShipAbility ability) =>
         Type != null && (Pilot != null
             ? Pilot.HasManeuver(ability)
-            : Type.OffersManeuver(ability) && System.Array.IndexOf(Type.ManeuverPool, ability) < ManeuverAccess);
+            : Type.OffersManeuver(ability)
+                && System.Array.IndexOf(Type.ManeuverPool, ability) < Mathf.Min(ManeuverAccess, Pilot.MaxManeuvers));
 
-    /// <summary>For ships without a pilot: how many of the line's maneuvers they can fly, in pool order.</summary>
-    public int ManeuverAccess = int.MaxValue;
+    /// <summary>
+    /// For ships without a pilot: how many of the line's maneuvers they can
+    /// fly, in pool order. Capped at what a pilot can know.
+    /// </summary>
+    public int ManeuverAccess = Pilot.MaxManeuvers;
 
     /// <summary>Special maneuvers cannot be repeated during their per-fighter cooldown.</summary>
     public bool IsManeuverReady(ManeuverType maneuver) =>

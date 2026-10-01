@@ -354,7 +354,7 @@ public partial class BattleManager : Node2D
         f.ApplyType(type);
         f.ApplyPilot(pilot);
         if (team == 1)
-            f.ManeuverAccess = Forces?.EnemyManeuvers ?? int.MaxValue;
+            f.ManeuverAccess = Forces?.EnemyManeuvers ?? Pilot.MaxManeuvers;
         f.Setup(team, pos, heading, type.GetSkin(team));
         _fighterLayer.AddChild(f);
         GetTeam(team).Add(f);

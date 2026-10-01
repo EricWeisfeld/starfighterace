@@ -320,9 +320,31 @@ orange under the objective) and called out at the start of the battle.
 - **Reinforcements** come in at the enemy's starting spots furthest from your ships, the map's top spots when the wing started elsewhere, or behind you in an ambush.
 - **Measured** (10 battles each, sector 1, your squad flown by a striker autopilot): wins sit at 90–100% for every opening except the ambush. An ambush with two reinforcements wins 40%, against 60% when the same two come in from the front. A running fight is the quickest (median 5 turns: both wings turn in together); a pincer the longest (11).
 
+### Measured: tactics and openings together
+
+Two 240-battle batches, both with your squadron flown as strikers who can't
+see enemy orders (the old charge autopilot is too predictable for the new
+pilots to be a fair stand-in for a person). The control batch turns the enemy
+tactics off and opens every battle head-on.
+
+| | Control | Tactics and openings |
+| --- | --- | --- |
+| Overall | 52% | 46% |
+| Level 1 / 3 / 5 / 6 | 32 / 30 / 68 / 77% | 18 / 32 / 58 / 75% |
+| Stops without an ace | 68% | 71% |
+| Stops with an ace | 35% | 21% |
+| Median battle length | 10 turns | 9 turns |
+| Battles still going at turn 30 | 7 | 0 |
+
+- **Ordinary fights are as hard as before.** Skirmishes win about the same; the enemy's rock deaths fell from 0.97 to 0.63 a battle.
+- **Aces got much harder.** Across all levels: sector 1 elite 35% (control 60%), sector 1 boss 35% (45%), sector 2 elite 25% (45%), sector 2 boss 15% (25%), sector 3 elite 15% (30%), sector 3 boss 0% (5%). An ace now hunts the most worn-down ship from out of your guns while reading your orders.
+- **By opening** (all stops, so harder stops weigh on the openings they allow): running fight 58%, head-on 54%, long approach 46%, pincer 43%, bounced 42%, ambush 38% (8 battles), flanked 35%.
+- The old charge autopilot against the control enemies (the previous batch) won 47%; the striker autopilot wins 52%.
+
 ## Known issues and next steps
 
-- Aces may be too strong where they lead a boss: the sector 1 boss wins 30% across all levels and the sector 3 boss (two Mk IV aces) never wins.
+- Aces are too strong, more so since they fly the ace tactic: stops with an ace win 21% across all levels (35% before tactics), and the sector 3 boss (two Mk IV aces) never wins. Options: one ace at the sector 3 boss, and aces refitted level with your squadron (Mk I/II/III) instead of a step ahead.
+- Flanked is the hardest opening (35% across all stops, head-on 54%).
 - The player instinct called Ace shares a word with enemy aces; it may want a new name.
 - The sector 2 boss is now an ordinary 4 + 2 fight; it has not been measured since the escort was removed.
 - Sector 2 elites (3 + 1) and the sector 3 boss (4 + 2) sat below the 50% and 40% targets; worth a second pass once humans have played the new curve.

@@ -113,7 +113,7 @@ public partial class RunScreen
         (string status, ChipRole role) = StatusOf(pilot);
         title.AddChild(Tag(status, role));
         words.AddChild(title);
-        words.AddChild(RoleLabel(frame, $" · {ShipTypes.ClassName(pilot.ClassId).ToUpper()} LINE"));
+        words.AddChild(Text($"{ShipTypes.ClassName(pilot.ClassId).ToUpper()} LINE", FontMicro, Muted, 3));
         words.AddChild(Text(frame.Description, FontCaption, Body, 0, wrap: true));
         row.AddChild(words);
         stack.AddChild(row);

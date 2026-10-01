@@ -8,7 +8,7 @@ public partial class RunScreen
     int? _shipPickerSlot;
 
     /// <summary>
-    /// The start of a run: each pilot gets a ship (any of the nine frames) and
+    /// The start of a run: each pilot gets a ship (a Kestrel, Raptor or ZT) and
     /// one of three instincts offered to them. Both stay with them for the run.
     /// </summary>
     Control BuildDraftPage()
@@ -57,7 +57,7 @@ public partial class RunScreen
         title.AddChild(name);
         title.AddChild(Text("CHANGE", FontMicro, Accent, 3));
         words.AddChild(title);
-        words.AddChild(RoleLabel(frame, $" · {ShipTypes.ClassName(ShipTypes.ClassIdForHull(frame.Id)).ToUpper()} LINE"));
+        words.AddChild(Text($"{ShipTypes.ClassName(ShipTypes.ClassIdForHull(frame.Id)).ToUpper()} LINE", FontMicro, Muted, 3));
         words.AddChild(Text(CombatStats(frame) + " · " + HandlingStats(frame), FontMicro, Body, 1, wrap: true));
         row.AddChild(words);
         ship.AddChild(row);
@@ -85,7 +85,7 @@ public partial class RunScreen
     /// <summary>
     /// Every frame, grouped by class line. A line's frames fly alike and learn
     /// the same maneuvers, so both are shown once per line; each frame shows
-    /// its role and how it fights.
+    /// how it fights.
     /// </summary>
     Control BuildShipPickerPage(int slot)
     {
@@ -96,7 +96,7 @@ public partial class RunScreen
             _shipPickerSlot = null;
             Render();
         }));
-        page.AddChild(Text("Ships in a line fly alike; attack and guard frames trade firepower for toughness or back. Every frame can fit any module.",
+        page.AddChild(Text("Each line flies differently and learns its own maneuvers. Every ship can fit any module.",
             FontCaption, Body, 0, wrap: true));
         (TouchScroll scroll, VBoxContainer content) = ScrollBody(12);
         page.AddChild(scroll);
@@ -126,24 +126,12 @@ public partial class RunScreen
         VBoxContainer words = Stack(4);
         words.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         words.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        words.AddChild(RoleLabel(frame));
         words.AddChild(Text(frame.DisplayName.ToUpper(), FontBody, TextBright, 2));
         words.AddChild(Text(frame.Description, FontCaption, Body, 0, wrap: true));
         words.AddChild(Text(CombatStats(frame), FontMicro, Body, 1, wrap: true));
         row.AddChild(words);
         tap.AddChild(row);
         return tap;
-    }
-
-    static Label RoleLabel(ShipType frame, string suffix = "")
-    {
-        (string role, Color color) = frame.Role switch
-        {
-            FrameRole.Attack => ("ATTACK", Warning),
-            FrameRole.Guard => ("GUARD", Accent),
-            _ => ("BALANCED", Muted),
-        };
-        return Text(role + suffix, FontMicro, color, 3);
     }
 
     // Non-breaking spaces keep each stat's name and number on one line.

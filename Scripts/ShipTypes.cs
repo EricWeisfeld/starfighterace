@@ -262,46 +262,6 @@ public static class ShipTypes
         },
     };
 
-    /// <summary>The Striker is the first selectable Kestrel-series specialization.</summary>
-    /// <summary>The Kestrel line's attack frame: heavier guns, less hull and precision.</summary>
-    public static readonly ShipType ScoutStriker = new()
-    {
-        Id = "s4_striker",
-        DisplayName = "S4 Striker",
-        Description = "An aggressive Kestrel-series frame. Heavier guns, paid for with hull and precision.",
-        Role = FrameRole.Attack,
-        MaxHp = 160,
-        MaxShield = 80,
-        ShotDamage = 40,
-        Accuracy = 0.80f,
-        Evasion = 0.35f,
-        NormalTurnLimitDegrees = KestrelTurn,
-        NormalMoveMinDistance = KestrelMinMove,
-        NormalMoveMaxDistance = KestrelMaxMove,
-        Maneuvers = Scout.Maneuvers,
-        SkinsByTeam = Scout.SkinsByTeam,
-    };
-
-    /// <summary>The Ghost is the evasive electronic-warfare Kestrel-series specialization.</summary>
-    /// <summary>The Kestrel line's guard frame: survives by not being hit, at the cost of its own aim.</summary>
-    public static readonly ShipType ScoutGhost = new()
-    {
-        Id = "s9_ghost",
-        DisplayName = "S9 Ghost",
-        Description = "An evasive Kestrel-series frame that is hard to hit, but its jamming gear throws off its own aim.",
-        Role = FrameRole.Guard,
-        MaxHp = 200,
-        MaxShield = 140,
-        ShotDamage = 30,
-        Accuracy = 0.70f,
-        Evasion = 0.40f,
-        NormalTurnLimitDegrees = KestrelTurn,
-        NormalMoveMinDistance = KestrelMinMove,
-        NormalMoveMaxDistance = KestrelMaxMove,
-        Maneuvers = Scout.Maneuvers,
-        SkinsByTeam = Scout.SkinsByTeam,
-    };
-
     /// <summary>The Raptor line's balanced frame. It uses the Black Hawk art.</summary>
     public static readonly ShipType Raptor = new()
     {
@@ -347,6 +307,94 @@ public static class ShipTypes
                 DestructPath = $"{Klaed}/Destruction/PNGs/Kla'ed - Bomber - Destruction.png", DestructFrames = 9,
             },
         },
+    };
+
+    /// <summary>The ZT line's balanced frame.</summary>
+    public static readonly ShipType Zt = new()
+    {
+        Id = "zt",
+        DisplayName = "ZT Class",
+        Description = "Armored ZT-class starfighter, balanced between firepower and protection.",
+        Role = FrameRole.Balanced,
+        MaxHp = 500,
+        MaxShield = 250,
+        ShieldRegenPerTurn = 25,
+        ShotDamage = 45,
+        Accuracy = 0.82f,
+        Evasion = 0.15f,
+        NormalTurnLimitDegrees = ZtTurn,
+        NormalMoveMinDistance = ZtMinMove,
+        NormalMoveMaxDistance = ZtMaxMove,
+        Maneuvers = new ShipManeuverProfile
+        {
+            RotatingGunsMoveDistance = 80f,
+            RotatingGunsFireConeDeg = 45f,
+            SuppressionTurnPenaltyDeg = 8f,
+            EmergencyThrustersMoveDistance = 320f,
+            EmergencyThrustersTurnLimitDegrees = 35f,
+            EmergencyThrustersEvasionPenalty = 0.10f,
+            Pool = new[] { ShipAbility.RotatingGuns, ShipAbility.SuppressionFire, ShipAbility.EmergencyThrusters },
+        },
+        SkinsByTeam = new[]
+        {
+            new SkinDef
+            {
+                BasePath = $"{Nairan}/Designs - Base/PNGs/Nairan - Frigate - Base.png",
+                EnginePath = $"{Nairan}/Engine Effects/PNGs/Nairan - Frigate - Engine.png", EngineFrames = 8,
+                WeaponPath = $"{Nairan}/Weapons/PNGs/Nairan - Frigate - Weapons.png", WeaponFrames = 28,
+                ShieldPath = $"{Nairan}/Shields/PNGs/Nairan - Frigate - Shield.png", ShieldFrames = 8,
+                DestructPath = $"{Nairan}/Destruction/PNGs/Nairan - Frigate -  Destruction.png", DestructFrames = 16,
+            },
+            new SkinDef
+            {
+                BasePath = $"{Klaed}/Base/PNGs/Kla'ed - Frigate - Base.png",
+                EnginePath = $"{Klaed}/Engine/PNGs/Kla'ed - Frigate - Engine.png", EngineFrames = 10,
+                WeaponPath = $"{Klaed}/Weapons/PNGs/Kla'ed - Frigate - Weapons.png", WeaponFrames = 6,
+                ShieldPath = $"{Klaed}/Shield/PNGs/Kla'ed - Frigate - Shield.png", ShieldFrames = 40,
+                DestructPath = $"{Klaed}/Destruction/PNGs/Kla'ed - Frigate - Destruction.png", DestructFrames = 10,
+            },
+        },
+    };
+
+    // Shelved frames: each line's attack and guard frames, out of play until
+    // they are redesigned. Nobody flies them.
+
+    /// <summary>The Kestrel line's attack frame: heavier guns, less hull and precision.</summary>
+    public static readonly ShipType ScoutStriker = new()
+    {
+        Id = "s4_striker",
+        DisplayName = "S4 Striker",
+        Description = "An aggressive Kestrel-series frame. Heavier guns, paid for with hull and precision.",
+        Role = FrameRole.Attack,
+        MaxHp = 160,
+        MaxShield = 80,
+        ShotDamage = 40,
+        Accuracy = 0.80f,
+        Evasion = 0.35f,
+        NormalTurnLimitDegrees = KestrelTurn,
+        NormalMoveMinDistance = KestrelMinMove,
+        NormalMoveMaxDistance = KestrelMaxMove,
+        Maneuvers = Scout.Maneuvers,
+        SkinsByTeam = Scout.SkinsByTeam,
+    };
+
+    /// <summary>The Kestrel line's guard frame: survives by not being hit, at the cost of its own aim.</summary>
+    public static readonly ShipType ScoutGhost = new()
+    {
+        Id = "s9_ghost",
+        DisplayName = "S9 Ghost",
+        Description = "An evasive Kestrel-series frame that is hard to hit, but its jamming gear throws off its own aim.",
+        Role = FrameRole.Guard,
+        MaxHp = 200,
+        MaxShield = 140,
+        ShotDamage = 30,
+        Accuracy = 0.70f,
+        Evasion = 0.40f,
+        NormalTurnLimitDegrees = KestrelTurn,
+        NormalMoveMinDistance = KestrelMinMove,
+        NormalMoveMaxDistance = KestrelMaxMove,
+        Maneuvers = Scout.Maneuvers,
+        SkinsByTeam = Scout.SkinsByTeam,
     };
 
     /// <summary>The Raptor line's attack frame: stronger shots, less protection.</summary>
@@ -424,53 +472,6 @@ public static class ShipTypes
         },
     };
 
-    /// <summary>The ZT line's balanced frame.</summary>
-    public static readonly ShipType Zt = new()
-    {
-        Id = "zt",
-        DisplayName = "ZT Class",
-        Description = "Armored ZT-class starfighter, balanced between firepower and protection.",
-        Role = FrameRole.Balanced,
-        MaxHp = 500,
-        MaxShield = 250,
-        ShieldRegenPerTurn = 25,
-        ShotDamage = 45,
-        Accuracy = 0.82f,
-        Evasion = 0.15f,
-        NormalTurnLimitDegrees = ZtTurn,
-        NormalMoveMinDistance = ZtMinMove,
-        NormalMoveMaxDistance = ZtMaxMove,
-        Maneuvers = new ShipManeuverProfile
-        {
-            RotatingGunsMoveDistance = 80f,
-            RotatingGunsFireConeDeg = 45f,
-            SuppressionTurnPenaltyDeg = 8f,
-            EmergencyThrustersMoveDistance = 320f,
-            EmergencyThrustersTurnLimitDegrees = 35f,
-            EmergencyThrustersEvasionPenalty = 0.10f,
-            Pool = new[] { ShipAbility.RotatingGuns, ShipAbility.SuppressionFire, ShipAbility.EmergencyThrusters },
-        },
-        SkinsByTeam = new[]
-        {
-            new SkinDef
-            {
-                BasePath = $"{Nairan}/Designs - Base/PNGs/Nairan - Frigate - Base.png",
-                EnginePath = $"{Nairan}/Engine Effects/PNGs/Nairan - Frigate - Engine.png", EngineFrames = 8,
-                WeaponPath = $"{Nairan}/Weapons/PNGs/Nairan - Frigate - Weapons.png", WeaponFrames = 28,
-                ShieldPath = $"{Nairan}/Shields/PNGs/Nairan - Frigate - Shield.png", ShieldFrames = 8,
-                DestructPath = $"{Nairan}/Destruction/PNGs/Nairan - Frigate -  Destruction.png", DestructFrames = 16,
-            },
-            new SkinDef
-            {
-                BasePath = $"{Klaed}/Base/PNGs/Kla'ed - Frigate - Base.png",
-                EnginePath = $"{Klaed}/Engine/PNGs/Kla'ed - Frigate - Engine.png", EngineFrames = 10,
-                WeaponPath = $"{Klaed}/Weapons/PNGs/Kla'ed - Frigate - Weapons.png", WeaponFrames = 6,
-                ShieldPath = $"{Klaed}/Shield/PNGs/Kla'ed - Frigate - Shield.png", ShieldFrames = 40,
-                DestructPath = $"{Klaed}/Destruction/PNGs/Kla'ed - Frigate - Destruction.png", DestructFrames = 10,
-            },
-        },
-    };
-
     /// <summary>The ZT line's attack frame: heavier guns, less armor.</summary>
     public static readonly ShipType Zt6 = new()
     {
@@ -508,7 +509,6 @@ public static class ShipTypes
         },
     };
 
-    /// <summary>A shield-first ZT specialization with reinforced armor and improved handling.</summary>
     /// <summary>The ZT line's guard frame: more armor and faster shield regeneration, weaker guns.</summary>
     public static readonly ShipType Zt8Bulwark = new()
     {
@@ -530,16 +530,14 @@ public static class ShipTypes
     };
 
     /// <summary>
-    /// Every frame a pilot can fly, grouped by class line: balanced, attack,
-    /// guard. Within a line, attack and guard move about a fifth of the
-    /// balanced frame's firepower (damage x accuracy) into toughness ((hull +
-    /// shield) / (1 - evasion)) or back, so none is a straight upgrade. A
-    /// pilot's frame is chosen when they join.
+    /// Every frame a pilot can fly, and every frame enemies fly: one per class
+    /// line while the attack and guard frames are shelved. A pilot's frame is
+    /// chosen when they join.
     /// </summary>
-    public static readonly ShipType[] PlayerFrames = { Scout, ScoutStriker, ScoutGhost, Raptor, BlackHawk, Falcon, Zt, Zt6, Zt8Bulwark };
+    public static readonly ShipType[] PlayerFrames = { Scout, Raptor, Zt };
     public static readonly ShipType[] SandboxHulls = PlayerFrames;
 
-    /// <summary>Resolves a data-authored hull id. Invalid or retired hull IDs fall back to the S1 Kestrel.</summary>
+    /// <summary>Resolves a data-authored hull id. Invalid or shelved hull IDs fall back to the S1 Kestrel.</summary>
     public static ShipType FromId(string id) => PlayerFrames.FirstOrDefault(type => type.Id == id) ?? Scout;
 
     /// <summary>A class line's name, for grouping frames: Kestrel, Raptor or ZT.</summary>

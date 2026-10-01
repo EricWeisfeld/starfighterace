@@ -244,20 +244,18 @@ public static class RunContent
         };
     }
 
-    static string[] EnemyPool(int tier) => tier switch
-    {
-        1 => new[] { "scout", "scout", "raptor", "zt" },
-        2 => new[] { "scout", "raptor", "zt", "s4_striker", "r3_black_hawk", "zt_6" },
-        _ => new[] { "s4_striker", "s9_ghost", "r3_black_hawk", "r5_falcon", "zt_6", "zt_8_bulwark" },
-    };
-
-    static string HeavyHull(int tier) => tier switch { 1 => "zt", 2 => "zt_6", _ => "zt_8_bulwark" };
+    /// <summary>
+    /// The hulls a wing draws from: mostly Kestrels in sector 1, then an even
+    /// mix of the three lines.
+    /// </summary>
+    static ShipType[] EnemyPool(int tier) => tier == 1
+        ? new[] { ShipTypes.Scout, ShipTypes.Scout, ShipTypes.Raptor, ShipTypes.Zt }
+        : ShipTypes.PlayerFrames;
 
     /// <summary>
     /// How many enemies a battle stop brings at the start, and how many join
     /// later. Enemies always fly at their frames' base numbers: a fight gets
-    /// harder through more ships and a tougher mix of hulls, while pilots
-    /// grow through levels and refits.
+    /// harder through more ships, while pilots grow through levels and refits.
     /// </summary>
     public static (int Initial, int Wave) EnemyForce(int sector, RunNodeKind kind, int layer, RandomNumberGenerator rng)
     {
@@ -299,12 +297,12 @@ public static class RunContent
         };
         int tier = Mathf.Clamp(sector + (kind is RunNodeKind.Elite or RunNodeKind.Boss ? 1 : 0), 1, 3);
         (int initial, int wave) = EnemyForce(sector, kind, node.Layer, rng);
-        string[] pool = EnemyPool(tier);
-        ShipType Pick() => ShipTypes.FromId(pool[rng.RandiRange(0, pool.Length - 1)]);
+        ShipType[] pool = EnemyPool(tier);
+        ShipType Pick() => pool[rng.RandiRange(0, pool.Length - 1)];
         ShipType[] squad = Enumerable.Range(0, initial).Select(_ => Pick()).ToArray();
         ShipType[] reinforcements = Enumerable.Range(0, wave).Select(_ => Pick()).ToArray();
         if (objective == MissionObjective.DestroyTarget)
-            squad[0] = ShipTypes.FromId(HeavyHull(tier)); // the first enemy is the marked target
+            squad[0] = ShipTypes.Zt; // the first enemy is the marked target
 
         string name = kind switch
         {

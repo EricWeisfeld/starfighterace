@@ -188,7 +188,8 @@ public static class EnemyAI
     /// straight on at the throttle it started the turn with. Pilots who
     /// <paramref name="readOrders"/> lead the move you actually queued.
     /// </summary>
-    public static void Plan(Fighter self, IReadOnlyList<Fighter> foes, IReadOnlyList<Fighter> allies, bool readOrders = true)
+    public static void Plan(Fighter self, IReadOnlyList<Fighter> foes, IReadOnlyList<Fighter> allies, bool readOrders = true,
+        IReadOnlyCollection<Fighter> readsOrdersOf = null)
     {
         bool tactical = self.Tactic != EnemyTactic.None;
         TacticProfile profile = ProfileFor(self.Tactic);
@@ -205,7 +206,8 @@ public static class EnemyAI
         // Tactical pilots who can't read orders expect each of your ships to
         // turn toward whichever of them is nearest it.
         var tracks = foes.Where(f => f != null && f.IsAlive)
-            .Select(f => FoeTrack.Expect(f, readOrders, tactical ? allies : null)).ToList();
+            .Select(f => FoeTrack.Expect(f, readOrders || (readsOrdersOf?.Contains(f) ?? false), tactical ? allies : null))
+            .ToList();
         FoeTrack targetTrack = tracks.First(t => t.Ship == target);
         var context = new PlanContext
         {
@@ -245,12 +247,12 @@ public static class EnemyAI
     {
         for (int distanceIndex = 0; distanceIndex <= NormalDistanceSamples; distanceIndex++)
         {
-            float distance = Mathf.Lerp(self.NormalMoveMinDistance, self.NormalMoveMaxDistance,
+            float distance = Mathf.Lerp(self.MinMoveFor(ManeuverType.Normal), self.MaxMoveFor(ManeuverType.Normal),
                 distanceIndex / (float)NormalDistanceSamples);
-            float maxTurn = Mathf.DegToRad(self.GetNormalTurnLimitDegrees(distance));
+            (float minTurn, float maxTurn) = self.NormalTurnWindow(distance);
             for (int turnIndex = 0; turnIndex <= NormalTurnSamples; turnIndex++)
             {
-                float turn = Mathf.Lerp(-maxTurn, maxTurn, turnIndex / (float)NormalTurnSamples);
+                float turn = Mathf.Lerp(minTurn, maxTurn, turnIndex / (float)NormalTurnSamples);
                 yield return new FlightPlan(ManeuverType.Normal, turn, distance);
             }
         }
@@ -555,14 +557,16 @@ public static class EnemyAI
         public static FoeTrack Expect(Fighter foe, bool readOrders, IReadOnlyList<Fighter> anticipate)
         {
             ManeuverType maneuver = readOrders ? foe.PlannedManeuver : ManeuverType.Normal;
-            float turn = readOrders ? foe.PlannedTurnAngleRadians ?? 0f : 0f;
             float distance = readOrders ? foe.PlannedPathDistance : foe.TurnStartPathDistance;
+            // A foe's visible course is its held course: straight on, or as
+            // gentle a turn as turn momentum allows.
+            float held = maneuver == ManeuverType.Normal ? foe.ClampNormalTurn(0f, distance) : 0f;
+            float turn = readOrders ? foe.PlannedTurnOrHold : held;
             if (!readOrders && anticipate != null &&
                 anticipate.Where(f => f.IsAlive).OrderBy(f => f.Position.DistanceSquaredTo(foe.Position)).FirstOrDefault() is { } nearest)
             {
-                float maxTurn = Mathf.DegToRad(foe.GetNormalTurnLimitDegrees(distance));
-                turn = Mathf.Clamp(Mathf.Wrap((nearest.Position - foe.Position).Angle() - foe.Heading, -Mathf.Pi, Mathf.Pi),
-                    -maxTurn, maxTurn);
+                turn = foe.ClampNormalTurn(Mathf.Wrap((nearest.Position - foe.Position).Angle() - foe.Heading, -Mathf.Pi, Mathf.Pi),
+                    distance);
             }
             bool gunsLive = !foe.GunsSilentDuring(maneuver);
             float cone = Mathf.DegToRad(maneuver == ManeuverType.RotatingGuns ? foe.Moves.RotatingGunsFireConeDeg : foe.BaseFireConeDeg);
@@ -575,7 +579,7 @@ public static class EnemyAI
             for (int i = 0; i < GunSamples.Length; i++)
             {
                 foe.RoutePoint(maneuver, turn, distance, GunSamples[i], out Vector2 pos, out float heading);
-                foe.RoutePoint(maneuver, readOrders ? turn : 0f, distance, GunSamples[i], out _, out float straightHeading);
+                foe.RoutePoint(maneuver, readOrders ? turn : held, distance, GunSamples[i], out _, out float straightHeading);
                 track.Samples[i] = new Sample
                 {
                     Position = pos,

@@ -240,7 +240,7 @@ bump lumpy. So enemies now scale by count and pilots by refits.
 
 - **Hull mix and maneuvers (composition).** Sector 1 wings are mostly Kestrels; later wings draw evenly from the three lines (elites and bosses use the next sector's mix). (Sector 2 used to add attack frames and sector 3 to fly only attack and guard frames; those are shelved.) Enemies fly none of their line's maneuvers in sector 1. From sector 2 on they fly two, the same cap as your pilots: the line's signature maneuver and the next in its pool (Break Turn and Pursuit Burn, U-Turn and Boost, Turret and Suppression Fire). They weigh those maneuvers alongside normal flight when lining up a shot, not only to escape rocks.
 - **Reinforcements.** A "+N" wave arrives at the start of turn 3 at the enemy start positions furthest from your ships. If the first group is wiped out before then, the wave arrives at once instead of the battle ending. Briefings show the wave faded as INBOUND, and the map shows "3 HOSTILES +1".
-- **Quick battle** pits the max-level (Mk IV) squadron against a late sector 3 patrol (4 + 1) instead of three basic ships.
+- **Quick battle** pits the max-level (Mk IV) squadron against a late sector 3 patrol (4 + 1) instead of three basic ships. (Since Phase 7 it is set up by hand.)
 - **Who sees your orders.** Enemies plan when you press Engage. Most can't see your orders: they lead each of your ships along its visible course, straight on at the throttle it started the turn with (`Fighter.TurnStartPathDistance`). Only aces read the move you actually queued. (Before aces were individuals, every ship in an elite wing read orders. Measured over 480 autopilot battles then: 46% overall, the same as when nobody reads orders and up from 38% when everyone did.)
 - **One mission type.** Strike stops and the sector 2 escort boss are gone; every battle is eliminate-all-hostiles. Strike stops became skirmishes, the sector 1 boss is a plain 3 + 1 fight and the sector 2 boss a 4 + 2 one whose wave arrives on turn 3. (Enemies then shot the nearest of your ships; see Phase 6 for how they pick targets now.)
 - **Aces (`Aces`).** An ace is one enemy pilot who makes a fight harder, and the biggest threat on the field. One flies with every elite stop (now called "ACE PILOT" on the map, titled with the ace's callsign) and every sector boss, two with the sector 3 boss. Aces take the place of a ship in the opening wing, so wing sizes are unchanged.
@@ -343,6 +343,61 @@ snipers.
 - **Aces got much harder.** Across all levels: sector 1 elite 35% (control 60%), sector 1 boss 35% (45%), sector 2 elite 25% (45%), sector 2 boss 15% (25%), sector 3 elite 15% (30%), sector 3 boss 0% (5%). An ace now hunts the most worn-down ship from out of your guns while reading your orders.
 - **By opening** (all stops, so harder stops weigh on the openings they allow): running fight 58%, head-on 54%, long approach 46%, pincer 43%, bounced 42%, ambush 38% (8 battles), flanked 35%.
 - The old charge autopilot against the control enemies (the previous batch) won 47%; the striker autopilot wins 52%.
+
+## Phase 7: experiments in following an enemy
+
+Staying on an enemy's tail was close to impossible: a ship that started a
+turn behind an enemy and pointed at it was still there a turn later only 13%
+of the time (0% against a Kestrel). Each turn lets a ship end anywhere in a
+fan far wider than a chaser's guns cover, both sides plan blind, and nothing
+carries over from one turn to the next. Four experimental rules try to change
+that, each behind its own switch (`Experiments`, saved in `GameSettings`).
+They are all off by default; one that is on applies to every battle, runs
+included.
+
+| Rule | What it does | How it shows |
+| --- | --- | --- |
+| ON THEIR SIX | A ship that starts a turn within 300 of an enemy, inside its rear 120° arc and pointed within 60° of it, is on its six. That enemy commits its move as the turn opens, against your visible courses (an ace loses its order-reading that turn), and you plan seeing it. An enemy on your six plans against your real orders, like an ace. | The committed move as a dashed red path with a faint ghost, its fire cone and "ITS MOVE" (plus the maneuver's name); targeting and threat previews use that move. "ENEMY ON YOUR SIX" under a ship being tailed. HUD notes. |
+| HARD TURNS BLEED SPEED | A normal turn sharper than two thirds of the ship's limit (Kestrel 80°, Raptor 73°, ZT 47°) caps next turn's throttle at the minimum. Maneuvers don't bleed. | "SLOWED · HARD TURN" under the ship; the throttle gauge and HUD range shrink ("Throttle 170–170"); the HUD warns while you plan a hard turn. |
+| TURN MOMENTUM | A normal turn can differ from the last one by at most 75% of the ship's turn limit (Kestrel 90°, Raptor 82°, ZT 52°), so reversing a hard turn takes two turns. A maneuver resets it; flying straight centres the window. A ship given no order holds the gentlest turn its window allows. | The steering fan is the window, shifted to one side after a turn; the HUD reads e.g. "turn 30–120° left (momentum)". |
+| TRACKING LOCK | Lock builds while the locked enemy sits in your guns (full in 1.2 seconds of the 1.6-second turn) and fades over 0.8 seconds while it doesn't, kept between turns. It adds up to +30% accuracy against that enemy. Once it fades, lock moves to the nearest enemy in your guns. Enemies build lock too. | "LOCK 60%" under an enemy you hold, "LOCKED ON YOU 100%" under your ship. |
+
+The enemy pilot respects momentum and bleed (it only plans moves the rules
+allow) and uses order-reading when on your six, but doesn't yet steer to get
+on your six or avoid hard turns on purpose.
+
+**Measured** (40 sector 1 skirmishes per setting, your squad flown as
+strikers who use a committed enemy's move when they can see it). "Kept" is how
+often a ship on an enemy's six is still on it a turn later; "in guns" how
+often it has the enemy in its cone then.
+
+| Rules on | Wins | Median turns | Kept | In guns |
+| --- | --- | --- | --- | --- |
+| None | 98% | 7 | 13% | 10% |
+| On their six | 92% | 8 | 16% | 25% |
+| Bleed speed | 92% | 7.5 | 21% | 19% |
+| Momentum | 85% | 7.5 | 23% | 13% |
+| Lock | 92% | 7 | 13% | 10% |
+| All four | 92% | 8.5 | 20% | 22% |
+
+Each cell rests on 50–80 tail situations, so differences of a few points are
+noise. Seeing the move turns a tail into shots more than into a held tail;
+momentum and bleed make a tail last; lock changes neither, only what a held
+tail is worth. None of the autopilots chase deliberately, so a person playing
+for the tail should get more out of each rule than this.
+
+### Quick battle setup (`TestBattleSelect`, `QuickBattleSetup`)
+
+The quick battle screen now sets up any fight, on one scrolling page:
+
+- **Your squadron:** up to three Kestrels, Raptors or ZTs, and the pilots' level (1–6, with the matching refit). Level 1 pilots know their line's signature maneuver; from level 2, the first two.
+- **Enemy wing:** up to six ships, optionally led by an ace (refitted a step ahead of your squadron). Enemies fly the first two maneuvers of their line at base numbers.
+- **Battlefield** and **opening** (every opening but the ambush, which needs reinforcements; one-sided openings come from a random side).
+- **Experiments:** the four switches above, each with its rule spelled out.
+
+Choices last for the session. After a quick battle the debrief offers FIGHT
+AGAIN (same setup) and CHANGE SETUP, and the pause menu's quit goes back to
+the setup screen.
 
 ## Known issues and next steps
 

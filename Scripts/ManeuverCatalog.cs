@@ -53,13 +53,34 @@ public sealed class ManeuverInfo
 /// </summary>
 public static class ManeuverCatalog
 {
+    /// <summary>
+    /// How far normal flight can turn this turn: "turn up to 120°", or under
+    /// turn momentum the window either side, e.g. "turn 30–120° left".
+    /// </summary>
+    static string TurnWindowText(Fighter f)
+    {
+        if (!Experiments.TurnMomentum)
+            return $"turn up to {f.PlannedNormalTurnLimitDegrees:0}°";
+        (float min, float max) = f.NormalTurnWindow(f.PlannedPathDistance);
+        float left = -Mathf.RadToDeg(min), right = Mathf.RadToDeg(max);
+        if (right < -0.5f)
+            return $"turn {-right:0}–{left:0}° left (momentum)";
+        if (left < -0.5f)
+            return $"turn {-left:0}–{right:0}° right (momentum)";
+        if (right < 0.5f)
+            return $"turn up to {left:0}° left (momentum)";
+        if (left < 0.5f)
+            return $"turn up to {right:0}° right (momentum)";
+        return $"turn up to {left:0}° left or {right:0}° right (momentum)";
+    }
+
     public static readonly ManeuverInfo[] All =
     {
         new()
         {
             Action = ManeuverAction.Normal, Maneuver = ManeuverType.Normal, Name = "FLY",
             Color = new Color(0.302f, 0.639f, 1f), Aimable = true,
-            Summary = f => $"Drag the ghost to steer. Throttle {f.NormalMoveMinDistance:0}–{f.NormalMoveMaxDistance:0}, turn up to {f.PlannedNormalTurnLimitDegrees:0}°." +
+            Summary = f => $"Drag the ghost to steer. Throttle {f.MinMoveFor(ManeuverType.Normal):0}–{f.MaxMoveFor(ManeuverType.Normal):0}, {TurnWindowText(f)}." +
                 (f.InNebula ? $" Nebula: every move is {(1f - f.RouteScale) * 100:0}% shorter this turn." : ""),
         },
         new()
@@ -79,7 +100,7 @@ public static class ManeuverCatalog
             Action = ManeuverAction.AirBrake, Ability = ShipAbility.AirBrake, Maneuver = ManeuverType.AirBrake, Name = "AIR BRAKE",
             Color = new Color(1f, 0.9f, 0.55f), Aimable = true,
             Summary = f => $"Drag to steer. Crawl {f.MinMoveFor(ManeuverType.AirBrake):0}–{f.MaxMoveFor(ManeuverType.AirBrake):0}, " +
-                $"turn up to {f.GetNormalTurnLimitDegrees(f.PlannedPathDistance):0}°. Pursuers overshoot.",
+                $"{TurnWindowText(f)}. Pursuers overshoot.",
         },
         new()
         {

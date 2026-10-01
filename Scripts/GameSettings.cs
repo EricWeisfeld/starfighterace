@@ -29,6 +29,15 @@ public static class GameSettings
         }
     }
 
+    /// <summary>Whether an experimental rule is switched on (see <see cref="Experiments"/>). All start off.</summary>
+    public static bool GetExperiment(string key) => (bool)File.GetValue("experiments", key, false);
+
+    public static void SetExperiment(string key, bool on)
+    {
+        File.SetValue("experiments", key, on);
+        File.Save(Path);
+    }
+
     public static BattleCameraMode CameraMode
     {
         get => (BattleCameraMode)(int)File.GetValue("battle", "camera", (int)BattleCameraMode.Overview);

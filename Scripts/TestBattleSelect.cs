@@ -4,20 +4,68 @@ using System.Linq;
 using static SignalUi;
 
 /// <summary>
-/// Quick Battle setup, laid out for a portrait phone: pick a battlefield,
-/// fill up to three squadron slots from the hangar list, launch. Pilots are
-/// disposable max-level sandbox pilots and never touch campaign data.
+/// What a quick battle stages: your ships and their level, the enemy wing,
+/// the battlefield and the opening. Kept for the whole session, so a rematch
+/// or a change to one setting doesn't mean building the fight again.
+/// </summary>
+public static class QuickBattleSetup
+{
+    public const int SquadSize = 3;
+    /// <summary>Every opening places up to six enemy ships.</summary>
+    public const int WingSize = 6;
+
+    public static readonly List<ShipType> Squad = new() { ShipTypes.Scout, ShipTypes.Raptor, ShipTypes.Zt };
+    public static readonly List<ShipType> Wing = new() { ShipTypes.Scout, ShipTypes.Raptor, ShipTypes.Zt };
+    public static int Level = Pilot.MaxLevel;
+    public static int MapIndex;
+    public static BattleOpening Opening = BattleOpening.HeadOn;
+    /// <summary>The wing's first ship flies as an ace, refitted a step ahead of your squadron.</summary>
+    public static bool AceLeads;
+
+    /// <summary>Openings a quick battle can stage: all but the ambush, which needs reinforcements.</summary>
+    public static readonly BattleOpening[] Openings =
+    {
+        BattleOpening.HeadOn, BattleOpening.LongApproach, BattleOpening.Flanked,
+        BattleOpening.Pincer, BattleOpening.RunningFight, BattleOpening.Bounced,
+    };
+
+    public static bool CanLaunch => Squad.Count > 0 && Wing.Count > 0;
+
+    /// <summary>Sets up the battle scene for this fight. One-sided openings come from a random side.</summary>
+    public static void Start()
+    {
+        BattleMapDefinition map = BattleMaps.All[MapIndex];
+        var forces = new BattleMission
+        {
+            Name = "QUICK BATTLE",
+            MapId = map.Id,
+            EnemySquad = Wing.ToArray(),
+            EnemyManeuvers = Pilot.MaxManeuvers,
+            Aces = AceLeads ? new[] { Aces.Callsigns[GD.RandRange(0, Aces.Callsigns.Length - 1)] } : System.Array.Empty<string>(),
+            AceRefits = Mathf.Min(3, Refits.TierFor(Level) + 1),
+            Opening = Opening,
+            OpeningMirrored = GD.Randf() < 0.5f,
+        };
+        GameSetup.StartQuickBattle(Squad, Level, map, forces);
+    }
+}
+
+/// <summary>
+/// Quick battle setup, laid out for a portrait phone: your ships and their
+/// level, the enemy wing, the battlefield, the opening, and the experimental
+/// chase rules. Pilots are disposable sandbox pilots and never touch run data.
 /// </summary>
 public partial class TestBattleSelect : Node2D
 {
-    const int SquadSize = 3;
-    readonly List<ShipType> _squad = new();
-    readonly List<TapCard> _shipCards = new();
-    readonly List<Button> _mapButtons = new();
-    readonly Button[] _slots = new Button[SquadSize];
-    Label _squadLabel, _mapBriefing;
-    Button _launch;
-    int _mapIndex;
+    readonly Button[] _squadSlots = new Button[QuickBattleSetup.SquadSize];
+    readonly Button[] _wingSlots = new Button[QuickBattleSetup.WingSize];
+    readonly List<Button> _squadAdds = new(), _wingAdds = new();
+    readonly List<Button> _levelButtons = new(), _mapButtons = new(), _openingButtons = new();
+    readonly Dictionary<Experiments.Rule, Button> _ruleButtons = new();
+    Label _squadLabel, _wingLabel, _levelLabel, _mapBriefing, _openingSummary;
+    Button _ace, _launch;
+
+    static readonly ShipType[] Lines = { ShipTypes.Scout, ShipTypes.Raptor, ShipTypes.Zt };
 
     public override void _Ready()
     {
@@ -41,63 +89,163 @@ public partial class TestBattleSelect : Node2D
         VBoxContainer titleBlock = Stack(0);
         titleBlock.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         titleBlock.AddChild(Text("QUICK BATTLE", FontTitle, TextBright, 4));
-        titleBlock.AddChild(Text($"MAX-LEVEL PILOTS · LEVEL {Pilot.MaxLevel}", FontCaption, Muted, 2));
+        titleBlock.AddChild(Text("SET UP ANY FIGHT", FontCaption, Muted, 2));
         header.AddChild(titleBlock);
         page.AddChild(header);
 
-        page.AddChild(Text("BATTLEFIELD", FontCaption, Muted, 4));
-        var maps = new GridContainer { Columns = 3, MouseFilter = Control.MouseFilterEnum.Ignore };
-        maps.AddThemeConstantOverride("h_separation", 12);
-        maps.AddThemeConstantOverride("v_separation", 12);
-        for (int i = 0; i < BattleMaps.All.Length; i++)
+        var scroll = new TouchScroll { SizeFlagsVertical = Control.SizeFlags.ExpandFill };
+        page.AddChild(scroll);
+        VBoxContainer body = Stack(14);
+        body.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        scroll.AddChild(body);
+
+        // Your squadron.
+        _squadLabel = Text("", FontCaption, Muted, 4);
+        body.AddChild(_squadLabel);
+        body.AddChild(SlotGrid(_squadSlots, 3, slot => Remove(QuickBattleSetup.Squad, slot)));
+        body.AddChild(AddRow(_squadAdds, ship => Add(QuickBattleSetup.Squad, QuickBattleSetup.SquadSize, ship)));
+        _levelLabel = Text("", FontCaption, Muted, 4);
+        body.AddChild(_levelLabel);
+        HBoxContainer levels = Row(10);
+        for (int level = 1; level <= Pilot.MaxLevel; level++)
         {
-            int index = i;
-            Button map = SelectableButton(BattleMaps.All[i].DisplayName);
-            map.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-            map.Pressed += () =>
+            int chosen = level;
+            Button button = SelectableButton(level.ToString());
+            button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            button.Pressed += () =>
             {
-                _mapIndex = index;
+                QuickBattleSetup.Level = chosen;
                 Refresh();
             };
-            _mapButtons.Add(map);
-            maps.AddChild(map);
+            _levelButtons.Add(button);
+            levels.AddChild(button);
         }
-        page.AddChild(maps);
-        _mapBriefing = Text("", FontCaption, Body, 0, wrap: true);
-        _mapBriefing.CustomMinimumSize = new Vector2(0, 60);
-        page.AddChild(_mapBriefing);
+        body.AddChild(levels);
+        body.AddChild(Text("Tap a ship to remove it. Level 1 pilots know their signature maneuver; from level 2, the first two of their line.",
+            FontMicro, Muted, 0, wrap: true));
 
-        _squadLabel = Text("", FontCaption, Muted, 4);
-        page.AddChild(_squadLabel);
-        HBoxContainer slots = Row(12);
-        for (int i = 0; i < SquadSize; i++)
+        // The enemy wing.
+        body.AddChild(Spacer(10));
+        _wingLabel = Text("", FontCaption, Muted, 4);
+        body.AddChild(_wingLabel);
+        body.AddChild(SlotGrid(_wingSlots, 3, slot => Remove(QuickBattleSetup.Wing, slot)));
+        body.AddChild(AddRow(_wingAdds, ship => Add(QuickBattleSetup.Wing, QuickBattleSetup.WingSize, ship)));
+        _ace = SelectableButton("");
+        _ace.Pressed += () =>
+        {
+            QuickBattleSetup.AceLeads = !QuickBattleSetup.AceLeads;
+            Refresh();
+        };
+        body.AddChild(_ace);
+        body.AddChild(Text("Tap a ship to remove it. Enemies fly the first two maneuvers of their line, at base numbers. An ace is refitted a step ahead of your squadron.",
+            FontMicro, Muted, 0, wrap: true));
+
+        // Battlefield.
+        body.AddChild(Spacer(10));
+        body.AddChild(Text("BATTLEFIELD", FontCaption, Muted, 4));
+        body.AddChild(ChoiceGrid(_mapButtons, BattleMaps.All.Select(m => m.DisplayName), 3, index =>
+        {
+            QuickBattleSetup.MapIndex = index;
+            Refresh();
+        }));
+        _mapBriefing = Text("", FontCaption, Body, 0, wrap: true);
+        body.AddChild(_mapBriefing);
+
+        // Opening.
+        body.AddChild(Spacer(10));
+        body.AddChild(Text("OPENING", FontCaption, Muted, 4));
+        body.AddChild(ChoiceGrid(_openingButtons, QuickBattleSetup.Openings.Select(BattleOpenings.Name), 2, index =>
+        {
+            QuickBattleSetup.Opening = QuickBattleSetup.Openings[index];
+            Refresh();
+        }));
+        _openingSummary = Text("", FontCaption, Body, 0, wrap: true);
+        body.AddChild(_openingSummary);
+
+        // Experimental chase rules.
+        body.AddChild(Spacer(10));
+        body.AddChild(Text("EXPERIMENTS", FontCaption, Muted, 4));
+        body.AddChild(Text("Rules for following an enemy, to try out. Each is saved on this device and applies to runs too while it's on.",
+            FontMicro, Muted, 0, wrap: true));
+        foreach (Experiments.Rule rule in Experiments.All)
+        {
+            Button toggle = SelectableButton("");
+            toggle.Pressed += () =>
+            {
+                Experiments.Set(rule, !Experiments.IsOn(rule));
+                Refresh();
+            };
+            _ruleButtons[rule] = toggle;
+            body.AddChild(toggle);
+            body.AddChild(Text(Experiments.Description(rule), FontMicro, Body, 0, wrap: true));
+        }
+        body.AddChild(Spacer(8));
+
+        _launch = TouchButton("LAUNCH", primary: true);
+        _launch.Pressed += Launch;
+        page.AddChild(_launch);
+    }
+
+    static Control Spacer(float height) =>
+        new Control { CustomMinimumSize = new Vector2(0, height), MouseFilter = Control.MouseFilterEnum.Ignore };
+
+    /// <summary>A grid of ship slots; tapping a filled slot empties it.</summary>
+    static GridContainer SlotGrid(Button[] slots, int columns, System.Action<int> remove)
+    {
+        var grid = new GridContainer { Columns = columns, MouseFilter = Control.MouseFilterEnum.Ignore };
+        grid.AddThemeConstantOverride("h_separation", 12);
+        grid.AddThemeConstantOverride("v_separation", 12);
+        for (int i = 0; i < slots.Length; i++)
         {
             int slot = i;
-            var button = SelectableButton("");
-            button.CustomMinimumSize = new Vector2(0, 132);
+            Button button = SelectableButton("");
+            button.CustomMinimumSize = new Vector2(0, 120);
             button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             button.IconAlignment = HorizontalAlignment.Center;
             button.VerticalIconAlignment = VerticalAlignment.Top;
             button.ExpandIcon = true;
             button.AddThemeFontSizeOverride("font_size", FontMicro);
-            button.Pressed += () => Remove(slot);
-            _slots[i] = button;
-            slots.AddChild(button);
+            button.Pressed += () => remove(slot);
+            slots[i] = button;
+            grid.AddChild(button);
         }
-        page.AddChild(slots);
+        return grid;
+    }
 
-        page.AddChild(Text("HANGAR · TAP A SHIP TO ADD IT", FontCaption, Muted, 4));
-        var scroll = new TouchScroll { SizeFlagsVertical = Control.SizeFlags.ExpandFill };
-        page.AddChild(scroll);
-        VBoxContainer list = Stack(12);
-        list.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        scroll.AddChild(list);
-        foreach (ShipType ship in ShipTypes.SandboxHulls)
-            list.AddChild(BuildShipRow(ship));
+    /// <summary>One add button per class line.</summary>
+    static HBoxContainer AddRow(List<Button> buttons, System.Action<ShipType> add)
+    {
+        HBoxContainer row = Row(12);
+        foreach (ShipType ship in Lines)
+        {
+            Button button = TouchButton($"+ {ShortName(ship)}", fontSize: FontCaption);
+            button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            button.Pressed += () => add(ship);
+            buttons.Add(button);
+            row.AddChild(button);
+        }
+        return row;
+    }
 
-        _launch = TouchButton("LAUNCH", primary: true);
-        _launch.Pressed += Launch;
-        page.AddChild(_launch);
+    /// <summary>A grid of choices; exactly one is lit (see <see cref="Refresh"/>).</summary>
+    static GridContainer ChoiceGrid(List<Button> buttons, IEnumerable<string> names, int columns, System.Action<int> choose)
+    {
+        var grid = new GridContainer { Columns = columns, MouseFilter = Control.MouseFilterEnum.Ignore };
+        grid.AddThemeConstantOverride("h_separation", 12);
+        grid.AddThemeConstantOverride("v_separation", 12);
+        int index = 0;
+        foreach (string name in names)
+        {
+            int chosen = index++;
+            Button button = SelectableButton(name);
+            button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            button.AddThemeFontSizeOverride("font_size", FontMicro);
+            button.ClipText = true;
+            button.Pressed += () => choose(chosen);
+            buttons.Add(button);
+            grid.AddChild(button);
+        }
+        return grid;
     }
 
     /// <summary>Outlined button whose border lights up when selected (see <see cref="SetSelected"/>).</summary>
@@ -120,77 +268,81 @@ public partial class TestBattleSelect : Node2D
         button.AddThemeColorOverride("font_hover_color", selected ? TextBright : Body);
     }
 
-    Control BuildShipRow(ShipType ship)
+    void Add(List<ShipType> side, int size, ShipType ship)
     {
-        // The whole card is the add button.
-        var card = new TapCard { CustomMinimumSize = new Vector2(0, 150) };
-        card.Tapped += () => Add(ship);
-        _shipCards.Add(card);
-        HBoxContainer row = Row(16);
-        card.AddChild(row);
-        row.AddChild(new TextureRect
-        {
-            Texture = ship.GetSkin(0).Icon,
-            CustomMinimumSize = new Vector2(96, 96),
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-            TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
-            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        VBoxContainer info = Stack(4);
-        info.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        info.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        info.AddChild(Text(ship.DisplayName.ToUpper(), FontBody, TextBright, 2));
-        info.AddChild(Text($"HULL {ship.MaxHp} · SHIELD {ship.MaxShield} · DMG {ship.ShotDamage} · EVA {ship.Evasion * 100:0}%", FontMicro, Body, 1));
-        string maneuvers = string.Join(" · ", ship.ManeuverPool.Take(Pilot.MaxManeuvers).Select(a => ManeuverCatalog.AbilityName(a).ToUpper()));
-        Label pool = Text(maneuvers, FontMicro, Muted, 1, wrap: true);
-        info.AddChild(pool);
-        row.AddChild(info);
-        return card;
+        if (side.Count >= size)
+            return;
+        side.Add(ship);
+        Refresh();
     }
 
-    void Add(ShipType ship)
+    void Remove(List<ShipType> side, int slot)
     {
-        if (_squad.Count < SquadSize)
-        {
-            _squad.Add(ship);
-            Refresh();
-        }
-    }
-
-    void Remove(int slot)
-    {
-        if (slot < _squad.Count)
-        {
-            _squad.RemoveAt(slot);
-            Refresh();
-        }
+        if (slot >= side.Count)
+            return;
+        side.RemoveAt(slot);
+        Refresh();
     }
 
     void Refresh()
     {
-        for (int i = 0; i < _mapButtons.Count; i++)
-            SetSelected(_mapButtons[i], i == _mapIndex);
-        _mapBriefing.Text = BattleMaps.All[_mapIndex].Briefing;
+        var squad = QuickBattleSetup.Squad;
+        var wing = QuickBattleSetup.Wing;
+        _squadLabel.Text = $"YOUR SQUADRON · {squad.Count}/{QuickBattleSetup.SquadSize}";
+        FillSlots(_squadSlots, squad, team: 0, label: (_, ship) => ShortName(ship));
+        foreach (Button add in _squadAdds)
+            add.Disabled = squad.Count >= QuickBattleSetup.SquadSize;
+        int refit = Refits.TierFor(QuickBattleSetup.Level);
+        _levelLabel.Text = $"PILOT LEVEL · LV {QuickBattleSetup.Level} · {Refits.Name(refit)}";
+        for (int i = 0; i < _levelButtons.Count; i++)
+            SetSelected(_levelButtons[i], i + 1 == QuickBattleSetup.Level);
 
-        _squadLabel.Text = $"SQUADRON · {_squad.Count}/{SquadSize} · TAP TO REMOVE";
-        for (int i = 0; i < _slots.Length; i++)
+        _wingLabel.Text = $"ENEMY WING · {wing.Count}/{QuickBattleSetup.WingSize}";
+        FillSlots(_wingSlots, wing, team: 1,
+            label: (slot, ship) => slot == 0 && QuickBattleSetup.AceLeads ? $"ACE {ShortName(ship)}" : ShortName(ship));
+        foreach (Button add in _wingAdds)
+            add.Disabled = wing.Count >= QuickBattleSetup.WingSize;
+        _ace.Text = QuickBattleSetup.AceLeads
+            ? $"ACE LEADS THE WING · ON · {Refits.Name(Mathf.Min(3, refit + 1))}"
+            : "ACE LEADS THE WING · OFF";
+        SetSelected(_ace, QuickBattleSetup.AceLeads);
+
+        for (int i = 0; i < _mapButtons.Count; i++)
+            SetSelected(_mapButtons[i], i == QuickBattleSetup.MapIndex);
+        _mapBriefing.Text = BattleMaps.All[QuickBattleSetup.MapIndex].Briefing;
+
+        for (int i = 0; i < _openingButtons.Count; i++)
+            SetSelected(_openingButtons[i], QuickBattleSetup.Openings[i] == QuickBattleSetup.Opening);
+        _openingSummary.Text = BattleOpenings.Summary(QuickBattleSetup.Opening, mirrored: null);
+
+        foreach ((Experiments.Rule rule, Button button) in _ruleButtons)
         {
-            bool occupied = i < _squad.Count;
-            _slots[i].Icon = occupied ? _squad[i].GetSkin(0).Base : null;
-            _slots[i].Text = occupied ? _squad[i].DisplayName.ToUpper() : "EMPTY";
-            SetSelected(_slots[i], occupied);
+            bool on = Experiments.IsOn(rule);
+            button.Text = $"{Experiments.Name(rule)} · {(on ? "ON" : "OFF")}";
+            SetSelected(button, on);
         }
-        foreach (TapCard card in _shipCards)
-            card.Disabled = _squad.Count >= SquadSize;
-        _launch.Disabled = _squad.Count == 0;
+        _launch.Disabled = !QuickBattleSetup.CanLaunch;
+    }
+
+    static string ShortName(ShipType ship) => ShipTypes.ClassName(ShipTypes.ClassIdForHull(ship.Id)).ToUpper();
+
+    static void FillSlots(Button[] slots, List<ShipType> ships, int team, System.Func<int, ShipType, string> label)
+    {
+        for (int i = 0; i < slots.Length; i++)
+        {
+            bool occupied = i < ships.Count;
+            slots[i].Icon = occupied ? ships[i].GetSkin(team).Icon : null;
+            slots[i].Text = occupied ? label(i, ships[i]) : "EMPTY";
+            slots[i].Disabled = !occupied;
+            SetSelected(slots[i], occupied);
+        }
     }
 
     void Launch()
     {
-        GameSetup.StartTestBattle(_squad, BattleMaps.All[_mapIndex]);
+        if (!QuickBattleSetup.CanLaunch)
+            return;
+        QuickBattleSetup.Start();
         ChangeScene(this, "res://Scenes/Battle.tscn");
     }
-
 }

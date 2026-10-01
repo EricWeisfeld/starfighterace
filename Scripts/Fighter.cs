@@ -111,6 +111,18 @@ public partial class Fighter : Node2D
     public int AiIdleTurns;
     /// <summary><see cref="ShotsFired"/> when the enemy pilot last planned.</summary>
     public int AiShotsSeen;
+
+    // Experimental chase rules (see Experiments).
+    /// <summary>The normal-flight turn flown last turn; 0 after a maneuver. Turn momentum centres this turn's window on it.</summary>
+    public float LastTurnRadians;
+    /// <summary>A hard turn last turn: this turn's throttle is capped at the minimum.</summary>
+    public bool Slowed;
+    bool _slowNextTurn;
+    /// <summary>The enemy this ship is building tracking lock on, and how far (0 to 1).</summary>
+    public Fighter LockTarget;
+    public float Lock;
+    /// <summary>An enemy that planned at the start of the turn because one of your ships is on its six.</summary>
+    public bool CommittedEarly;
     public Texture2D BaseTexture;             // for ghost previews
     public int Team;                          // 0 = player, 1 = enemy
     public float Heading;
@@ -274,6 +286,48 @@ public partial class Fighter : Node2D
         }
         return turnLimitDegrees;
     }
+
+    /// <summary>
+    /// The signed normal-flight turns this ship may make this turn, in radians.
+    /// Symmetric about straight ahead, unless turn momentum is on: then the
+    /// window is centred on last turn's turn.
+    /// </summary>
+    public (float Min, float Max) NormalTurnWindow(float pathDistance)
+    {
+        float limit = Mathf.DegToRad(GetNormalTurnLimitDegrees(pathDistance));
+        if (!Experiments.TurnMomentum)
+            return (-limit, limit);
+        float change = Mathf.DegToRad(NormalTurnLimitDegrees * Experiments.MomentumShare);
+        float min = Mathf.Max(-limit, LastTurnRadians - change);
+        float max = Mathf.Min(limit, LastTurnRadians + change);
+        if (min > max)
+            min = max = Mathf.Clamp(LastTurnRadians, -limit, limit);
+        return (min, max);
+    }
+
+    /// <summary>
+    /// The turn this ship will actually fly: its order, or with none its held
+    /// course (straight on), kept inside this turn's window. Under turn
+    /// momentum a held course may have to be a gentle turn.
+    /// </summary>
+    public float PlannedTurnOrHold => FliesLikeNormal(PlannedManeuver)
+        ? ClampNormalTurn(PlannedTurnAngleRadians ?? 0f, PlannedPathDistance)
+        : PlannedTurnAngleRadians ?? 0f;
+
+    /// <summary>Clamps a normal-flight turn into this turn's window.</summary>
+    public float ClampNormalTurn(float turn, float pathDistance)
+    {
+        (float min, float max) = NormalTurnWindow(pathDistance);
+        return Mathf.Clamp(turn, min, max);
+    }
+
+    /// <summary>This turn's top normal throttle: the minimum after a hard turn while speed bleeds.</summary>
+    public float NormalMaxMove => Slowed ? NormalMoveMinDistance : NormalMoveMaxDistance;
+
+    /// <summary>Accuracy added against a target this ship holds tracking lock on.</summary>
+    public float LockBonusAgainst(Fighter target) =>
+        Experiments.TrackingLock && target != null && target == LockTarget ? Lock * Experiments.LockAccuracyBonus : 0f;
+
     /// <summary>The maneuver being flown while a turn executes, or the one planned before it.</summary>
     ManeuverType ActiveManeuver => BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing
         ? _execManeuver : PlannedManeuver;
@@ -306,7 +360,7 @@ public partial class Fighter : Node2D
     public float MinMoveFor(ManeuverType maneuver) => maneuver == ManeuverType.AirBrake
         ? Moves.AirBrakeMinDistance : NormalMoveMinDistance * ThrottleScale(maneuver);
     public float MaxMoveFor(ManeuverType maneuver) => maneuver == ManeuverType.AirBrake
-        ? Moves.AirBrakeMaxDistance : NormalMoveMaxDistance * ThrottleScale(maneuver);
+        ? Moves.AirBrakeMaxDistance : NormalMaxMove * ThrottleScale(maneuver);
     public float EffectiveFireConeDeg => IsRotatingGunsActive ? Moves.RotatingGunsFireConeDeg : BaseFireConeDeg;
     public float EffectiveEvasion => Mathf.Clamp(Evasion
         - (IsEmergencyThrustersActive ? Moves.EmergencyThrustersEvasionPenalty : 0f)
@@ -389,7 +443,8 @@ public partial class Fighter : Node2D
             - (TunnelVisionActive ? Perks.TunnelVisionAccuracyPenalty : 0f)
             + (CoolUnderFireActive ? Perks.CoolUnderFireAccuracyBonus : 0f)
             + (TailGunnerActiveAgainst(target) ? Perks.TailGunnerAccuracyBonus : 0f)
-            + (target != null && target == HunterLockTarget && HasAbility(ShipAbility.HunterLock) ? Moves.HunterLockAccuracyBonus : 0f);
+            + (target != null && target == HunterLockTarget && HasAbility(ShipAbility.HunterLock) ? Moves.HunterLockAccuracyBonus : 0f)
+            + LockBonusAgainst(target);
         accuracy *= 1f - SensorScrambleAccuracyPenalty;
         return Mathf.Clamp(accuracy, 0f, 1f);
     }
@@ -562,8 +617,7 @@ public partial class Fighter : Node2D
     {
         PlannedManeuver = maneuver;
         PlannedPathDistance = Mathf.Clamp(SelectedNormalMoveDistance * ThrottleScale(maneuver), MinMoveFor(maneuver), MaxMoveFor(maneuver));
-        float maxTurn = Mathf.DegToRad(GetNormalTurnLimitDegrees(PlannedPathDistance));
-        PlannedTurnAngleRadians = Mathf.Clamp(turn, -maxTurn, maxTurn);
+        PlannedTurnAngleRadians = ClampNormalTurn(turn, PlannedPathDistance);
     }
 
     /// <summary>
@@ -664,6 +718,10 @@ public partial class Fighter : Node2D
         AlphaStrikeCooldownTurns = Mathf.Max(0, AlphaStrikeCooldownTurns - 1);
         TractorCooldownTurns = Mathf.Max(0, TractorCooldownTurns - 1);
         ManeuverLockTurns = Mathf.Max(0, ManeuverLockTurns - 1);
+        Slowed = _slowNextTurn;
+        _slowNextTurn = false;
+        if (FliesLikeNormal(PlannedManeuver))
+            PlannedPathDistance = Mathf.Clamp(PlannedPathDistance, MinMoveFor(PlannedManeuver), MaxMoveFor(PlannedManeuver));
         // The turn after an alpha strike, the guns are offline.
         _gunsOfflineTurns = Mathf.Max(0, _gunsOfflineTurns - 1);
         if (_alphaStrikeThisTurn)
@@ -936,15 +994,17 @@ public partial class Fighter : Node2D
     {
         _startPos = Position;
         _startHeading = Heading;
-        _execTurn = PlannedTurnAngleRadians ?? 0f;
+        _execTurn = PlannedTurnOrHold;
         _execDist = PlannedPathDistance;
         _execProgress = 0f;
         _execManeuver = PlannedManeuver;
         if (FliesLikeNormal(_execManeuver))
-        {
-            float maxTurn = Mathf.DegToRad(GetNormalTurnLimitDegrees(_execDist));
-            _execTurn = Mathf.Clamp(_execTurn, -maxTurn, maxTurn);
-        }
+            _execTurn = ClampNormalTurn(_execTurn, _execDist);
+        // Turn momentum carries a normal turn into the next one; a maneuver resets it.
+        LastTurnRadians = FliesLikeNormal(_execManeuver) ? _execTurn : 0f;
+        // A hard normal turn bleeds speed: next turn's throttle is capped at the minimum.
+        _slowNextTurn = Experiments.BleedSpeed && FliesLikeNormal(_execManeuver) &&
+                        Mathf.Abs(_execTurn) > Mathf.DegToRad(GetNormalTurnLimitDegrees(_execDist)) * Experiments.HardTurnShare;
         if (FliesLikeNormal(_execManeuver) && Mathf.IsEqualApprox(PlannedPathDistance, NormalMoveMaxDistance) &&
             Mathf.Abs(_execTurn) > Mathf.DegToRad(GetNormalTurnLimitDegrees(_execDist)) * 0.9f)
             NoteTrait(Perks.EngineShy); // a hard turn at full throttle is where the scar bites

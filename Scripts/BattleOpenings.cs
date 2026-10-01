@@ -55,13 +55,13 @@ public static class BattleOpenings
         _ => "HEAD-ON",
     };
 
-    /// <summary>One sentence for the briefing.</summary>
-    public static string Summary(BattleOpening opening, bool mirrored) => opening switch
+    /// <summary>One sentence for the briefing. With no side given, a one-sided opening says "either side".</summary>
+    public static string Summary(BattleOpening opening, bool? mirrored) => opening switch
     {
         BattleOpening.LongApproach => "The enemy starts far off. You have time to pick your angle.",
-        BattleOpening.Flanked => $"The enemy cuts in across your path from the {(mirrored ? "right" : "left")}.",
+        BattleOpening.Flanked => $"The enemy cuts in across your path from {mirrored switch { null => "either side", true => "the right", _ => "the left" }}.",
         BattleOpening.Pincer => "The enemy splits and closes from both sides.",
-        BattleOpening.RunningFight => $"Both wings fly the same way, out of range, with the enemy on your {(mirrored ? "left" : "right")}.",
+        BattleOpening.RunningFight => $"Both wings fly the same way, out of range, with the enemy on {mirrored switch { null => "either side", true => "your left", _ => "your right" }}.",
         BattleOpening.Bounced => "The enemy jumps you from behind.",
         BattleOpening.Ambush => "The enemy meets you head-on. Its reinforcements come in behind you.",
         _ => "The wings meet nose to nose.",

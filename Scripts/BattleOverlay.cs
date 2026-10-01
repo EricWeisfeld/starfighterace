@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>
 /// Draws all planning visuals on top of the battle: the reachable-area fan for
@@ -20,6 +21,7 @@ public partial class BattleOverlay : Node2D
     static readonly Color ThreatHigh = new(1f, 0.32f, 0.28f, 0.7f);
     static readonly Color TimeSliceCone = new(1f, 0.9f, 0.4f, 0.13f);
     static readonly Color NebulaTag = new(0.56f, 0.76f, 1f);
+    static readonly Color CommittedColor = new(1f, 0.55f, 0.45f);
     static readonly float[] TimeSliceProgress = { 0.25f, 0.5f, 0.75f };
     const int TargetingTimeSamples = 24;
     const float StrongCoverageThreshold = 0.65f;
@@ -135,11 +137,16 @@ public partial class BattleOverlay : Node2D
                 // Every fighter keeps a ghost visible, even before it has an
                 // order. The player grabs that ghost to set its maneuver.
                 float alpha = f == mgr.Selected ? 0.9f : f.PlannedTurnAngleRadians.HasValue ? 0.65f : 0.45f;
-                DrawPlan(mgr, f, f.PlannedTurnAngleRadians ?? 0f, alpha, showCone: f == mgr.Selected,
+                DrawPlan(mgr, f, f.PlannedTurnOrHold, alpha, showCone: f == mgr.Selected,
                     targeting: f == mgr.Selected ? targetingAnalysis : null,
                     threat: f == mgr.Selected ? threatAnalysis : null);
             }
         }
+
+        if (mgr.CurrentPhase == BattleManager.Phase.Planning)
+            foreach (Fighter e in mgr.EnemyFighters)
+                if (e.IsAlive && e.CommittedEarly)
+                    DrawCommittedMove(mgr, e);
 
         foreach (Fighter f in mgr.PlayerFighters)
             DrawHpBar(f, SignalUi.Positive);
@@ -205,18 +212,22 @@ public partial class BattleOverlay : Node2D
 
     void DrawReachableFan(Fighter f)
     {
-        float maxTurn = Mathf.DegToRad(f.PlannedManeuver == ManeuverType.EngineBoost
-            ? f.EngineBoostTurnLimitDegrees
-            : f.PlannedManeuver == ManeuverType.EmergencyThrusters
-                ? f.EmergencyThrustersTurnLimitDegrees
-                : f.PlannedManeuver == ManeuverType.PursuitBurn
-                    ? f.PursuitBurnTurnLimitDegrees
-                    : f.PlannedNormalTurnLimitDegrees);
+        float burn = Mathf.DegToRad(f.PlannedManeuver switch
+        {
+            ManeuverType.EngineBoost => f.EngineBoostTurnLimitDegrees,
+            ManeuverType.EmergencyThrusters => f.EmergencyThrustersTurnLimitDegrees,
+            ManeuverType.PursuitBurn => f.PursuitBurnTurnLimitDegrees,
+            _ => 0f,
+        });
+        // Normal flight's fan is this turn's window, which turn momentum can shift to one side.
+        (float minTurn, float maxTurn) = Fighter.FliesLikeNormal(f.PlannedManeuver)
+            ? f.NormalTurnWindow(f.PlannedPathDistance)
+            : (-burn, burn);
         const int samples = 32;
         var edge = new Vector2[samples + 1];
         for (int i = 0; i <= samples; i++)
         {
-            float turn = Mathf.Lerp(-maxTurn, maxTurn, i / (float)samples);
+            float turn = Mathf.Lerp(minTurn, maxTurn, i / (float)samples);
             f.RoutePoint(ManeuverType.Normal, turn, f.PlannedPathDistance, 1f, out edge[i], out _);
         }
 
@@ -284,6 +295,33 @@ public partial class BattleOverlay : Node2D
         float handle = Mathf.Max(24f, Px(26f));
         DrawCircle(end, handle, new Color(pathColor, 0.08f * alpha));
         DrawArc(end, handle, 0f, Mathf.Tau, 36, new Color(pathColor, 0.7f * alpha), W(2f), true);
+    }
+
+    /// <summary>
+    /// On their six: the move an enemy committed to because one of your ships
+    /// is behind it, drawn in its colour with a faint ghost where it ends.
+    /// </summary>
+    void DrawCommittedMove(BattleManager mgr, Fighter e)
+    {
+        const int samples = 24;
+        var pts = new Vector2[samples + 1];
+        float endHeading = e.Heading;
+        float turn = e.PlannedTurnOrHold;
+        for (int i = 0; i <= samples; i++)
+            e.RoutePoint(e.PlannedManeuver, turn, e.PlannedPathDistance, i / (float)samples, out pts[i], out endHeading);
+        float a = _labelAlpha;
+        for (int i = 0; i < samples; i += 2)
+            DrawLine(pts[i], pts[i + 1], new Color(CommittedColor, 0.85f * a), W(2.5f), true);
+        Vector2 end = pts[samples];
+        Texture2D tex = e.BaseTexture;
+        DrawSetTransform(end, endHeading + Mathf.Pi / 2f, Vector2.One * e.ArtScale);
+        DrawTexture(tex, -tex.GetSize() / 2f, new Color(1f, 0.6f, 0.55f, 0.45f * a));
+        DrawSetTransform(Vector2.Zero);
+        if (!e.GunsSilentDuring(e.PlannedManeuver))
+            DrawFireConeOutline(end, Fighter.GunHeadingFor(e.PlannedManeuver, endHeading), e.EffectiveFireRange, e.EffectiveFireConeDeg);
+        string move = e.PlannedManeuver == ManeuverType.Normal ? "" : $" · {ManeuverCatalog.ForManeuver(e.PlannedManeuver).Name}";
+        DrawLabel(end + new Vector2(0f, -Mathf.Max(24f, e.VisualRadius + 4f) - Px(16f)), $"ITS MOVE{move}", SignalUi.FontMicro,
+            new Color(CommittedColor, a));
     }
 
     void DrawThreatPath(Vector2[] points, ThreatAnalysis threat)
@@ -361,7 +399,7 @@ public partial class BattleOverlay : Node2D
             return;
         foreach (float progress in TimeSliceProgress)
         {
-            mgr.PredictExecutionPoint(shooter, shooter.PlannedManeuver, shooter.PlannedTurnAngleRadians ?? 0f,
+            mgr.PredictExecutionPoint(shooter, shooter.PlannedManeuver, shooter.PlannedTurnOrHold,
                 shooter.PlannedPathDistance, progress, out Vector2 position, out float heading);
             DrawFireConeOutline(position, Fighter.GunHeadingFor(shooter.PlannedManeuver, heading),
                 shooter.EffectiveFireRange, shooter.EffectiveFireConeDeg);
@@ -402,7 +440,7 @@ public partial class BattleOverlay : Node2D
         float coneRadians = Mathf.DegToRad(shooter.EffectiveFireConeDeg);
         float range = shooter.EffectiveFireRange;
         PredictedPath shooterPath = PredictPath(mgr, shooter, shooter.PlannedManeuver,
-            shooter.PlannedTurnAngleRadians ?? 0f, shooter.PlannedPathDistance);
+            shooter.PlannedTurnOrHold, shooter.PlannedPathDistance);
         var targetPaths = new List<PredictedPath>();
         foreach (TargetPlan plan in targetPlans)
             targetPaths.Add(PredictPath(mgr, target, plan.Maneuver, plan.Turn, plan.Distance));
@@ -465,7 +503,7 @@ public partial class BattleOverlay : Node2D
         }
 
         PredictedPath targetPath = PredictPath(mgr, target, target.PlannedManeuver,
-            target.PlannedTurnAngleRadians ?? 0f, target.PlannedPathDistance);
+            target.PlannedTurnOrHold, target.PlannedPathDistance);
 
         for (int i = 0; i <= TargetingTimeSamples; i++)
         {
@@ -590,14 +628,22 @@ public partial class BattleOverlay : Node2D
 
     IEnumerable<TargetPlan> LegalTargetPlans(Fighter target)
     {
+        // On their six: an enemy that has committed has one plan, and you can see it.
+        if (target.CommittedEarly)
+        {
+            yield return new TargetPlan(target.PlannedManeuver, target.PlannedTurnOrHold, target.PlannedPathDistance);
+            yield break;
+        }
+
         // The normal envelope carries most of the weight: three throttle
-        // settings crossed with five representative turn rates.
+        // settings crossed with five representative turns across this
+        // turn's window.
         for (int distanceIndex = 0; distanceIndex <= 2; distanceIndex++)
         {
-            float distance = Mathf.Lerp(target.NormalMoveMinDistance, target.NormalMoveMaxDistance, distanceIndex / 2f);
-            float maxTurn = Mathf.DegToRad(target.GetNormalTurnLimitDegrees(distance));
-            for (int turnIndex = -2; turnIndex <= 2; turnIndex++)
-                yield return new TargetPlan(ManeuverType.Normal, maxTurn * turnIndex / 2f, distance);
+            float distance = Mathf.Lerp(target.MinMoveFor(ManeuverType.Normal), target.MaxMoveFor(ManeuverType.Normal), distanceIndex / 2f);
+            (float minTurn, float maxTurn) = target.NormalTurnWindow(distance);
+            for (int turnIndex = 0; turnIndex <= 4; turnIndex++)
+                yield return new TargetPlan(ManeuverType.Normal, Mathf.Lerp(minTurn, maxTurn, turnIndex / 4f), distance);
         }
 
         if (target.HasAbility(ShipAbility.UTurn) && target.IsManeuverReady(ManeuverType.UTurn))
@@ -706,7 +752,33 @@ public partial class BattleOverlay : Node2D
             tagAt.Y += Px(16f);
         }
         if (f.IsTractored && BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Planning)
+        {
             DrawLabel(tagAt, "TRACTORED · NO MANEUVERS", SignalUi.FontMicro, new Color(0.4f, 0.95f, 0.9f, a));
+            tagAt.Y += Px(16f);
+        }
+
+        // Experimental chase rules.
+        if (f.Slowed)
+        {
+            DrawLabel(tagAt, "SLOWED · HARD TURN", SignalUi.FontMicro, new Color(SignalUi.Warning, a));
+            tagAt.Y += Px(16f);
+        }
+        BattleManager mgr = BattleManager.Instance;
+        if (mgr != null && Experiments.OnTheirSix && mgr.CurrentPhase == BattleManager.Phase.Planning && f.Team == 0 &&
+            mgr.EnemyFighters.Any(e => Experiments.OnSix(e, f)))
+        {
+            DrawLabel(tagAt, "ENEMY ON YOUR SIX", SignalUi.FontMicro, new Color(SignalUi.Negative, a));
+            tagAt.Y += Px(16f);
+        }
+        if (mgr != null && Experiments.TrackingLock)
+        {
+            // The lock held on this ship by the other side, at its strongest.
+            float held = (f.Team == 0 ? mgr.EnemyFighters : mgr.PlayerFighters)
+                .Where(o => o.IsAlive && o.LockTarget == f).Select(o => o.Lock).DefaultIfEmpty(0f).Max();
+            if (held >= 0.05f)
+                DrawLabel(tagAt, $"{(f.Team == 0 ? "LOCKED ON YOU" : "LOCK")} {held * 100:0}%", SignalUi.FontMicro,
+                    new Color(f.Team == 0 ? SignalUi.Negative : SignalUi.Positive, a));
+        }
     }
 }
 

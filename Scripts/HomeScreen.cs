@@ -71,7 +71,7 @@ public partial class HomeScreen : Node2D
         Button quick = TouchButton("QUICK BATTLE");
         quick.Pressed += () => ChangeScene(this, "res://Scenes/TestBattleSelect.tscn");
         _actions.AddChild(quick);
-        _actions.AddChild(Text("Pick up to three max-level ships and a battlefield.", FontCaption, Muted, 0, wrap: true));
+        _actions.AddChild(Text("Set up any fight: your ships, the enemy wing, the battlefield, and experimental rules.", FontCaption, Muted, 0, wrap: true));
     }
 
     public override void _Draw()

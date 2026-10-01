@@ -117,13 +117,8 @@ public partial class BattleManager : Node2D
             fighter.RoutePoint(maneuver, turn, distance, sample / (float)finalSample, out positions[sample], out headings[sample]);
     }
 
-    static float ClampPlannedTurn(Fighter fighter, ManeuverType maneuver, float turn, float distance)
-    {
-        if (!Fighter.FliesLikeNormal(maneuver))
-            return turn;
-        float maxTurn = Mathf.DegToRad(fighter.GetNormalTurnLimitDegrees(distance));
-        return Mathf.Clamp(turn, -maxTurn, maxTurn);
-    }
+    static float ClampPlannedTurn(Fighter fighter, ManeuverType maneuver, float turn, float distance) =>
+        Fighter.FliesLikeNormal(maneuver) ? fighter.ClampNormalTurn(turn, distance) : turn;
 
     /// <summary>Checks whether a bullet segment is stopped by an asteroid.</summary>
     public bool ShotBlocked(Vector2 from, Vector2 to) => SegmentHitsAsteroid(from, to, 0f);
@@ -560,7 +555,7 @@ public partial class BattleManager : Node2D
     public void FocusOn(Fighter fighter)
     {
         var points = new List<Vector2> { fighter.Position };
-        fighter.RoutePoint(fighter.PlannedManeuver, fighter.PlannedTurnAngleRadians ?? 0f, fighter.PlannedPathDistance, 1f,
+        fighter.RoutePoint(fighter.PlannedManeuver, fighter.PlannedTurnOrHold, fighter.PlannedPathDistance, 1f,
             out Vector2 ghost, out float ghostHeading);
         points.Add(ghost);
         points.Add(ghost + Vector2.FromAngle(Fighter.GunHeadingFor(fighter.PlannedManeuver, ghostHeading)) * fighter.EffectiveFireRange * 0.8f);
@@ -850,7 +845,7 @@ public partial class BattleManager : Node2D
 
     public Vector2 GetGhostEndpoint(Fighter fighter)
     {
-        fighter.RoutePoint(fighter.PlannedManeuver, fighter.PlannedTurnAngleRadians ?? 0f, fighter.PlannedPathDistance, 1f,
+        fighter.RoutePoint(fighter.PlannedManeuver, fighter.PlannedTurnOrHold, fighter.PlannedPathDistance, 1f,
             out Vector2 endpoint, out _);
         return endpoint;
     }
@@ -865,8 +860,7 @@ public partial class BattleManager : Node2D
             return;
 
         float bearing = Mathf.Wrap(offset.Angle() - fighter.Heading, -Mathf.Pi, Mathf.Pi);
-        float maxTurn = Mathf.DegToRad(fighter.PlannedNormalTurnLimitDegrees);
-        float turn = Mathf.Clamp(2f * bearing, -maxTurn, maxTurn);
+        float turn = fighter.ClampNormalTurn(2f * bearing, fighter.PlannedPathDistance);
         float absTurn = Mathf.Abs(turn);
         float chordFraction = absTurn < 0.001f ? 1f : 2f * Mathf.Sin(absTurn / 2f) / absTurn;
         // Nebula drag shortens the route flown for a given throttle, so the
@@ -875,8 +869,7 @@ public partial class BattleManager : Node2D
 
         // The Reckless penalty depends on the resulting throttle, so clamp once
         // more after the requested endpoint has established the move distance.
-        maxTurn = Mathf.DegToRad(fighter.PlannedNormalTurnLimitDegrees);
-        turn = Mathf.Clamp(2f * bearing, -maxTurn, maxTurn);
+        turn = fighter.ClampNormalTurn(2f * bearing, fighter.PlannedPathDistance);
         absTurn = Mathf.Abs(turn);
         chordFraction = absTurn < 0.001f ? 1f : 2f * Mathf.Sin(absTurn / 2f) / absTurn;
         fighter.SetPlannedMoveDistance(offset.Length() / chordFraction / fighter.RouteScale);
@@ -992,7 +985,7 @@ public partial class BattleManager : Node2D
             return;
         }
 
-        float currentTurn = fighter.PlannedTurnAngleRadians ?? 0f;
+        float currentTurn = fighter.PlannedTurnOrHold;
         bool alreadyActive = fighter.PlannedManeuver == info.Maneuver;
         if (action == ManeuverAction.Normal || (alreadyActive && !info.Directional))
         {
@@ -1055,7 +1048,7 @@ public partial class BattleManager : Node2D
 
     /// <summary>Player ships whose current plan flies into an asteroid.</summary>
     public List<Fighter> ShipsOnFatalCourse() => PlayerFighters
-        .Where(f => f.IsAlive && PathHitsAsteroid(f, f.PlannedManeuver, f.PlannedTurnAngleRadians ?? 0f, f.PlannedPathDistance))
+        .Where(f => f.IsAlive && PathHitsAsteroid(f, f.PlannedManeuver, f.PlannedTurnOrHold, f.PlannedPathDistance))
         .ToList();
 
     /// <summary>True while Engage is waiting for a second tap to confirm a fatal course.</summary>
@@ -1090,7 +1083,14 @@ public partial class BattleManager : Node2D
 
         var enemyTargets = PlayerFighters.Where(f => f.IsAlive).ToList();
         foreach (Fighter e in EnemyFighters.Where(f => f.IsAlive))
-            EnemyAI.Plan(e, enemyTargets, EnemyFighters, readOrders: e.IsAce);
+        {
+            // An enemy one of your ships is on the six of has already committed.
+            if (e.CommittedEarly)
+                continue;
+            // On their six: an enemy behind one of your ships plans against its real orders.
+            var tailed = Experiments.OnTheirSix ? enemyTargets.Where(p => Experiments.OnSix(e, p)).ToList() : null;
+            EnemyAI.Plan(e, enemyTargets, EnemyFighters, readOrders: e.IsAce, readsOrdersOf: tailed);
+        }
         foreach (Fighter f in AllAlive().Where(f => f.ChaffArmed))
             DropChaff(f);
         foreach (Fighter f in AllAlive())
@@ -1126,6 +1126,9 @@ public partial class BattleManager : Node2D
             f.RouteScale = IsInNebula(f.Position) ? NebulaRouteScale : 1f;
             f.TurnStartPathDistance = f.PlannedPathDistance;
         }
+        foreach (Fighter f in EnemyFighters)
+            f.CommittedEarly = false;
+        CommitTailedEnemies();
         // The first turn calls out the opening, and any aces.
         string[] aces = EnemyFighters.Where(f => f.IsAce).Select(f => f.AceName).ToArray();
         if (_turn == 1)
@@ -1142,6 +1145,25 @@ public partial class BattleManager : Node2D
         Selected = PlayerFighters.FirstOrDefault(f => f.IsAlive);
         if (frameCamera)
             FrameBattle();
+    }
+
+    /// <summary>
+    /// On their six: an enemy with one of your ships behind it commits its
+    /// move as the turn opens, against your ships' visible courses (an ace
+    /// can't read your orders this turn), and you plan seeing it.
+    /// </summary>
+    void CommitTailedEnemies()
+    {
+        if (!Experiments.OnTheirSix)
+            return;
+        var targets = PlayerFighters.Where(f => f.IsAlive).ToList();
+        foreach (Fighter e in EnemyFighters.Where(f => f.IsAlive).ToList())
+        {
+            if (!targets.Any(p => Experiments.OnSix(p, e)))
+                continue;
+            EnemyAI.Plan(e, targets, EnemyFighters, readOrders: false);
+            e.CommittedEarly = true;
+        }
     }
 
     IEnumerable<Fighter> AllAlive() =>
@@ -1198,6 +1220,8 @@ public partial class BattleManager : Node2D
     {
         foreach (Fighter f in AllAlive())
         {
+            if (Experiments.TrackingLock)
+                UpdateTrackingLock(f, dt);
             if (!f.CanFire || f.IsEvasiveSpinActive || f.GunsOffline)
                 continue;
             f.Cooldown -= dt;
@@ -1239,6 +1263,32 @@ public partial class BattleManager : Node2D
                 f.PlayFireAnimation(f.BarrageShotsLeft * BarrageShotInterval);
             }
         }
+    }
+
+    /// <summary>Whether a target sits in this ship's guns right now: in range, inside the cone, guns live.</summary>
+    bool InGuns(Fighter f, Fighter t) =>
+        t != null && t.IsAlive && f.CanFire && !f.IsEvasiveSpinActive && !f.GunsOffline &&
+        f.Position.DistanceTo(t.Position) <= f.EffectiveFireRange &&
+        Mathf.Abs(Mathf.Wrap((t.Position - f.Position).Angle() - f.GunHeading, -Mathf.Pi, Mathf.Pi)) <= Mathf.DegToRad(f.EffectiveFireConeDeg);
+
+    /// <summary>
+    /// Tracking lock builds while the locked enemy sits in this ship's guns
+    /// and fades while it doesn't. Once it has faded, lock moves to the
+    /// nearest enemy in the guns.
+    /// </summary>
+    void UpdateTrackingLock(Fighter f, float dt)
+    {
+        if (f.LockTarget != null && InGuns(f, f.LockTarget))
+        {
+            f.Lock = Mathf.Min(1f, f.Lock + dt / Experiments.LockBuildSeconds);
+            return;
+        }
+        f.Lock = Mathf.Max(0f, f.Lock - dt / Experiments.LockFadeSeconds);
+        if (f.Lock > 0f && f.LockTarget is { IsAlive: true })
+            return;
+        f.Lock = 0f;
+        f.LockTarget = GetTeam(1 - f.Team).Where(t => InGuns(f, t))
+            .OrderBy(t => f.Position.DistanceSquaredTo(t.Position)).FirstOrDefault();
     }
 
     void FireShot(Fighter shooter, Fighter target)

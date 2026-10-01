@@ -210,15 +210,15 @@ public partial class BattleHud : CanvasLayer
         stack.AddChild(_retreat);
         _retreatNote = Text("", FontCaption, Muted, 0, wrap: true);
         stack.AddChild(_retreatNote);
-        Button quit = TouchButton("QUIT TO TITLE");
+        Button quit = TouchButton(GameSetup.IsTestBattle ? "QUIT TO SETUP" : "QUIT TO TITLE");
         quit.Pressed += () =>
         {
             GetTree().Paused = false;
-            ChangeScene(this, "res://Scenes/HomeScreen.tscn");
+            ChangeScene(this, GameSetup.IsTestBattle ? "res://Scenes/TestBattleSelect.tscn" : "res://Scenes/HomeScreen.tscn");
         };
         stack.AddChild(quit);
         stack.AddChild(Text(GameSetup.IsTestBattle
-            ? "Leaves this quick battle."
+            ? "Leaves this quick battle for its setup screen."
             : "The run was saved when this battle began. Continue to replay it from the start.",
             FontCaption, Muted, 0, wrap: true));
 
@@ -383,7 +383,7 @@ public partial class BattleHud : CanvasLayer
             return;
         }
 
-        float turn = fighter.PlannedTurnAngleRadians ?? 0f;
+        float turn = fighter.PlannedTurnOrHold;
         if (Mgr.PathHitsAsteroid(fighter, fighter.PlannedManeuver, turn, fighter.PlannedPathDistance))
         {
             SetSummary("This path flies into an asteroid. The ship will be destroyed.", Negative);
@@ -402,6 +402,7 @@ public partial class BattleHud : CanvasLayer
             summary += $" {armed.Name} ARMED.";
         if (fighter.GunsOffline)
             summary += " Guns offline this turn.";
+        summary += ChaseNotes(fighter, turn);
         if (fighter.IsSuppressed)
         {
             // Maneuvers keep their own angles, so they are the way out.
@@ -409,6 +410,25 @@ public partial class BattleHud : CanvasLayer
             return;
         }
         SetSummary(summary, Muted);
+    }
+
+    /// <summary>What the experimental chase rules mean for this ship's turn.</summary>
+    string ChaseNotes(Fighter fighter, float turn)
+    {
+        string notes = "";
+        if (fighter.Slowed)
+            notes += " Slowed by last turn's hard turn.";
+        if (Experiments.BleedSpeed && Fighter.FliesLikeNormal(fighter.PlannedManeuver) &&
+            Mathf.Abs(turn) > Mathf.DegToRad(fighter.PlannedNormalTurnLimitDegrees) * Experiments.HardTurnShare)
+            notes += " Hard turn: next turn at minimum throttle.";
+        if (Experiments.OnTheirSix)
+        {
+            if (Mgr.EnemyFighters.Any(e => e.CommittedEarly && Experiments.OnSix(fighter, e)))
+                notes += " On an enemy's six: you see its move.";
+            if (Mgr.EnemyFighters.Any(e => Experiments.OnSix(e, fighter)))
+                notes += " An enemy on your six will see your move.";
+        }
+        return notes;
     }
 
     void SetSummary(string text, Color color)
@@ -518,7 +538,7 @@ public partial class ManeuverButton : Button
         bool active = Info.TargetsEnemy ? pendingTarget == Info.Action
             : Info.Toggle ? fighter.IsArmed(Info.Action)
             : fighter.PlannedManeuver == Info.Maneuver;
-        float side = Mathf.Sign(fighter.PlannedTurnAngleRadians ?? 0f);
+        float side = Mathf.Sign(fighter.PlannedTurnOrHold);
 
         Disabled = cooldown > 0;
         _glyph.Side = active && Info.Directional && side != 0f ? side : 1f;

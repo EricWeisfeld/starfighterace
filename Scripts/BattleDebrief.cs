@@ -74,10 +74,30 @@ public partial class BattleDebrief : CanvasLayer
         if (_report.Run is { } run)
             content.AddChild(BuildRunSummary(run));
 
-        Button next = TouchButton("CONTINUE", primary: true);
-        next.Pressed += () => ChangeScene(this, 
-            IsQuickBattle ? "res://Scenes/HomeScreen.tscn" : "res://Scenes/Run.tscn");
-        page.AddChild(next);
+        if (IsQuickBattle)
+        {
+            // A quick battle can be fought again as set up, or set up afresh.
+            HBoxContainer actions = Row(12);
+            Button setup = TouchButton("CHANGE SETUP");
+            setup.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            setup.Pressed += () => ChangeScene(this, "res://Scenes/TestBattleSelect.tscn");
+            actions.AddChild(setup);
+            Button again = TouchButton("FIGHT AGAIN", primary: true);
+            again.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            again.Pressed += () =>
+            {
+                QuickBattleSetup.Start();
+                ChangeScene(this, "res://Scenes/Battle.tscn");
+            };
+            actions.AddChild(again);
+            page.AddChild(actions);
+        }
+        else
+        {
+            Button next = TouchButton("CONTINUE", primary: true);
+            next.Pressed += () => ChangeScene(this, "res://Scenes/Run.tscn");
+            page.AddChild(next);
+        }
     }
 
     Control BuildKpis()

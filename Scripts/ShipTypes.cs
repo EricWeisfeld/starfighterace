@@ -589,19 +589,28 @@ public static class GameSetup
     public static BattleMission QuickBattleForces { get; private set; }
 
     /// <summary>A disposable max-level squadron for a quick battle.</summary>
-    public static void StartTestBattle(IEnumerable<ShipType> ships, BattleMapDefinition map)
+    /// <summary>A max-level squadron against a random late sector 3 patrol.</summary>
+    public static void StartTestBattle(IEnumerable<ShipType> ships, BattleMapDefinition map) =>
+        StartQuickBattle(ships, Pilot.MaxLevel, map, RunContent.QuickBattleForces(((ulong)GD.Randi() << 32) | GD.Randi()));
+
+    /// <summary>
+    /// A quick battle set up by hand: sandbox pilots at one level (level 1
+    /// knows its signature maneuver, later levels the first two of the line)
+    /// against a given enemy wing.
+    /// </summary>
+    public static void StartQuickBattle(IEnumerable<ShipType> ships, int level, BattleMapDefinition map, BattleMission forces)
     {
         string[] callsigns = { "ALPHA", "BRAVO", "CHARLIE" };
         PlayerPilots = ships.Select((ship, index) =>
         {
-            var pilot = new Pilot(callsigns[index], ship) { Level = Pilot.MaxLevel };
-            pilot.RestoreManeuvers(pilot.Ship.ManeuverPool);
+            var pilot = new Pilot(callsigns[index], ship) { Level = level };
+            pilot.RestoreManeuvers(pilot.Ship.ManeuverPool.Take(level >= 2 ? Pilot.MaxManeuvers : 1));
             return pilot;
         }).ToList();
         Mode = BattleMode.Quick;
         Mission = null;
         TestBattleMap = map;
-        QuickBattleForces = RunContent.QuickBattleForces(((ulong)GD.Randi() << 32) | GD.Randi());
+        QuickBattleForces = forces;
     }
 
     public static void StartRunBattle(List<Pilot> squad, BattleMission mission)

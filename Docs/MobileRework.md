@@ -284,15 +284,17 @@ those two turns, and 15 of 40 battles lost a ship there.
 
 ### Enemy tactics (`EnemyAI`, `EnemyTactic`)
 
-Every enemy flies a tactic, shown over the ship while planning (aces keep
-their gold label).
+Every enemy flies a tactic. Nothing on screen names it (role labels over
+the ships were tried and dropped); each line has its own habits to learn.
 
 | Tactic | Who | How it flies |
 | --- | --- | --- |
-| STRIKER | Raptors first, then every second Kestrel and ZT | Goes straight for its target and takes an even trade of fire. |
-| FLANKER | Kestrels first, then every second Raptor | Swings out to its side of the target (420 off its course) while closing, and holds off to the side, at least 320 away, while the target faces it. It turns in once the target looks away, or after two turns without firing. Flankers alternate sides. |
-| SNIPER | ZTs first | Keeps about 250 from its target and backs off anyone who would end a move within 180. One caught within 180 at the start of a turn fights as a striker. |
+| Striker | Raptors first, then every second Kestrel | Goes straight for its target and takes an even trade of fire. |
+| Flanker | Kestrels first, then every second Raptor | Swings out to its side of the target (420 off its course) while closing, and holds off to the side, at least 320 away, while the target faces it. It turns in once the target looks away, or after two turns without firing. Flankers alternate sides. |
+| Gunship | Every ZT | A slow, tough gun platform. It wades into the middle of the fight (likes to end about 150 from its target), barely minds your guns, counts any of your ships in its guns as good as its target, and goes after whichever of your ships is nearest its wing, so anyone chasing its wingmates flies into its fire. |
 | Ace | Aces | Hunts your most worn-down ship, minds your guns, and reads your orders. |
+
+- **Gunship replaced Sniper.** ZTs first flew as snipers that kept about 250 off and backed away from anyone closing. Over the same 40 sector 2 battles (level 1 squad flown as strikers), gunships fire about 75% more volleys than snipers did (268 against 153), fight closer (a median 239 from your nearest ship, was 264) and stay nearer their wing (228, was 256), and 40% of their first-exchange volleys hit a ship's side (snipers 18%). Wins and fight length are about the same (9 and 7 wins of 40; median 12 and 13 turns).
 
 - **Guns along the route.** Each candidate route is scored on how much of the move the pilot's guns cover a foe and how much a foe's guns cover it (sampled at five points), weighted by the foe's firepower, plus where the move leaves it against its target: nose on, at its preferred range, and, for flankers and aces especially, off the target's nose.
 - **What they expect you to do.** Non-ace pilots still can't see your orders. They now expect each of your ships to turn toward the nearest of their wing, as far as it can; straight ahead along your visible course still counts for half. Aces see the move you actually queued.
@@ -325,7 +327,8 @@ orange under the objective) and called out at the start of the battle.
 Two 240-battle batches, both with your squadron flown as strikers who can't
 see enemy orders (the old charge autopilot is too predictable for the new
 pilots to be a fair stand-in for a person). The control batch turns the enemy
-tactics off and opens every battle head-on.
+tactics off and opens every battle head-on. Measured while ZTs still flew as
+snipers.
 
 | | Control | Tactics and openings |
 | --- | --- | --- |

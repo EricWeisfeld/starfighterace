@@ -20,7 +20,6 @@ public partial class BattleOverlay : Node2D
     static readonly Color ThreatHigh = new(1f, 0.32f, 0.28f, 0.7f);
     static readonly Color TimeSliceCone = new(1f, 0.9f, 0.4f, 0.13f);
     static readonly Color NebulaTag = new(0.56f, 0.76f, 1f);
-    static readonly Color EnemyTag = new(1f, 0.62f, 0.52f);
     static readonly float[] TimeSliceProgress = { 0.25f, 0.5f, 0.75f };
     const int TargetingTimeSamples = 24;
     const float StrongCoverageThreshold = 0.65f;
@@ -686,9 +685,6 @@ public partial class BattleOverlay : Node2D
         else if (f.IsAce)
             DrawLabel(f.Position + new Vector2(0f, -Mathf.Max(26f, f.VisualRadius + 6f) - Px(12f)), $"ACE {f.AceName}", SignalUi.FontMicro,
                 new Color(ShipPaint.AceGold, a));
-        else if (EnemyAI.TacticLabel(f.Tactic) is { Length: > 0 } tactic)
-            DrawLabel(f.Position + new Vector2(0f, -Mathf.Max(26f, f.VisualRadius + 6f) - Px(12f)), tactic, SignalUi.FontMicro,
-                new Color(EnemyTag, 0.8f * a));
 
         // Status tags under the bars: Suppression Fire slows a ship's turning
         // until it gets out of the fire; nebula gas shortens this turn's move;

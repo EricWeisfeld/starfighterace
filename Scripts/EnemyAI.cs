@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>
-/// How an enemy pilot fights. Every enemy flies one, and you can read it over
-/// the ship while planning.
+/// How an enemy pilot fights. Every enemy flies one; nothing on screen names
+/// it, so you learn each line's habits by fighting it.
 /// </summary>
 public enum EnemyTactic
 {
@@ -14,8 +14,11 @@ public enum EnemyTactic
     Striker,
     /// <summary>Swings wide while closing, comes in from the side, and keeps out of guns.</summary>
     Flanker,
-    /// <summary>Hangs back near the edge of gun range and won't sit in front of anyone.</summary>
-    Sniper,
+    /// <summary>
+    /// A slow, tough gun platform: wades into the middle of the fight, shoots
+    /// whatever crosses its guns, and goes for whoever is on its wingmates.
+    /// </summary>
+    Gunship,
     /// <summary>An ace: hunts your weakest ship from out of its guns.</summary>
     Ace,
 }
@@ -53,8 +56,10 @@ public static class EnemyAI
         public float Weakness { get; init; }
         /// <summary>Swings out to its side while still far from its target.</summary>
         public bool Wide { get; init; }
-        /// <summary>Backs off anyone who would end a move close by.</summary>
-        public bool Kite { get; init; }
+        /// <summary>Any foe in its guns counts as much as its target.</summary>
+        public bool AnyTarget { get; init; }
+        /// <summary>Target choice: distance is measured from the nearest ship of its wing, not from itself.</summary>
+        public bool CoversWing { get; init; }
     }
 
     static TacticProfile ProfileFor(EnemyTactic tactic) => tactic switch
@@ -64,10 +69,10 @@ public static class EnemyAI
             Range = 190f, RangeWeight = 0.3f, Bearing = 1.0f, Offense = 110f, Exposure = 170f, Tail = 0.8f,
             Spread = 160f, Weakness = 80f, Wide = true,
         },
-        EnemyTactic.Sniper => new()
+        EnemyTactic.Gunship => new()
         {
-            Range = 250f, RangeWeight = 0.8f, Bearing = 0.6f, Offense = 140f, Exposure = 180f, Tail = 0.4f,
-            Spread = 80f, Weakness = 100f, Kite = true,
+            Range = 150f, RangeWeight = 0.3f, Bearing = 1.0f, Offense = 150f, Exposure = 45f, Tail = 0.15f,
+            Spread = 60f, Weakness = 80f, AnyTarget = true, CoversWing = true,
         },
         EnemyTactic.Ace => new()
         {
@@ -89,11 +94,6 @@ public static class EnemyAI
     const float FlankFacedDegrees = 70f;
     /// <summary>While holding off, a flanker keeps at least this far from its target.</summary>
     const float FlankHoldDistance = 320f;
-    /// <summary>
-    /// A sniper backs off a foe that would end a move this close; one that
-    /// starts a turn this close has caught it, and it turns to fight as a striker.
-    /// </summary>
-    const float SniperCrowdRange = 180f;
     /// <summary>Below this share of hull a pilot fights cautiously and weighs exposure more.</summary>
     const float CautiousHullFraction = 0.35f;
     const float CautiousExposureMultiplier = 1.6f;
@@ -115,10 +115,10 @@ public static class EnemyAI
     static readonly float[] GunSamples = { 0.2f, 0.4f, 0.6f, 0.8f, 1f };
 
     /// <summary>
-    /// Gives a newly spawned enemy its tactic. Aces fly as aces. Otherwise each
-    /// class line alternates between two tactics, so a wing of one line still
-    /// mixes them: Kestrels flank first, Raptors strike first, ZTs snipe
-    /// first. Flankers alternate sides.
+    /// Gives a newly spawned enemy its tactic. Aces fly as aces and ZTs as
+    /// gunships. Kestrels and Raptors alternate between flanking and striking,
+    /// so a wing of one line still mixes them: Kestrels flank first, Raptors
+    /// strike first. Flankers alternate sides.
     /// </summary>
     public static void AssignTactic(Fighter self, IEnumerable<Fighter> wing)
     {
@@ -132,22 +132,13 @@ public static class EnemyAI
         EnemyTactic[] cycle = line switch
         {
             "raptor" => new[] { EnemyTactic.Striker, EnemyTactic.Flanker },
-            "zt" => new[] { EnemyTactic.Sniper, EnemyTactic.Striker },
+            "zt" => new[] { EnemyTactic.Gunship },
             _ => new[] { EnemyTactic.Flanker, EnemyTactic.Striker },
         };
         int sameLine = others.Count(f => !f.IsAce && ShipTypes.ClassIdForHull(f.Type.Id) == line);
         self.Tactic = cycle[sameLine % cycle.Length];
         self.FlankSide = others.Count(f => f.Tactic == EnemyTactic.Flanker) % 2 == 0 ? 1 : -1;
     }
-
-    /// <summary>The label shown over an enemy flying this tactic.</summary>
-    public static string TacticLabel(EnemyTactic tactic) => tactic switch
-    {
-        EnemyTactic.Striker => "STRIKER",
-        EnemyTactic.Flanker => "FLANKER",
-        EnemyTactic.Sniper => "SNIPER",
-        _ => "",
-    };
 
     // Clearance is measured from the outside of the ship collision envelope.
     // It gives the live movement simulation room to remain visibly clear of a
@@ -200,9 +191,7 @@ public static class EnemyAI
     public static void Plan(Fighter self, IReadOnlyList<Fighter> foes, IReadOnlyList<Fighter> allies, bool readOrders = true)
     {
         bool tactical = self.Tactic != EnemyTactic.None;
-        bool caught = self.Tactic == EnemyTactic.Sniper &&
-                      foes.Any(f => f != null && f.IsAlive && f.Position.DistanceTo(self.Position) < SniperCrowdRange);
-        TacticProfile profile = ProfileFor(caught ? EnemyTactic.Striker : self.Tactic);
+        TacticProfile profile = ProfileFor(self.Tactic);
         self.AiIdleTurns = self.ShotsFired > self.AiShotsSeen ? 0 : self.AiIdleTurns + 1;
         self.AiShotsSeen = self.ShotsFired;
         Fighter target = tactical ? ChooseTarget(self, foes, allies, profile) : SelectTarget(self, foes);
@@ -430,7 +419,7 @@ public static class EnemyAI
             {
                 FoeTrack.Sample at = foe.Samples[i];
                 if (gunsLive && Covers(pos, gunHeading, cone, self.EffectiveFireRange, at.Position))
-                    best = Mathf.Max(best, foe == target ? 1f : 0.6f);
+                    best = Mathf.Max(best, foe == target || p.AnyTarget ? 1f : 0.6f);
                 if (!at.GunsLive)
                     continue;
                 if (Covers(at.Position, at.GunHeading, at.Cone, foe.Ship.EffectiveFireRange, pos))
@@ -444,17 +433,6 @@ public static class EnemyAI
         exposure /= GunSamples.Length;
         float caution = (self.Hp < self.MaxHp * CautiousHullFraction ? CautiousExposureMultiplier : 1f) * context.Boldness;
         score += offense * p.Offense - exposure * p.Exposure * caution;
-
-        // A sniper backs off anyone who would end up close.
-        if (p.Kite)
-        {
-            foreach (FoeTrack foe in context.Foes)
-            {
-                float d = end.DistanceTo(foe.EndPosition);
-                if (d < SniperCrowdRange)
-                    score -= (SniperCrowdRange - d) * 1.5f * context.Boldness;
-            }
-        }
         return score;
     }
 
@@ -463,8 +441,9 @@ public static class EnemyAI
         Mathf.Abs(Mathf.Wrap((to - from).Angle() - gunHeading, -Mathf.Pi, Mathf.Pi)) <= cone;
 
     /// <summary>
-    /// Picks a target for a tactical pilot: the nearest, pulled toward worn-down
-    /// ships, pushed off ships allies are already on, and held from last turn.
+    /// Picks a target for a tactical pilot: the nearest (to a gunship's wing,
+    /// for a gunship), pulled toward worn-down ships, pushed off ships allies
+    /// are already on, and held from last turn.
     /// </summary>
     static Fighter ChooseTarget(Fighter self, IReadOnlyList<Fighter> foes, IReadOnlyList<Fighter> allies, TacticProfile p)
     {
@@ -476,7 +455,10 @@ public static class EnemyAI
                 continue;
             float worn = 1f - (foe.Hp + foe.Shield) / (float)Mathf.Max(1, foe.MaxHp + foe.MaxShield);
             int onIt = allies.Count(a => a != self && a.IsAlive && a.AiTarget == foe);
-            float cost = self.Position.DistanceTo(foe.Position)
+            float near = p.CoversWing
+                ? allies.Where(a => a.IsAlive).Append(self).Min(a => a.Position.DistanceTo(foe.Position))
+                : self.Position.DistanceTo(foe.Position);
+            float cost = near
                          - worn * p.Weakness
                          + onIt * p.Spread
                          - (foe == self.AiTarget ? TargetStickiness : 0f);

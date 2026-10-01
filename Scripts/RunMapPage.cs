@@ -197,7 +197,8 @@ public partial class RunScreen
         if (node.BattleKind is RunNodeKind kind)
         {
             BattleMission mission = RunContent.BuildMission(node, Run.Sector, kind);
-            string detail = $"THREAT {mission.Threat} · {Plural(mission.EnemySquad.Length, "HOSTILE")}";
+            string waves = mission.Reinforcements.Length > 0 ? $" +{mission.Reinforcements.Length}" : "";
+            string detail = $"THREAT {mission.Threat} · {Plural(mission.EnemySquad.Length, "HOSTILE")}{waves}";
             return kind == RunNodeKind.Elite ? detail + " · MODULE CRATE" : detail;
         }
         return node.Kind switch

@@ -45,7 +45,7 @@ public static class Perks
     public const int BrawlerExtraShots = 2;
     /// <summary>Volleys from within this fraction of weapon range count as close in.</summary>
     public const float BrawlerRangeFraction = 1f / 3f;
-    public const int SteadyShieldRegenBonus = 2;
+    public const int SteadyShieldRegenBonus = 20;
     public const float DaredevilEvasionBonus = 0.15f;
 
     public const float HesitantRangeMultiplier = 0.80f;

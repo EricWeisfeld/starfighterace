@@ -35,9 +35,13 @@ public class Pilot
 
     public bool Alive => Condition != PilotCondition.KIA;
     public bool IsMaxLevel => Level >= MaxLevel;
-    /// <summary>The ship's always-on numbers: its frame's, with its modules fitted.</summary>
-    public ShipStats Stats => ShipStats.For(Ship, Upgrades);
-    /// <summary>Maximum hull: the frame's, plus armor plating.</summary>
+    /// <summary>Hull refits earned so far: 0 (Mk I) to 3 (Mk IV).</summary>
+    public int Refit => Refits.TierFor(Level);
+    /// <summary>The frame with its refit mark, for example "S1 KESTREL MK II".</summary>
+    public string FrameName => $"{Ship.DisplayName.ToUpper()} {Refits.Name(Refit)}";
+    /// <summary>The ship's always-on numbers: its frame's, refitted to the pilot's level, with its modules fitted.</summary>
+    public ShipStats Stats => ShipStats.For(Ship, Upgrades, Refit);
+    /// <summary>Maximum hull: the frame's, refitted, plus armor plating.</summary>
     public int MaxHull => Stats.MaxHull;
     /// <summary>Hull the ship will launch with. Shields always launch full.</summary>
     public int Hull => Mathf.Clamp(MaxHull - HullDamage, 1, MaxHull);

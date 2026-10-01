@@ -75,8 +75,8 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | Signal | One of six events. Rewards are XP, module crates, repairs, a recruit or a faded scar. Some turn into a fight. |
 | Boss | Sector 1: blockade command ship (strike). Sector 2: the convoy escort. Sector 3: the ace wing. |
 
-- **Threat** runs from 1 in the first sector to 9 at the last boss. It feeds the existing `EncounterDifficulty` curve.
-- **Enemy wings** draw from balanced frames early and attack and guard frames later, for variety; their strength comes from threat.
+- **Threat** runs from 1 in the first sector to 10 at a late sector 3 elite. It is shown on the map and briefing as a difficulty label.
+- **Enemy wings** grow in numbers, not stats: see Phase 5.
 - **Sector transitions:** clearing a sector patches half of each ship's damage. Full repairs are at docks.
 - **Losing** an ordinary battle spends the stop and earns nothing. Losing a boss, or losing every pilot, ends the run.
 
@@ -114,7 +114,8 @@ hardware. Anything you have to fly a certain way to get is a pilot skill.
 The ship type and the instinct are picked when a pilot joins and never change.
 Everything else grows from level-ups; there is no currency. (Phase 4 first had
 ships bought with salvage and refit frames earned at level 3; both were removed
-to keep the run simple.)
+to keep the run simple. Hull refits came back in Phase 5 as automatic Mk
+upgrades at levels 2, 4 and 6.)
 
 ### Ship growth (`ShipUpgrades`, `ShipTypes`)
 
@@ -130,15 +131,15 @@ to keep the run simple.)
 
 | Frame | Role | Hull | Shield | Dmg | Acc | Eva | Firepower | Toughness |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S1 Kestrel | Balanced | 20 | 10 | 3 | 85% | 35% | 2.55 | 46 |
-| S4 Striker | Attack | 16 | 8 | 4 | 80% | 35% | 3.20 (+25%) | 37 (−20%) |
-| S9 Ghost | Guard | 20 | 14 | 3 | 70% | 40% | 2.10 (−18%) | 57 (+23%) |
-| Raptor | Balanced | 34 | 17 | 5 | 88% | 28% | 4.40 | 71 |
-| R3 Black Hawk | Attack | 29 | 14 | 6 | 88% | 28% | 5.28 (+20%) | 60 (−16%) |
-| R5 Falcon | Guard | 34 | 22 | 4 | 88% | 36% | 3.52 (−20%) | 88 (+24%) |
-| ZT Class | Balanced | 50 | 25 | 5 | 82% | 15% | 4.10 | 88 |
-| ZT-6 | Attack | 40 | 20 | 6 | 85% | 15% | 5.10 (+24%) | 71 (−20%) |
-| ZT-8 Bulwark | Guard | 58 | 32 | 4 | 82% | 15% | 3.28 (−20%) | 106 (+20%), 3 shield regen |
+| S1 Kestrel | Balanced | 200 | 100 | 30 | 85% | 35% | 25.5 | 460 |
+| S4 Striker | Attack | 160 | 80 | 40 | 80% | 35% | 32.0 (+25%) | 370 (−20%) |
+| S9 Ghost | Guard | 200 | 140 | 30 | 70% | 40% | 21.0 (−18%) | 570 (+23%) |
+| Raptor | Balanced | 340 | 170 | 50 | 88% | 28% | 44.0 | 710 |
+| R3 Black Hawk | Attack | 290 | 140 | 60 | 88% | 28% | 52.8 (+20%) | 600 (−16%) |
+| R5 Falcon | Guard | 340 | 220 | 40 | 88% | 36% | 35.2 (−20%) | 880 (+24%) |
+| ZT Class | Balanced | 500 | 250 | 50 | 82% | 15% | 41.0 | 880 |
+| ZT-6 | Attack | 400 | 200 | 60 | 85% | 15% | 51.0 (+24%) | 710 (−20%) |
+| ZT-8 Bulwark | Guard | 580 | 320 | 40 | 82% | 15% | 32.8 (−20%) | 1060 (+20%), 30 shield regen |
 
 - The lines are not balanced against each other on paper: the Kestrel line's firepower × toughness is about a third of the ZT line's. It relies on speed, turning and its larger maneuver pool.
 
@@ -148,8 +149,9 @@ to keep the run simple.)
 | --- | --- |
 | Engine | Overdrive (+30 max move) · Vector Nozzles (+15° turn) · Retro Thrusters (-40 min move) |
 | Guns | Burst Loader (+1 shot per volley) · Targeting Array (+8% accuracy) · Wide Mount (cone 24° → 32°) |
-| Shields | Shield Capacitor (+8 shields) · Flux Recycler (+1 regen) · Armor Plating (+8 hull, -15 max move) |
+| Shields | Shield Capacitor (+35% shields) · Flux Recycler (+50% regen) · Armor Plating (+30% hull, -15 max move) |
 
+- Shield-slot modules are percentages, so they matter as much on a Bulwark as on a Kestrel.
 - Modules come from level-up cards and from module crates (elite wins and some signals). A crate offers three modules, each matched to a pilot's ship.
 - Fitting a module to a filled slot replaces the old one.
 
@@ -211,9 +213,47 @@ Instincts are never rolled after battles or learned later.
 The save is version 3. Older saves can't be loaded; Home says so and offers a
 new run. A run saved during the draft resumes on the draft page.
 
+## Phase 5: progression by numbers
+
+The first win-rate batch (960 autopilot battles) showed that enemy ship count
+decided fights far more than anything else, that a +% stat bonus on the enemy
+outgrew pilot levels, and that damage values of 3–6 made every percentage
+bump lumpy. So enemies now scale by count and pilots by refits.
+
+- **Numbers ×10.** Hull, shields, regen and damage are ten times what they were (a Kestrel has 200 hull and 30 damage), as are rock scrapes (up to 140), the ion storm (60) and Steady (+20 regen). Percentage changes now land smoothly. The save version is 4; older runs can't be continued.
+- **Hull refits (`Refits`).** At levels 2, 4 and 6 a pilot's frame becomes Mk II, III and IV. Each refit raises hull, shields, regen and damage by 20% (compounding, so Mk IV is +73%) and adds 2% accuracy and 1% evasion. Refits are automatic; the level-up card is still chosen as before. The Mk shows on every pilot card, the level-up page announces it, and the pilot page lists it above the numbers.
+- **Enemies fly at base numbers.** The old encounter roll (a +0–52% stat bonus traded against ship count) is gone. Each stop brings a set wing, and some bring reinforcements:
+
+| Stop | Sector 1 | Sector 2 | Sector 3 |
+| --- | --- | --- | --- |
+| Skirmish / strike, early | 2 | 3 | 4 |
+| Skirmish / strike, late | 2–3 | 3 + 1 | 4 + 1 |
+| Elite | 3 | 3 + 1 | 4 + 1 |
+| Boss | 3 + 1 | 4 + 2 mid-escort | 4 + 2 |
+
+- **Hull mix and maneuvers (composition).** Wings draw from balanced frames in sector 1, add attack frames in sector 2, and use attack and guard frames in sector 3 (elites and bosses use the next sector's mix). Enemies fly none of their line's maneuvers in sector 1, the first two in sector 2 and all of them in sector 3, and they now weigh those maneuvers alongside normal flight when lining up a shot, not only to escape rocks.
+- **Reinforcements.** A "+N" wave arrives at the start of turn 3 at the enemy start positions furthest from your ships. If the first group is wiped out before then, the wave arrives at once instead of the battle ending. The escort's wave still arrives partway along the corridor. Briefings show the wave faded as INBOUND, and the map shows "3 HOSTILES +1".
+- **Quick battle** pits the max-level (Mk IV) squadron against a late sector 3 patrol (4 + 1) instead of three basic ships.
+
+**Measured.** In the same 960-battle batch as before, the enemy AI flies both sides, neither side sees the other's orders, and each stop is fought at the pilot level a run reaches there:
+
+| Stop | Before | After |
+| --- | --- | --- |
+| Sector 1 skirmishes (L1–3) | 70–80% | 75–80% |
+| Sector 1 elite / boss (L3) | 30% / 50% | 50% / 40% |
+| Sector 2 skirmishes (L3–5) | 40–50% | 70–80% |
+| Sector 2 elite (L5) | 50% | 30% |
+| Sector 2 boss, escort (L5) | 0% | 0% |
+| Sector 3 skirmishes (L6) | 10% | 50–80% |
+| Sector 3 elite / boss (L6) | 10% / 0% | 50% / 20% |
+
+Level now matters: across all stops a level 1 squadron wins 21% and a level 6 one 73%, against 28% and 41% before. Cells are 10 battles each, so ±30%.
+
 ## Known issues and next steps
 
 - `EnemyAI` reads the player's queued maneuver when choosing its own, so enemies react to orders the player has not revealed yet. For a simultaneous-turn game this is worth reconsidering, together with difficulty.
+- The escort boss still loses every autopilot battle: the transport dies in about five turns while the squadron is mostly intact. It needs its own look (transport toughness, attacker focus, wave timing), ideally with human play.
+- Sector 2 elites (3 + 1 with every maneuver) and the sector 3 boss (4 + 2) sit below the 50% and 40% targets; worth a second pass once humans have played the new curve.
 - Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many level-ups a run gives now that every ship has three slots, free docks, threat per layer, ejection and scar odds, and instinct strength.
 - Maps could be drawn from pools by stop type (open maps for skirmishes, dense ones for elites) and mirrored left to right for more variety.
 - An Android export preset and a device test pass are still to do. The device pass should check the nebula and asteroid shaders' frame rate on a low-end phone.

@@ -253,6 +253,38 @@ public static class RunContent
 
     static string HeavyHull(int tier) => tier switch { 1 => "zt", 2 => "zt_6", _ => "zt_8_bulwark" };
 
+    /// <summary>
+    /// How many enemies a battle stop brings at the start, and how many join
+    /// later. Enemies always fly at their frames' base numbers: a fight gets
+    /// harder through more ships and a tougher mix of hulls, while pilots
+    /// grow through levels and refits.
+    /// </summary>
+    public static (int Initial, int Wave) EnemyForce(int sector, RunNodeKind kind, int layer, RandomNumberGenerator rng)
+    {
+        bool late = layer > 2;
+        return (kind, sector) switch
+        {
+            (RunNodeKind.Elite, 1) => (3, 0),
+            (RunNodeKind.Elite, 2) => (3, 1),
+            (RunNodeKind.Elite, _) => (4, 1),
+            (RunNodeKind.Boss, 1) => (3, 1),
+            (RunNodeKind.Boss, _) => (4, 2),
+            (_, 1) => (late && rng.Randf() < 0.5f ? 3 : 2, 0),
+            (_, 2) => (3, late ? 1 : 0),
+            _ => (4, late ? 1 : 0),
+        };
+    }
+
+    /// <summary>
+    /// How many of its line's maneuvers an enemy can fly, by hull tier: none
+    /// for sector 1's raiders, the first two from sector 2, all of them in sector 3.
+    /// </summary>
+    public static int EnemyManeuvers(int tier) => tier switch { 1 => 0, 2 => 2, _ => int.MaxValue };
+
+    /// <summary>A quick battle's opposition for a max-level squadron: a late sector 3 patrol.</summary>
+    public static BattleMission QuickBattleForces(ulong seed) =>
+        BuildMission(new RunNode { Layer = 3, Seed = seed, Kind = RunNodeKind.Skirmish }, 3, RunNodeKind.Skirmish);
+
     /// <summary>The fight at a battle stop. Seeded by the stop, so the briefing matches the battle.</summary>
     public static BattleMission BuildMission(RunNode node, int sector, RunNodeKind kind)
     {
@@ -266,11 +298,11 @@ public static class RunContent
             _ => MissionObjective.EliminateHostiles,
         };
         int tier = Mathf.Clamp(sector + (kind is RunNodeKind.Elite or RunNodeKind.Boss ? 1 : 0), 1, 3);
-        EnemyEncounter encounter = EncounterDifficulty.Roll(EncounterDifficulty.CombatLevel(threat, objective), rng);
+        (int initial, int wave) = EnemyForce(sector, kind, node.Layer, rng);
         string[] pool = EnemyPool(tier);
-        var squad = new ShipType[encounter.ShipCount];
-        for (int i = 0; i < squad.Length; i++)
-            squad[i] = ShipTypes.FromId(pool[rng.RandiRange(0, pool.Length - 1)]);
+        ShipType Pick() => ShipTypes.FromId(pool[rng.RandiRange(0, pool.Length - 1)]);
+        ShipType[] squad = Enumerable.Range(0, initial).Select(_ => Pick()).ToArray();
+        ShipType[] reinforcements = Enumerable.Range(0, wave).Select(_ => Pick()).ToArray();
         if (objective == MissionObjective.DestroyTarget)
             squad[0] = ShipTypes.FromId(HeavyHull(tier)); // the first enemy is the marked target
 
@@ -289,7 +321,8 @@ public static class RunContent
             Objective = objective,
             MapId = objective == MissionObjective.EscortShip ? BattleMaps.EscortCorridorId : node.MapId,
             EnemySquad = squad,
-            EnemyStatMultiplier = encounter.StatMultiplier,
+            Reinforcements = reinforcements,
+            EnemyManeuvers = EnemyManeuvers(tier),
             EnemyAITuning = MissionAITuning.ForObjective(objective),
         };
     }
@@ -550,11 +583,11 @@ public static class RunContent
             {
                 new()
                 {
-                    Label = "PUSH THROUGH", Detail = $"Every ship takes 6 hull damage. Hard flying: +{EventXpLarge} XP for every pilot.",
+                    Label = "PUSH THROUGH", Detail = $"Every ship takes {StormHullDamage} hull damage. Hard flying: +{EventXpLarge} XP for every pilot.",
                     Resolve = (run, rng) =>
                     {
                         foreach (Pilot pilot in run.Living)
-                            pilot.TakeHullDamage(6);
+                            pilot.TakeHullDamage(StormHullDamage);
                         return SquadXp(run, EventXpLarge, rng, "Rough going, but every pilot comes out sharper.");
                     },
                 },
@@ -591,6 +624,7 @@ public static class RunContent
         },
     };
 
+    const int StormHullDamage = 60;
     const int EventXpSmall = 50;
     const int EventXpLarge = 70;
 

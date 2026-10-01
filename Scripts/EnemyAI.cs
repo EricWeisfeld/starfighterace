@@ -92,12 +92,17 @@ public static class EnemyAI
 
         var arena = new Rect2(30, 30, BattleManager.ArenaW - 60, BattleManager.ArenaH - 60);
         var choices = new PlanChoices();
-        ScoreCandidates(self, targetEnd, allies, arena, NormalCandidates(self), choices);
+        // Enemy pilots weigh the maneuvers their sector allows them alongside
+        // normal flight, to turn onto a target or slip out of its cone.
+        IEnumerable<FlightPlan> candidates = NormalCandidates(self);
+        if (self.Pilot == null)
+            candidates = candidates.Concat(EscapeCandidates(self));
+        ScoreCandidates(self, targetEnd, allies, arena, candidates, choices);
 
         // A normal arc may be unable to clear a narrow pocket. In that case,
         // consider the hull's special maneuvers before accepting even a
-        // survivable scrape. Enemies are treated as fully trained pilots.
-        if (!choices.HasSafe)
+        // survivable scrape.
+        if (!choices.HasSafe && self.Pilot != null)
             ScoreCandidates(self, targetEnd, allies, arena, EscapeCandidates(self), choices);
 
         if (choices.HasSafe)
@@ -214,7 +219,7 @@ public static class EnemyAI
                     int remainingDurability = self.Hp + self.Shield;
                     terrainPenalty = scrapeDamage >= remainingDurability
                         ? 10000f
-                        : scrapeDamage * 7f + scrapeDamage / (float)remainingDurability * 120f;
+                        : scrapeDamage * 0.7f + scrapeDamage / (float)remainingDurability * 120f;
                 }
                 else
                 {

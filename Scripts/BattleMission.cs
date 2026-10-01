@@ -39,9 +39,19 @@ public class BattleMission
     public int Threat = 1;
     public MissionObjective Objective;
     public string MapId = "shard-run";
+    /// <summary>The enemy wing at the start. Enemies fly at their frames' base numbers.</summary>
     public ShipType[] EnemySquad = Array.Empty<ShipType>();
-    public float EnemyStatMultiplier = 1f;
+    /// <summary>Ships that join later: on <see cref="ReinforcementTurn"/>, or partway along an escort.</summary>
+    public ShipType[] Reinforcements = Array.Empty<ShipType>();
+    public int ReinforcementTurn = 3;
+    /// <summary>How many of its line's maneuvers each enemy can fly, in pool order.</summary>
+    public int EnemyManeuvers = int.MaxValue;
     public MissionAITuning EnemyAITuning = new();
+
+    /// <summary>"+2 ON TURN 3", "+2 MID-ESCORT", or empty when nobody follows.</summary>
+    public string ReinforcementLabel => Reinforcements.Length == 0 ? ""
+        : Objective == MissionObjective.EscortShip ? $"+{Reinforcements.Length} MID-ESCORT"
+        : $"+{Reinforcements.Length} ON TURN {ReinforcementTurn}";
 
     public string ObjectiveLabel => Objective switch
     {

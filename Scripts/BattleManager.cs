@@ -26,7 +26,7 @@ public partial class BattleManager : Node2D
     const float MinWorldTouchRadius = 34f;
     public const float BulletSpeed = 900f;
     public const float ShipCollisionRadius = 18f;
-    public const int AsteroidMaxScrapeDamage = 14;
+    public const int AsteroidMaxScrapeDamage = 140;
     /// <summary>A ship that starts its turn in nebula gas flies this share of its maneuver.</summary>
     public const float NebulaRouteScale = 0.75f;
     public const float NebulaAccuracyMultiplier = 0.7f;
@@ -45,6 +45,9 @@ public partial class BattleManager : Node2D
     Fighter _priorityTarget;
     public Fighter PriorityTarget => _priorityTarget;
     BattleMission CurrentMission => GameSetup.Mission;
+    /// <summary>Who the enemy brings: the run's mission, or a quick battle's patrol.</summary>
+    BattleMission Forces => GameSetup.IsTestBattle ? GameSetup.QuickBattleForces : CurrentMission;
+    bool _waveSpawned;
 
     // Planning state (read by the overlay and HUD for drawing).
     public Fighter Selected { get; private set; }
@@ -241,7 +244,7 @@ public partial class BattleManager : Node2D
         if (penetration <= 0f)
             return 0;
         float severity = Mathf.Clamp(penetration / ShipCollisionRadius, 0f, 1f);
-        return Mathf.Max(1, Mathf.RoundToInt(AsteroidMaxScrapeDamage * severity * severity));
+        return Mathf.Max(10, Mathf.RoundToInt(AsteroidMaxScrapeDamage * severity * severity));
     }
 
     public bool IsInNebula(Vector2 point)
@@ -317,16 +320,11 @@ public partial class BattleManager : Node2D
             SpawnFighter(0, playerSpawn.Position, Mathf.DegToRad(playerSpawn.HeadingDegrees), playerType, squad[i]);
         }
 
-        ShipType[] enemySquad = GameSetup.IsTestBattle
-            ? new[] { ShipTypes.Scout, ShipTypes.Raptor, ShipTypes.Zt }
-            : CurrentMission?.EnemySquad ?? new[] { ShipTypes.Scout, ShipTypes.Scout, ShipTypes.Scout };
-        for (int i = 0; i < enemySquad.Length; i++)
+        ShipType[] enemySquad = Forces?.EnemySquad ?? new[] { ShipTypes.Scout, ShipTypes.Scout, ShipTypes.Scout };
+        for (int i = 0; i < enemySquad.Length && i < Map.EnemySpawns.Length; i++)
         {
-            ShipType enemyType = enemySquad[i];
             BattleSpawn enemySpawn = Map.EnemySpawns[i];
-            float statMultiplier = GameSetup.IsTestBattle ? 1f : CurrentMission?.EnemyStatMultiplier ?? 1f;
-            SpawnFighter(1, enemySpawn.Position, Mathf.DegToRad(enemySpawn.HeadingDegrees), enemyType,
-                statMultiplier: statMultiplier);
+            SpawnFighter(1, enemySpawn.Position, Mathf.DegToRad(enemySpawn.HeadingDegrees), enemySquad[i]);
         }
         if (!GameSetup.IsTestBattle && CurrentMission?.Objective == MissionObjective.DestroyTarget)
             _priorityTarget = EnemyFighters.FirstOrDefault();
@@ -350,13 +348,13 @@ public partial class BattleManager : Node2D
 
     bool _initialFramePending;
 
-    void SpawnFighter(int team, Vector2 pos, float heading, ShipType type, Pilot pilot = null, float statMultiplier = 1f)
+    void SpawnFighter(int team, Vector2 pos, float heading, ShipType type, Pilot pilot = null)
     {
         var f = new Fighter();
         f.ApplyType(type);
         f.ApplyPilot(pilot);
         if (team == 1)
-            f.ApplyCombatStatMultiplier(statMultiplier);
+            f.ManeuverAccess = Forces?.EnemyManeuvers ?? int.MaxValue;
         f.Setup(team, pos, heading, type.GetSkin(team));
         _fighterLayer.AddChild(f);
         GetTeam(team).Add(f);
@@ -365,23 +363,48 @@ public partial class BattleManager : Node2D
     void SpawnEscortReinforcements()
     {
         _escortReinforcementsSpawned = true;
-        ShipType[] enemyWave = GameSetup.IsTestBattle
-            ? new[] { ShipTypes.Scout, ShipTypes.Raptor, ShipTypes.Zt }
-            : CurrentMission?.EnemySquad ?? new[] { ShipTypes.Scout, ShipTypes.Scout, ShipTypes.Scout };
+        _waveSpawned = true;
+        ShipType[] enemyWave = Forces?.Reinforcements ?? System.Array.Empty<ShipType>();
         BattleSpawn[] spawnPoints = Map.EscortReinforcementSpawns;
         if (spawnPoints == null || spawnPoints.Length == 0 || enemyWave.Length == 0)
             return;
 
-        float statMultiplier = GameSetup.IsTestBattle ? 1f : CurrentMission?.EnemyStatMultiplier ?? 1f;
         int spawnCount = Mathf.Min(enemyWave.Length, spawnPoints.Length);
         for (int i = 0; i < spawnCount; i++)
         {
             BattleSpawn spawn = spawnPoints[i];
-            SpawnFighter(1, spawn.Position, Mathf.DegToRad(spawn.HeadingDegrees), enemyWave[i],
-                statMultiplier: statMultiplier);
+            SpawnFighter(1, spawn.Position, Mathf.DegToRad(spawn.HeadingDegrees), enemyWave[i]);
             SpawnFlash(spawn.Position);
         }
         Announce($"REINFORCEMENTS · {spawnCount} HOSTILES ENTERING THE CORRIDOR");
+    }
+
+    /// <summary>A timed wave is due: it is the reinforcement turn, or the first group is already gone.</summary>
+    bool WaveDue(bool enemiesWiped) =>
+        !_waveSpawned && Forces is { } forces && forces.Reinforcements.Length > 0 &&
+        forces.Objective != MissionObjective.EscortShip && (enemiesWiped || _turn >= forces.ReinforcementTurn);
+
+    /// <summary>
+    /// Brings in a mission's reinforcements at the enemy's start positions
+    /// furthest from your ships, clear of anyone already there.
+    /// </summary>
+    void SpawnWave()
+    {
+        _waveSpawned = true;
+        ShipType[] wave = Forces.Reinforcements;
+        var friendly = PlayerFighters.Where(f => f.IsAlive).Select(f => f.Position).ToList();
+        List<BattleSpawn> spots = Map.EnemySpawns
+            .Where(spawn => AllAlive().All(f => f.Position.DistanceTo(spawn.Position) > 120f))
+            .OrderByDescending(spawn => friendly.Count == 0 ? 0f : friendly.Min(p => p.DistanceTo(spawn.Position)))
+            .ToList();
+        if (spots.Count < wave.Length)
+            spots.AddRange(Map.EnemySpawns.Except(spots));
+        for (int i = 0; i < wave.Length && i < spots.Count; i++)
+        {
+            SpawnFighter(1, spots[i].Position, Mathf.DegToRad(spots[i].HeadingDegrees), wave[i]);
+            SpawnFlash(spots[i].Position);
+        }
+        Announce($"REINFORCEMENTS · {Plural(wave.Length, "HOSTILE")} INBOUND", 5.0);
     }
 
     /// <summary>Shows a short-lived message in the HUD's objective line.</summary>
@@ -1056,6 +1079,8 @@ public partial class BattleManager : Node2D
     void BeginPlanningPhase(bool frameCamera = true)
     {
         CurrentPhase = Phase.Planning;
+        if (WaveDue(enemiesWiped: false))
+            SpawnWave();
         // Nebula drag is fixed for the whole turn by where each ship starts it.
         foreach (Fighter f in AllAlive())
             f.RouteScale = IsInNebula(f.Position) ? NebulaRouteScale : 1f;
@@ -1292,6 +1317,13 @@ public partial class BattleManager : Node2D
 
         bool playersAlive = PlayerFighters.Any(f => f.IsAlive);
         bool enemiesAlive = EnemyFighters.Any(f => f.IsAlive);
+        // Wiping the first group early doesn't skip a wave that is on its way: it arrives now.
+        bool targetDown = CurrentMission?.Objective == MissionObjective.DestroyTarget && _priorityTarget != null && !_priorityTarget.IsAlive;
+        if (playersAlive && !enemiesAlive && !targetDown && WaveDue(enemiesWiped: true))
+        {
+            SpawnWave();
+            enemiesAlive = true;
+        }
         bool objectiveSuccess = CurrentMission?.Objective switch
         {
             MissionObjective.DestroyTarget => _priorityTarget != null && !_priorityTarget.IsAlive,

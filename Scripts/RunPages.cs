@@ -26,7 +26,7 @@ public partial class RunScreen
         {
             content.AddChild(Text("FALLEN", FontCaption, Muted, 4));
             foreach (Pilot pilot in Run.Fallen)
-                content.AddChild(Text($"{pilot.Callsign} · LV {pilot.Level} {pilot.Ship.DisplayName.ToUpper()} · {Plural(pilot.Kills, "KILL")}", FontCaption, Negative, 1));
+                content.AddChild(Text($"{pilot.Callsign} · LV {pilot.Level} {pilot.FrameName} · {Plural(pilot.Kills, "KILL")}", FontCaption, Negative, 1));
         }
         return page;
     }
@@ -135,14 +135,18 @@ public partial class RunScreen
         briefStack.AddChild(Text($"THREAT {mission.Threat}" + (crate ? " · WIN FOR A MODULE CRATE" : ""), FontCaption, Warning, 2));
         content.AddChild(brief);
 
-        content.AddChild(Text($"ENEMY WING · {mission.EnemySquad.Length} SHIPS", FontCaption, Muted, 4));
+        string waveNote = mission.Reinforcements.Length > 0 ? $" · {mission.ReinforcementLabel}" : "";
+        content.AddChild(Text($"ENEMY WING · {Plural(mission.EnemySquad.Length, "SHIP")}{waveNote}", FontCaption, Muted, 4));
         var wing = new HFlowContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         wing.AddThemeConstantOverride("h_separation", 12);
-        foreach (ShipType enemy in mission.EnemySquad)
+        // Reinforcements are shown faded after the opening wing, captioned with when they arrive.
+        foreach ((ShipType enemy, bool later) in mission.EnemySquad.Select(s => (s, false))
+                     .Concat(mission.Reinforcements.Select(s => (s, true))))
         {
             VBoxContainer box = Stack(0);
-            box.AddChild(ShipIcon(enemy, 72f, team: 1));
-            Label name = Text(enemy.DisplayName.ToUpper(), FontMicro, Muted, 1);
+            TextureRect icon = ShipIcon(enemy, 72f, team: 1, faded: later);
+            box.AddChild(icon);
+            Label name = Text(later ? "INBOUND" : enemy.DisplayName.ToUpper(), FontMicro, later ? Warning : Muted, 1);
             name.HorizontalAlignment = HorizontalAlignment.Center;
             box.AddChild(name);
             wing.AddChild(box);
@@ -207,6 +211,16 @@ public partial class RunScreen
             summary.Tapped += () => OpenPilot(pilot);
             summary.AddChild(PilotSummary(pilot, "TAP FOR STATS"));
             page.AddChild(summary);
+            // Refit levels upgrade the hull automatically, on top of the card chosen below.
+            if (int.TryParse(promotion.Reason.Split(' ')[^1], out int reached) && Refits.IsRefitLevel(reached))
+            {
+                PanelContainer refit = Card(24, 14, new Color(Positive, 0.55f));
+                VBoxContainer words = Stack(4);
+                refit.AddChild(words);
+                words.AddChild(Text($"HULL REFIT · {Refits.Name(Refits.TierFor(reached))}", FontCaption, Positive, 3));
+                words.AddChild(Text(Refits.Summary, FontCaption, Body, 0, wrap: true));
+                page.AddChild(refit);
+            }
             page.AddChild(Text("CHOOSE ONE · PILOT OR SHIP", FontCaption, Muted, 4));
         }
 
@@ -476,13 +490,13 @@ public partial class RunScreen
         {
             content.AddChild(Text("CAME HOME", FontCaption, Muted, 4));
             foreach (Pilot pilot in Run.Living)
-                content.AddChild(Text($"{pilot.Callsign} · LV {pilot.Level} {pilot.Ship.DisplayName.ToUpper()} · {Plural(pilot.Kills, "KILL")}", FontCaption, Body, 1));
+                content.AddChild(Text($"{pilot.Callsign} · LV {pilot.Level} {pilot.FrameName} · {Plural(pilot.Kills, "KILL")}", FontCaption, Body, 1));
         }
         if (Run.Fallen.Any())
         {
             content.AddChild(Text("FALLEN", FontCaption, Muted, 4));
             foreach (Pilot pilot in Run.Fallen)
-                content.AddChild(Text($"{pilot.Callsign} · LV {pilot.Level} {pilot.Ship.DisplayName.ToUpper()} · {Plural(pilot.Kills, "KILL")}", FontCaption, Negative, 1));
+                content.AddChild(Text($"{pilot.Callsign} · LV {pilot.Level} {pilot.FrameName} · {Plural(pilot.Kills, "KILL")}", FontCaption, Negative, 1));
         }
 
         Button again = TouchButton("NEW RUN", primary: true);

@@ -184,7 +184,7 @@ public partial class RunScreen : Node2D
         identity.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         identity.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         identity.AddChild(Text(pilot.Callsign, FontBody, pilot.Alive ? TextBright : Negative, 2));
-        identity.AddChild(Text($"LV {pilot.Level} · {pilot.Ship.DisplayName.ToUpper()}", FontCaption, Muted, 2));
+        identity.AddChild(Text($"LV {pilot.Level} · {pilot.FrameName}", FontCaption, Muted, 2));
         header.AddChild(identity);
         (string status, ChipRole role) = StatusOf(pilot);
         header.AddChild(Tag(status, role));

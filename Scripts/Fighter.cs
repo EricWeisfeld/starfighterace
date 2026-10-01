@@ -77,10 +77,10 @@ public partial class Fighter : Node2D
     public bool InNebula => RouteScale < 1f;
 
     // Per-fighter combat stats — tune freely (or vary per ship type later).
-    public int MaxHp = 30;
-    public int MaxShield = 15;
+    public int MaxHp = 300;
+    public int MaxShield = 150;
     public int ShieldRegenPerTurn = 2;
-    public int ShotDamage = 4;
+    public int ShotDamage = 40;
     public float Accuracy = 0.85f;            // base chance each shot connects
     public float Evasion = 0.25f;             // reduces attackers' hit chance
     public float FireCooldown = 0.6f;         // delay between barrages
@@ -266,7 +266,12 @@ public partial class Fighter : Node2D
         - (SurvivorsGuiltActive ? Perks.SurvivorsGuiltCombatPenalty : 0f), 0f, 0.95f);
     /// <summary>Move distance currently planned for this turn.</summary>
     public bool HasAbility(ShipAbility ability) =>
-        Type != null && (Pilot != null ? Pilot.HasManeuver(ability) : Type.OffersManeuver(ability));
+        Type != null && (Pilot != null
+            ? Pilot.HasManeuver(ability)
+            : Type.OffersManeuver(ability) && System.Array.IndexOf(Type.ManeuverPool, ability) < ManeuverAccess);
+
+    /// <summary>For ships without a pilot: how many of the line's maneuvers they can fly, in pool order.</summary>
+    public int ManeuverAccess = int.MaxValue;
 
     /// <summary>Special maneuvers cannot be repeated during their per-fighter cooldown.</summary>
     public bool IsManeuverReady(ManeuverType maneuver) =>
@@ -663,15 +668,6 @@ public partial class Fighter : Node2D
         Moves = Masteries.Apply(Type.Maneuvers, Pilot.Masteries);
         SelectedNormalMoveDistance = NormalMoveMaxDistance;
         PlannedPathDistance = NormalMoveMaxDistance;
-    }
-
-    /// <summary>Scales only combat values, preserving a hull's flight handling and identity.</summary>
-    public void ApplyCombatStatMultiplier(float multiplier)
-    {
-        MaxHp = Mathf.RoundToInt(MaxHp * multiplier);
-        MaxShield = Mathf.RoundToInt(MaxShield * multiplier);
-        ShieldRegenPerTurn = Mathf.RoundToInt(ShieldRegenPerTurn * multiplier);
-        ShotDamage = Mathf.RoundToInt(ShotDamage * multiplier);
     }
 
     public void Setup(int team, Vector2 pos, float heading, FighterSkin skin)

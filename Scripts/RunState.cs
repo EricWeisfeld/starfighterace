@@ -140,7 +140,7 @@ public class PilotSave
 public class RunState
 {
     /// <summary>Version 3: ships and instincts are picked at the start; frames are never earned or lost.</summary>
-    public const int SaveVersion = 3;
+    public const int SaveVersion = 4;
     public const int RosterLimit = 5;
     public const int SquadLimit = 3;
     public const int StartingPilots = 3;

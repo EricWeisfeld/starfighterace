@@ -116,7 +116,7 @@ public class ShipType
     public int MaxShield;
     /// <summary>The frame's place in its line: balanced, attack or guard.</summary>
     public FrameRole Role;
-    public const int DefaultShieldRegen = 2;
+    public const int DefaultShieldRegen = 20;
     public int ShieldRegenPerTurn = DefaultShieldRegen;
     public int ShotDamage;
     public float Accuracy;
@@ -192,7 +192,7 @@ public static class ShipTypes
         Id = "civilian_dreadnought",
         DisplayName = "Civilian Dreadnought",
         Description = "An unarmed civilian transport built on a dreadnought hull.",
-        MaxHp = 80,
+        MaxHp = 800,
         MaxShield = 0,
         ShieldRegenPerTurn = 0,
         ShotDamage = 0,
@@ -222,9 +222,9 @@ public static class ShipTypes
         DisplayName = "S1 Kestrel",
         Description = "Fast and nimble reconnaissance frame with a tight turn, but fragile and lightly armed.",
         Role = FrameRole.Balanced,
-        MaxHp = 20,
-        MaxShield = 10,
-        ShotDamage = 3,
+        MaxHp = 200,
+        MaxShield = 100,
+        ShotDamage = 30,
         Accuracy = 0.85f,
         Evasion = 0.35f,
         NormalTurnLimitDegrees = KestrelTurn,
@@ -282,9 +282,9 @@ public static class ShipTypes
         DisplayName = "S4 Striker",
         Description = "An aggressive Kestrel-series frame. Heavier guns, paid for with hull and precision.",
         Role = FrameRole.Attack,
-        MaxHp = 16,
-        MaxShield = 8,
-        ShotDamage = 4,
+        MaxHp = 160,
+        MaxShield = 80,
+        ShotDamage = 40,
         Accuracy = 0.80f,
         Evasion = 0.35f,
         NormalTurnLimitDegrees = KestrelTurn,
@@ -303,9 +303,9 @@ public static class ShipTypes
         DisplayName = "S9 Ghost",
         Description = "An evasive Kestrel-series frame that is hard to hit, but its jamming gear throws off its own aim.",
         Role = FrameRole.Guard,
-        MaxHp = 20,
-        MaxShield = 14,
-        ShotDamage = 3,
+        MaxHp = 200,
+        MaxShield = 140,
+        ShotDamage = 30,
         Accuracy = 0.70f,
         Evasion = 0.40f,
         NormalTurnLimitDegrees = KestrelTurn,
@@ -327,9 +327,9 @@ public static class ShipTypes
         DisplayName = "Raptor",
         Description = "Versatile Raptor-class starfighter, balanced between firepower and protection.",
         Role = FrameRole.Balanced,
-        MaxHp = 34,
-        MaxShield = 17,
-        ShotDamage = 5,
+        MaxHp = 340,
+        MaxShield = 170,
+        ShotDamage = 50,
         Accuracy = 0.88f,
         Evasion = 0.28f,
         NormalTurnLimitDegrees = RaptorTurn,
@@ -375,9 +375,9 @@ public static class ShipTypes
         DisplayName = "R3 Black Hawk",
         Description = "A heavier-hitting Raptor variant that trades protection for stronger shots.",
         Role = FrameRole.Attack,
-        MaxHp = 29,
-        MaxShield = 14,
-        ShotDamage = 6,
+        MaxHp = 290,
+        MaxShield = 140,
+        ShotDamage = 60,
         Accuracy = 0.88f,
         Evasion = 0.28f,
         NormalTurnLimitDegrees = RaptorTurn,
@@ -414,9 +414,9 @@ public static class ShipTypes
         DisplayName = "R5 Falcon",
         Description = "A shielded, hard-to-hit Raptor variant that carries lighter guns.",
         Role = FrameRole.Guard,
-        MaxHp = 34,
-        MaxShield = 22,
-        ShotDamage = 4,
+        MaxHp = 340,
+        MaxShield = 220,
+        ShotDamage = 40,
         Accuracy = 0.88f,
         Evasion = 0.36f,
         NormalTurnLimitDegrees = RaptorTurn,
@@ -453,9 +453,9 @@ public static class ShipTypes
         DisplayName = "ZT Class",
         Description = "Armored ZT-class starfighter, balanced between firepower and protection.",
         Role = FrameRole.Balanced,
-        MaxHp = 50,
-        MaxShield = 25,
-        ShotDamage = 5,
+        MaxHp = 500,
+        MaxShield = 250,
+        ShotDamage = 50,
         Accuracy = 0.82f,
         Evasion = 0.15f,
         NormalTurnLimitDegrees = ZtTurn,
@@ -501,9 +501,9 @@ public static class ShipTypes
         DisplayName = "ZT-6",
         Description = "A slow armored gunship that trades armor for heavier guns to pin enemies down.",
         Role = FrameRole.Attack,
-        MaxHp = 40,
-        MaxShield = 20,
-        ShotDamage = 6,
+        MaxHp = 400,
+        MaxShield = 200,
+        ShotDamage = 60,
         Accuracy = 0.85f,
         Evasion = 0.15f,
         NormalTurnLimitDegrees = ZtTurn,
@@ -540,10 +540,10 @@ public static class ShipTypes
         DisplayName = "ZT-8 Bulwark",
         Description = "A reinforced fleet defender that trades gun output for armor and faster shield regeneration.",
         Role = FrameRole.Guard,
-        MaxHp = 58,
-        MaxShield = 32,
-        ShieldRegenPerTurn = 3,
-        ShotDamage = 4,
+        MaxHp = 580,
+        MaxShield = 320,
+        ShieldRegenPerTurn = 30,
+        ShotDamage = 40,
         Accuracy = 0.82f,
         Evasion = 0.15f,
         NormalTurnLimitDegrees = ZtTurn,
@@ -594,6 +594,8 @@ public static class GameSetup
     /// <summary>The run battle being fought; null in a quick battle.</summary>
     public static BattleMission Mission { get; private set; }
     public static BattleMapDefinition TestBattleMap { get; private set; }
+    /// <summary>The enemy force in a quick battle: a late sector 3 patrol for max-level pilots.</summary>
+    public static BattleMission QuickBattleForces { get; private set; }
 
     /// <summary>A disposable max-level squadron for a quick battle.</summary>
     public static void StartTestBattle(IEnumerable<ShipType> ships, BattleMapDefinition map)
@@ -608,6 +610,7 @@ public static class GameSetup
         Mode = BattleMode.Quick;
         Mission = null;
         TestBattleMap = map;
+        QuickBattleForces = RunContent.QuickBattleForces(((ulong)GD.Randi() << 32) | GD.Randi());
     }
 
     public static void StartRunBattle(List<Pilot> squad, BattleMission mission)

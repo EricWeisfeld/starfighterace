@@ -43,9 +43,11 @@ public static class ShipUpgrades
     public const int ExtraShots = 1;
     public const float AccuracyBonus = 0.08f;
     public const float WideMountConeBonusDegrees = 4f;
-    public const int ShieldCapacityBonus = 8;
-    public const int ShieldRegenBonus = 1;
-    public const int ArmorHullBonus = 8;
+    // Shield-slot modules scale with the ship, so they matter as much on a
+    // Bulwark as on a Kestrel.
+    public const float ShieldCapacityBonus = 0.35f;
+    public const float ShieldRegenBonus = 0.50f;
+    public const float ArmorHullBonus = 0.30f;
     public const float ArmorMoveLimitPenalty = 15f;
 
     public static readonly ShipUpgradeDefinition[] All =
@@ -63,11 +65,11 @@ public static class ShipUpgrades
         new(ShipUpgrade.GunsWideMount, ShipUpgradeSlot.Guns, "Wide Mount",
             $"Firing cone {Fighter.FireConeDeg * 2:0}° → {(Fighter.FireConeDeg + WideMountConeBonusDegrees) * 2:0}°."),
         new(ShipUpgrade.ShieldsCapacity, ShipUpgradeSlot.Shields, "Shield Capacitor",
-            $"+{ShieldCapacityBonus} maximum shields."),
+            $"+{ShieldCapacityBonus * 100:0}% maximum shields."),
         new(ShipUpgrade.ShieldsRegen, ShipUpgradeSlot.Shields, "Flux Recycler",
-            $"+{ShieldRegenBonus} shield regeneration per turn."),
+            $"+{ShieldRegenBonus * 100:0}% shield regeneration per turn."),
         new(ShipUpgrade.ShieldsArmor, ShipUpgradeSlot.Shields, "Armor Plating",
-            $"+{ArmorHullBonus} hull, -{ArmorMoveLimitPenalty:0} maximum move."),
+            $"+{ArmorHullBonus * 100:0}% hull, -{ArmorMoveLimitPenalty:0} maximum move."),
     };
 
     public static ShipUpgradeDefinition Get(ShipUpgrade upgrade) => All.First(definition => definition.Id == upgrade);

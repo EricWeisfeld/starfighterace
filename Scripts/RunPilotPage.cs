@@ -105,7 +105,7 @@ public partial class RunScreen
         words.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         words.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         HBoxContainer title = Row(12);
-        Label name = Text(frame.DisplayName.ToUpper(), FontBody, TextBright, 2);
+        Label name = Text(pilot.FrameName, FontBody, TextBright, 2);
         name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         title.AddChild(name);
         (string status, ChipRole role) = StatusOf(pilot);
@@ -151,16 +151,22 @@ public partial class RunScreen
     }
 
     /// <summary>
-    /// The ship's numbers with its modules fitted, two to a row. What the
-    /// modules add is shown beside each number.
+    /// The ship's numbers at its refit with its modules fitted, two to a row.
+    /// What the modules add is shown beside each number; the refit is named
+    /// above them.
     /// </summary>
     static Control ShipStatsCard(Pilot pilot)
     {
-        ShipStats bare = ShipStats.Frame(pilot.Ship);
+        ShipStats bare = ShipStats.Frame(pilot.Ship).Refitted(pilot.Refit);
         ShipStats s = pilot.Stats;
         PanelContainer card = Card();
         VBoxContainer stack = Stack(14);
         card.AddChild(stack);
+        int next = Refits.Levels.FirstOrDefault(level => level > pilot.Level);
+        string refit = pilot.Refit == 0
+            ? "MK I · no refits yet"
+            : $"{Refits.Name(pilot.Refit)} · hull, shields, regen and damage +{(Refits.Multiplier(pilot.Refit) - 1f) * 100:0}% over Mk I";
+        stack.AddChild(Text(refit + (next > 0 ? $". Next refit at level {next}." : "."), FontCaption, Positive, 0, wrap: true));
         var grid = new GridContainer { Columns = 2, MouseFilter = Control.MouseFilterEnum.Ignore };
         grid.AddThemeConstantOverride("h_separation", 16);
         grid.AddThemeConstantOverride("v_separation", 14);

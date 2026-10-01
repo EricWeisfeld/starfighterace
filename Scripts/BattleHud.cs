@@ -315,7 +315,8 @@ public partial class BattleHud : CanvasLayer
         if (planning && selected != null)
         {
             _shipName.Text = $"{BattleManager.CallsignOf(selected)} · {selected.Type.DisplayName.ToUpper()}";
-            _shipStats.Text = $"HULL {Mathf.Max(0, selected.Hp)}/{selected.MaxHp} · SHIELD {selected.Shield}/{selected.MaxShield}";
+            // Three-digit numbers: the shield's maximum is left to its bar so the line fits beside the buttons.
+            _shipStats.Text = $"HULL {Mathf.Max(0, selected.Hp)}/{selected.MaxHp} · SHIELD {selected.Shield}";
             RefreshTraits(selected);
             RefreshManeuvers(selected);
             RefreshSummary(selected);

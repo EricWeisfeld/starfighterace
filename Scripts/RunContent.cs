@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-public enum RunNodeKind { Skirmish, Strike, Elite, Repair, Recruit, Event, Boss }
+public enum RunNodeKind { Skirmish, Elite, Repair, Recruit, Event, Boss }
 
 /// <summary>
 /// What a card offers. Level-ups offer maneuvers and masteries for the pilot
@@ -69,11 +69,11 @@ public static class RunContent
     public static readonly string[] SectorBriefings =
     {
         "Kla'ed raiders have cut the Orion lanes. Break their blockade.",
-        "Haven's evacuation convoy is waiting for a clear corridor. Get it out.",
+        "Raiders are hunting Haven's evacuation convoy. Clear the lanes for it.",
         "The Kla'ed ace wing guards the Helios gate. End this.",
     };
 
-    static readonly string[] BattleMapIds = BattleMaps.Battlefields.Select(map => map.Id).ToArray();
+    static readonly string[] BattleMapIds = BattleMaps.All.Select(map => map.Id).ToArray();
 
     // ---------------------------------------------------------------- maps
 
@@ -126,11 +126,9 @@ public static class RunContent
     {
         (RunNodeKind Kind, int Weight)[] table = layer switch
         {
-            1 => sector == 1
-                ? new[] { (RunNodeKind.Skirmish, 1) }
-                : new[] { (RunNodeKind.Skirmish, 7), (RunNodeKind.Strike, 3) },
-            2 => new[] { (RunNodeKind.Skirmish, 35), (RunNodeKind.Strike, 25), (RunNodeKind.Event, 20), (RunNodeKind.Recruit, 20) },
-            3 => new[] { (RunNodeKind.Skirmish, 20), (RunNodeKind.Strike, 20), (RunNodeKind.Elite, 25), (RunNodeKind.Event, 20), (RunNodeKind.Repair, 15) },
+            1 => new[] { (RunNodeKind.Skirmish, 1) },
+            2 => new[] { (RunNodeKind.Skirmish, 60), (RunNodeKind.Event, 20), (RunNodeKind.Recruit, 20) },
+            3 => new[] { (RunNodeKind.Skirmish, 40), (RunNodeKind.Elite, 25), (RunNodeKind.Event, 20), (RunNodeKind.Repair, 15) },
             _ => new[] { (RunNodeKind.Repair, 30), (RunNodeKind.Recruit, 20), (RunNodeKind.Event, 25), (RunNodeKind.Elite, 25) },
         };
         // A layer never offers the same kind of non-combat stop twice.
@@ -150,7 +148,7 @@ public static class RunContent
     }
 
     public static bool IsBattleKind(RunNodeKind kind) =>
-        kind is RunNodeKind.Skirmish or RunNodeKind.Strike or RunNodeKind.Elite or RunNodeKind.Boss;
+        kind is RunNodeKind.Skirmish or RunNodeKind.Elite or RunNodeKind.Boss;
 
     /// <summary>
     /// Links each stop to the stops ahead that sit roughly above it, makes sure
@@ -204,7 +202,6 @@ public static class RunContent
     public static string KindName(RunNodeKind kind) => kind switch
     {
         RunNodeKind.Skirmish => "SKIRMISH",
-        RunNodeKind.Strike => "STRIKE",
         RunNodeKind.Elite => "ELITE WING",
         RunNodeKind.Repair => "REPAIR DOCK",
         RunNodeKind.Recruit => "RECRUIT",
@@ -216,7 +213,6 @@ public static class RunContent
     public static string KindSummary(RunNodeKind kind, int sector) => kind switch
     {
         RunNodeKind.Skirmish => "Destroy an enemy patrol.",
-        RunNodeKind.Strike => "Destroy a marked command ship. The rest of the wing can live.",
         RunNodeKind.Elite => "An ace wing, sharper than any patrol. Win it to open a module crate.",
         RunNodeKind.Repair => "Every ship repaired to full, and a medic who can treat one scar.",
         RunNodeKind.Recruit => "Pilots looking for a squadron. One can join.",
@@ -227,8 +223,8 @@ public static class RunContent
 
     static string BossName(int sector) => sector switch
     {
-        1 => "The blockade command ship",
-        2 => "The convoy escort",
+        1 => "The blockade wing",
+        2 => "The convoy raiders",
         _ => "The Kla'ed ace wing",
     };
 
@@ -288,27 +284,17 @@ public static class RunContent
     {
         var rng = new RandomNumberGenerator { Seed = node.Seed };
         int threat = ThreatFor(sector, node.Layer, kind);
-        MissionObjective objective = kind switch
-        {
-            RunNodeKind.Strike => MissionObjective.DestroyTarget,
-            RunNodeKind.Boss when sector == 1 => MissionObjective.DestroyTarget,
-            RunNodeKind.Boss when sector == 2 => MissionObjective.EscortShip,
-            _ => MissionObjective.EliminateHostiles,
-        };
         int tier = Mathf.Clamp(sector + (kind is RunNodeKind.Elite or RunNodeKind.Boss ? 1 : 0), 1, 3);
         (int initial, int wave) = EnemyForce(sector, kind, node.Layer, rng);
         ShipType[] pool = EnemyPool(tier);
         ShipType Pick() => pool[rng.RandiRange(0, pool.Length - 1)];
         ShipType[] squad = Enumerable.Range(0, initial).Select(_ => Pick()).ToArray();
         ShipType[] reinforcements = Enumerable.Range(0, wave).Select(_ => Pick()).ToArray();
-        if (objective == MissionObjective.DestroyTarget)
-            squad[0] = ShipTypes.Zt; // the first enemy is the marked target
 
         string name = kind switch
         {
-            RunNodeKind.Boss => sector switch { 1 => "BLOCKADE BREAKER", 2 => "CONVOY ESCORT", _ => "ACE WING" },
+            RunNodeKind.Boss => sector switch { 1 => "BLOCKADE BREAKER", 2 => "CONVOY RAIDERS", _ => "ACE WING" },
             RunNodeKind.Elite => "ACE INTERCEPTORS",
-            RunNodeKind.Strike => "COMMAND STRIKE",
             _ => "PATROL CLASH",
         };
         return new BattleMission
@@ -316,13 +302,11 @@ public static class RunContent
             Name = name,
             Briefing = KindSummary(kind, sector),
             Threat = threat,
-            Objective = objective,
-            MapId = objective == MissionObjective.EscortShip ? BattleMaps.EscortCorridorId : node.MapId,
+            MapId = node.MapId,
             EnemySquad = squad,
             Reinforcements = reinforcements,
             EnemyManeuvers = EnemyManeuvers(tier),
             EnemiesReadOrders = kind == RunNodeKind.Elite,
-            EnemyAITuning = MissionAITuning.ForObjective(objective),
         };
     }
 
@@ -610,8 +594,8 @@ public static class RunContent
             {
                 new()
                 {
-                    Label = "ANSWER THE CALL", Detail = "Fight a strike mission. Win and the convoy hands over a module crate.",
-                    Resolve = (_, _) => new EventOutcome { Text = "You turn toward the convoy.", Battle = RunNodeKind.Strike, CrateReward = "CONVOY'S THANKS" },
+                    Label = "ANSWER THE CALL", Detail = "Drive off the raiders. Win and the convoy hands over a module crate.",
+                    Resolve = (_, _) => new EventOutcome { Text = "You turn toward the convoy.", Battle = RunNodeKind.Skirmish, CrateReward = "CONVOY'S THANKS" },
                 },
                 new() { Label = "KEEP COURSE", Detail = "Someone else will have to help.", Resolve = (_, _) => new EventOutcome { Text = "The signal fades behind you." } },
             },

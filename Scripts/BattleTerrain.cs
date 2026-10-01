@@ -49,10 +49,6 @@ public class BattleMapDefinition
     public TerrainFeature[] Terrain;
     public BattleSpawn[] PlayerSpawns;
     public BattleSpawn[] EnemySpawns;
-    public BattleSpawn[] EscortReinforcementSpawns;
-    public BattleSpawn EscortSpawn;
-    public Vector2 EscortDestination;
-    public float EscortDestinationRadius;
 
     /// <summary>
     /// Returns a copy turned a quarter-turn anticlockwise so the authored
@@ -71,11 +67,6 @@ public class BattleMapDefinition
         }).ToArray(),
         PlayerSpawns = ToPortrait(PlayerSpawns),
         EnemySpawns = ToPortrait(EnemySpawns),
-        EscortReinforcementSpawns = ToPortrait(EscortReinforcementSpawns),
-        EscortSpawn = EscortSpawn == null ? null : ToPortrait(EscortSpawn),
-        // Vector2.Zero means "not authored"; keep it recognisable after the turn.
-        EscortDestination = EscortDestination == Vector2.Zero ? Vector2.Zero : ToPortrait(EscortDestination),
-        EscortDestinationRadius = EscortDestinationRadius,
     };
 
     static Vector2 ToPortrait(Vector2 authored) => new(authored.Y, BattleMaps.AuthoredWidth - authored.X);
@@ -92,7 +83,6 @@ public class BattleMapDefinition
 /// <summary>Battle maps rotate terrain and opening angles instead of always staging a head-on joust.</summary>
 public static class BattleMaps
 {
-    public const string EscortCorridorId = "escort-corridor";
     // Authored (landscape) battlefield size. The portrait arena swaps these.
     public const float AuthoredWidth = 2400f;
     public const float AuthoredHeight = 1350f;
@@ -360,51 +350,11 @@ public static class BattleMaps
         },
     };
 
-    /// <summary>
-    /// A long escort lane. The transport needs about fourteen clear turns to
-    /// reach the jump zone, while the hostile wing approaches from an offset
-    /// interception screen instead of starting in immediate firing range.
-    /// </summary>
-    public static readonly BattleMapDefinition EscortCorridor = new()
-    {
-        Id = EscortCorridorId,
-        DisplayName = "JUMP CORRIDOR",
-        Briefing = "Protect the transport through the long approach and deliver it to the marked jump zone.",
-        Terrain = new[]
-        {
-            new TerrainFeature(TerrainFeatureType.Asteroid, 810, 315, 72),
-            new TerrainFeature(TerrainFeatureType.Asteroid, 980, 420, 48),
-            new TerrainFeature(TerrainFeatureType.Asteroid, 1040, 1020, 68),
-            new TerrainFeature(TerrainFeatureType.Asteroid, 1210, 900, 52),
-            new TerrainFeature(TerrainFeatureType.Nebula, 1450, 300, 180),
-            new TerrainFeature(TerrainFeatureType.Nebula, 1580, 1080, 190),
-        },
-        PlayerSpawns = new[]
-        {
-            new BattleSpawn(330, 440, 8), new BattleSpawn(270, 675, 0), new BattleSpawn(330, 910, -8),
-        },
-        EnemySpawns = new[]
-        {
-            new BattleSpawn(1420, 380, 158), new BattleSpawn(1510, 675, 180), new BattleSpawn(1420, 970, 202),
-            new BattleSpawn(1740, 470, 166), new BattleSpawn(1770, 820, 194), new BattleSpawn(1960, 675, 180),
-        },
-        EscortReinforcementSpawns = new[]
-        {
-            new BattleSpawn(1650, 270, 160), new BattleSpawn(1800, 500, 174), new BattleSpawn(1840, 850, 188),
-            new BattleSpawn(1660, 1080, 200), new BattleSpawn(2020, 390, 174), new BattleSpawn(2070, 960, 186),
-        },
-        EscortSpawn = new BattleSpawn(360, 675, 0),
-        EscortDestination = new Vector2(2050, 675),
-        EscortDestinationRadius = 95f,
-    };
-
-    /// <summary>The maps ordinary battles are fought on.</summary>
-    public static readonly BattleMapDefinition[] Battlefields =
+    /// <summary>Every battle map: runs pick from these, and so does a quick battle.</summary>
+    public static readonly BattleMapDefinition[] All =
     {
         ShardRun, CobaltVeil, BrokenRing, OpenDrift, RubbleBelt, Crossing, Monolith, Shallows, GravelField, KnifeFight,
     };
-
-    public static readonly BattleMapDefinition[] All = Battlefields.Append(EscortCorridor).ToArray();
 
     /// <summary>The portrait battlefield for the battle that is about to start.</summary>
     public static BattleMapDefinition ForCurrentBattle() => AuthoredForCurrentBattle().ToPortrait();

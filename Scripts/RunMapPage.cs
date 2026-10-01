@@ -236,7 +236,6 @@ public partial class SectorMapView : Control
     public static Color KindColor(RunNodeKind kind) => kind switch
     {
         RunNodeKind.Skirmish => new Color(1f, 0.55f, 0.45f),
-        RunNodeKind.Strike => new Color(1f, 0.45f, 0.4f),
         RunNodeKind.Elite => SignalUi.Warning,
         RunNodeKind.Boss => SignalUi.Negative,
         RunNodeKind.Repair => SignalUi.Positive,
@@ -375,15 +374,6 @@ public partial class SectorMapView : Control
             case RunNodeKind.Skirmish:
                 DrawLine(c + new Vector2(-r, -r), c + new Vector2(r, r), color, w, true);
                 DrawLine(c + new Vector2(r, -r), c + new Vector2(-r, r), color, w, true);
-                break;
-            case RunNodeKind.Strike:
-                DrawArc(c, r * 0.8f, 0f, Mathf.Tau, 24, color, w, true);
-                DrawCircle(c, w, color);
-                for (int i = 0; i < 4; i++)
-                {
-                    Vector2 dir = Vector2.Up.Rotated(i * Mathf.Pi / 2f);
-                    DrawLine(c + dir * r * 0.5f, c + dir * r * 1.2f, color, w, true);
-                }
                 break;
             case RunNodeKind.Elite:
             case RunNodeKind.Boss:

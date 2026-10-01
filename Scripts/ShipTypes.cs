@@ -166,7 +166,7 @@ public static class ShipTypes
     const string Nairan = "res://Assets/Foozle_2DS0013_Void_FleetPack_2/Foozle_2DS0013_Void_EnemyFleet_2/Nairan";
     const string Klaed = "res://Assets/Foozle_2DS0012_Void_FleetPack_1/Foozle_2DS0012_Void_EnemyFleet_1/Kla'ed";
 
-    /// <summary>Escort-only civilian hull. It uses the regular ship systems but carries no weapons.</summary>
+    /// <summary>An unarmed civilian transport. Nothing flies it in battle; its art appears in the convoy event's scene.</summary>
     public static readonly ShipType CivilianDreadnought = new()
     {
         Id = "civilian_dreadnought",

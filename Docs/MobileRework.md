@@ -33,7 +33,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
   - Engage asks for confirmation when any ship is on a course into an asteroid.
 - **`ManeuverCatalog`:** one place for maneuver names, colours and descriptions.
 - **Maps (`BattleMaps`):**
-  - Ten battlefields plus the escort corridor. Runs pick any battlefield at random for each stop.
+  - Ten battlefields. Runs pick any battlefield at random for each stop.
   - Shard Run, Cobalt Veil, Broken Ring: the originals, with the squadrons starting closer and Cobalt Veil's gas about 30% smaller.
   - Open Drift (a few rocks as cover), Rubble Belt (a rock wall with two gaps), Crossing (the enemy wing crosses ahead of you), Monolith (one huge central rock), Shallows (small gas pockets at the edges), Gravel Field (many small rocks) and Knife Fight (a close start with rocks ahead).
   - The squadrons start about 850–950 apart (Knife Fight 700), so first contact comes on turn 2 rather than turn 3 or 4.
@@ -42,7 +42,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
   - Shots fired through gas have ×0.7 accuracy.
   - Movement is never slowed partway through a move, so every ship ends its turn exactly where its preview showed. The earlier mid-move slowdown left ghosts and targeting previews wrong.
 - **Battle visuals** (art only; collision, ranges and damage are unchanged):
-  - Ships are drawn at 1.6× (the escort transport at 1.15×), so their art roughly fills their collision circle. `Fighter.VisualRadius` places bars, rings, labels and callouts around the larger art.
+  - Ships are drawn at 1.6×, so their art roughly fills their collision circle. `Fighter.VisualRadius` places bars, rings, labels and callouts around the larger art.
   - Enemy hulls are repainted in one hostile red by a brightness-ramp shader (`ShipPaint.Enemy`, colour `ShipPaint.EnemyHull`). Your ships sit on a faint cyan glow.
   - Names, bars and status tags fade out while a turn plays. Floating damage numbers take their place: blue for shield, gold for hull, and hits close together add into one number.
   - Shots use the packs' pixel bolts (Nairan for you, Kla'ed for the enemy), glowing in the team colour with a short tracer, plus muzzle flashes and sparks (orange on hull, blue on shields, grey on rock). A kill adds a debris burst, a shock ring and a small camera shake. The ship's own shield animation still plays when its shield takes a hit.
@@ -68,12 +68,13 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 | Stop | What it does |
 | --- | --- |
 | Skirmish | Destroy the enemy patrol. |
-| Strike | Destroy a marked command ship; the rest of the wing can live. |
 | Elite wing | +2 threat. Ace pilots, who quietly read your orders (see Phase 5). A win opens a module crate: pick one of three modules, each matched to a surviving ship. |
 | Repair dock | Every hull is repaired to full on arrival, and the medic treats one scar per visit. |
 | Recruit | Two candidates at the squadron's level minus one, each with a random ship and instinct, already promoted to that level. One can join. |
 | Signal | One of six events. Rewards are XP, module crates, repairs, a recruit or a faded scar. Some turn into a fight. |
-| Boss | Sector 1: blockade command ship (strike). Sector 2: the convoy escort. Sector 3: the ace wing. |
+| Boss | Sector 1: the blockade wing. Sector 2: the convoy raiders. Sector 3: the ace wing. |
+
+- **Every battle is won by destroying every enemy ship**, reinforcements included. Strike stops (destroy a marked command ship) and the escort boss (bring a transport to a jump zone) were removed, along with the escort's corridor map; other mission types may come later.
 
 - **Threat** runs from 1 in the first sector to 10 at a late sector 3 elite. It is shown on the map and briefing as a difficulty label.
 - **Enemy wings** grow in numbers, not stats: see Phase 5.
@@ -227,15 +228,16 @@ bump lumpy. So enemies now scale by count and pilots by refits.
 
 | Stop | Sector 1 | Sector 2 | Sector 3 |
 | --- | --- | --- | --- |
-| Skirmish / strike, early | 2 | 3 | 4 |
-| Skirmish / strike, late | 2–3 | 3 + 1 | 4 + 1 |
+| Skirmish, early | 2 | 3 | 4 |
+| Skirmish, late | 2–3 | 3 + 1 | 4 + 1 |
 | Elite | 3 | 3 + 1 | 4 + 1 |
-| Boss | 3 + 1 | 4 + 2 mid-escort | 4 + 2 |
+| Boss | 3 + 1 | 4 + 2 | 4 + 2 |
 
-- **Hull mix and maneuvers (composition).** Sector 1 wings are mostly Kestrels; later wings draw evenly from the three lines (elites and bosses use the next sector's mix). A strike's marked target is a ZT. (Sector 2 used to add attack frames and sector 3 to fly only attack and guard frames; those are shelved.) Enemies fly none of their line's maneuvers in sector 1. From sector 2 on they fly two, the same cap as your pilots: the line's signature maneuver and the next in its pool (Break Turn and Pursuit Burn, U-Turn and Boost, Turret and Suppression Fire). They weigh those maneuvers alongside normal flight when lining up a shot, not only to escape rocks.
-- **Reinforcements.** A "+N" wave arrives at the start of turn 3 at the enemy start positions furthest from your ships. If the first group is wiped out before then, the wave arrives at once instead of the battle ending. The escort's wave still arrives partway along the corridor. Briefings show the wave faded as INBOUND, and the map shows "3 HOSTILES +1".
+- **Hull mix and maneuvers (composition).** Sector 1 wings are mostly Kestrels; later wings draw evenly from the three lines (elites and bosses use the next sector's mix). (Sector 2 used to add attack frames and sector 3 to fly only attack and guard frames; those are shelved.) Enemies fly none of their line's maneuvers in sector 1. From sector 2 on they fly two, the same cap as your pilots: the line's signature maneuver and the next in its pool (Break Turn and Pursuit Burn, U-Turn and Boost, Turret and Suppression Fire). They weigh those maneuvers alongside normal flight when lining up a shot, not only to escape rocks.
+- **Reinforcements.** A "+N" wave arrives at the start of turn 3 at the enemy start positions furthest from your ships. If the first group is wiped out before then, the wave arrives at once instead of the battle ending. Briefings show the wave faded as INBOUND, and the map shows "3 HOSTILES +1".
 - **Quick battle** pits the max-level (Mk IV) squadron against a late sector 3 patrol (4 + 1) instead of three basic ships.
-- **Who sees your orders.** Enemies plan when you press Engage. Most can't see your orders: they lead each of your ships along its visible course, straight on at the throttle it started the turn with (`Fighter.TurnStartPathDistance`). Only elite wings, the Ace Interceptors, read the move you actually queued (`BattleMission.EnemiesReadOrders`). The player is told only that they are aces: the briefing calls them "an ace wing, sharper than any patrol" and the battle opens with "ACE PILOTS · SHARPER THAN ANY PATROL". The escort transport's course is always visible to enemies. Measured over 480 autopilot battles: 46% overall, the same as when nobody reads orders and up from 38% when everyone did. Elite stops sit 6–13 points below their blind rates, about where they were when every enemy read orders.
+- **Who sees your orders.** Enemies plan when you press Engage. Most can't see your orders: they lead each of your ships along its visible course, straight on at the throttle it started the turn with (`Fighter.TurnStartPathDistance`). Only elite wings, the Ace Interceptors, read the move you actually queued (`BattleMission.EnemiesReadOrders`). The player is told only that they are aces: the briefing calls them "an ace wing, sharper than any patrol" and the battle opens with "ACE PILOTS · SHARPER THAN ANY PATROL". Measured over 480 autopilot battles: 46% overall, the same as when nobody reads orders and up from 38% when everyone did. Elite stops sit 6–13 points below their blind rates, about where they were when every enemy read orders.
+- **One mission type.** Strike stops and the sector 2 escort boss are gone; every battle is eliminate-all-hostiles. Strike stops became skirmishes, the sector 1 boss is a plain 3 + 1 fight and the sector 2 boss a 4 + 2 one whose wave arrives on turn 3. Enemies always shoot the nearest of your ships. Not yet measured in a win-rate batch.
 - **Maneuver pools reworked.** Snap Turn, Ghost Run and ECM Jink are gone, Hunter Lock moved from the Kestrel to the Raptor, the Kestrel gained Evasive Spin and the ZT Rear Guns (see Phase 4). Each line now picks its second maneuver from three, all offered together on the first level-up (it used to be one random maneuver card per level-up, so a given maneuver could go unseen for whole runs). Enemy Kestrels fly Pursuit Burn where they flew Snap Turn.
 - **Burn turn angles swapped.** Pursuit Burn (Kestrel, 370) turns up to 45° and Engine Boost (Raptor, 350) up to 20°; they were 20° and 45°. Engine Boost can now be used every other turn, like Pursuit Burn (it was every third). Their masteries swapped too: Pursuit Burn 90°, Boost 45°. The Kestrel's chase burn can now follow a target off its nose, and the Raptor's boost is the straight-line one.
 - **Attack and guard frames shelved.** Players and enemies fly only the S1 Kestrel, Raptor and ZT Class (see Phase 4).
@@ -260,7 +262,7 @@ Level now matters: across all stops a level 1 squadron wins 21% and a level 6 on
 ## Known issues and next steps
 
 - Only elite wings read your orders now; everyone else plans against your visible course. Whether bosses (the sector 3 ace wing especially) should read orders too is open.
-- The escort boss still loses every autopilot battle: the transport dies in about five turns while the squadron is mostly intact. It needs its own look (transport toughness, attacker focus, wave timing), ideally with human play.
+- The sector 2 boss is now an ordinary 4 + 2 fight; it has not been measured since the escort was removed.
 - Sector 2 elites (3 + 1) and the sector 3 boss (4 + 2) sat below the 50% and 40% targets; worth a second pass once humans have played the new curve.
 - Balance is untested with human play: line against line (is Kestrel handling worth its paper weakness?), how many modules a ship ends a run with now that they stack, free docks, threat per layer, ejection and scar odds, and instinct strength.
 - Maps could be drawn from pools by stop type (open maps for skirmishes, dense ones for elites) and mirrored left to right for more variety.

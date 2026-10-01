@@ -124,7 +124,7 @@ public partial class RunScreen
         brief.AddChild(briefStack);
         if (node.Kind == RunNodeKind.Event && Run.EventResult != null)
             briefStack.AddChild(Text(Run.EventResult, FontCaption, Warning, 0, wrap: true));
-        briefStack.AddChild(Text(mission.ObjectiveLabel, FontBody, TextBright, 2));
+        briefStack.AddChild(Text("ELIMINATE ALL HOSTILES", FontBody, TextBright, 2));
         briefStack.AddChild(Text(mission.Briefing, FontCaption, Body, 0, wrap: true));
         BattleMapDefinition map = BattleMaps.ById(mission.MapId);
         briefStack.AddChild(Text($"{map.DisplayName} · {map.Briefing}", FontCaption, Muted, 0, wrap: true));

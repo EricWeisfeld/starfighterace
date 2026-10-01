@@ -123,9 +123,6 @@ public partial class BattleOverlay : Node2D
                 threatAnalysis = AnalyzeIncomingThreat(mgr, mgr.Selected);
         }
 
-        if (mgr.EscortShip != null)
-            DrawEscortObjective(mgr.EscortShip);
-
         if (mgr.CurrentPhase == BattleManager.Phase.Planning)
         {
             foreach (Fighter f in mgr.PlayerFighters)
@@ -148,14 +145,6 @@ public partial class BattleOverlay : Node2D
             DrawHpBar(f, SignalUi.Positive);
         foreach (Fighter f in mgr.EnemyFighters)
             DrawHpBar(f, SignalUi.Negative);
-        if (mgr.PriorityTarget != null && mgr.PriorityTarget.IsAlive)
-        {
-            Vector2 p = mgr.PriorityTarget.Position;
-            float ring = Mathf.Max(34f, mgr.PriorityTarget.VisualRadius + 12f);
-            DrawArc(p, ring, 0, Mathf.Tau, 28, SignalUi.Warning, W(2f), true);
-            if (_labelAlpha > 0f)
-                DrawLabel(p + new Vector2(0f, -ring - Px(22f)), "PRIORITY TARGET", SignalUi.FontMicro, new Color(SignalUi.Warning, _labelAlpha));
-        }
 
         if (targetingAnalysis != null)
             DrawTargetingAssist(mgr, mgr.Selected, focusedTarget, focusedTarget == mgr.PinnedTarget, targetingAnalysis);
@@ -167,17 +156,6 @@ public partial class BattleOverlay : Node2D
         // can pass over several ships while planning a route, so it must not
         // change the target; a left click pins the target instead.
         return mgr.PinnedTarget;
-    }
-
-    void DrawEscortObjective(ObjectiveShip transport)
-    {
-        Color zone = transport.Escaped ? SignalUi.Positive : new Color(0.35f, 0.9f, 1f, 0.9f);
-        DrawLine(transport.Position, transport.Destination, new Color(zone, 0.18f), W(2f), true);
-        DrawCircle(transport.Destination, transport.DestinationRadius, new Color(zone, 0.08f));
-        DrawArc(transport.Destination, transport.DestinationRadius, 0f, Mathf.Tau, 48, zone, W(3f), true);
-        DrawArc(transport.Destination, transport.DestinationRadius * 0.62f, 0f, Mathf.Tau, 36, new Color(zone, 0.45f), W(1.5f), true);
-        DrawLabel(transport.Destination + new Vector2(0f, -transport.DestinationRadius - Px(18f)),
-            transport.Escaped ? "TRANSPORT SECURED" : "JUMP ZONE", SignalUi.FontCaption, zone);
     }
 
     void DrawSelection(BattleManager mgr, Fighter f)

@@ -45,34 +45,11 @@ public static class EnemyAI
         public float EmergencyScore = float.MinValue;
     }
 
-    /// <summary>
-    /// Chooses a target using the mission's role weights and proximity. A
-    /// higher-priority objective usually wins, while a fighter that closes the
-    /// distance can still draw an attack.
-    /// </summary>
-    public static Fighter SelectTarget(Fighter self, IEnumerable<Fighter> foes, MissionAITuning tuning)
-    {
-        tuning ??= new MissionAITuning();
-        List<Fighter> liveTargets = foes
-            .Where(f => f != null && f.IsAlive && tuning.PriorityFor(f) > 0f)
-            .ToList();
-        bool hasObjective = liveTargets.Any(f => f is ObjectiveShip);
-        bool hasFighter = liveTargets.Any(f => f is not ObjectiveShip);
-        if (hasObjective && hasFighter && GD.Randf() > Mathf.Clamp(tuning.ObjectiveFocusChance, 0f, 1f))
-            liveTargets.RemoveAll(f => f is ObjectiveShip);
-
-        return liveTargets
-            .OrderByDescending(f => TargetScore(self, f, tuning))
-            .ThenBy(f => f.Position.DistanceSquaredTo(self.Position))
+    /// <summary>Chooses the nearest live foe.</summary>
+    public static Fighter SelectTarget(Fighter self, IEnumerable<Fighter> foes) =>
+        foes.Where(f => f != null && f.IsAlive)
+            .OrderBy(f => f.Position.DistanceSquaredTo(self.Position))
             .FirstOrDefault();
-    }
-
-    static float TargetScore(Fighter self, Fighter target, MissionAITuning tuning)
-    {
-        float distance = self.Position.DistanceTo(target.Position);
-        float bias = Mathf.Max(1f, tuning.DistanceBias);
-        return tuning.PriorityFor(target) * bias / (bias + distance);
-    }
 
     /// <summary>
     /// Plans one ship's move against its chosen target. Most enemy pilots
@@ -80,10 +57,9 @@ public static class EnemyAI
     /// straight on at the throttle it started the turn with. Pilots who
     /// <paramref name="readOrders"/> lead the move you actually queued.
     /// </summary>
-    public static void Plan(Fighter self, IReadOnlyList<Fighter> foes, IReadOnlyList<Fighter> allies,
-        MissionAITuning tuning = null, bool readOrders = true)
+    public static void Plan(Fighter self, IReadOnlyList<Fighter> foes, IReadOnlyList<Fighter> allies, bool readOrders = true)
     {
-        Fighter target = SelectTarget(self, foes, tuning);
+        Fighter target = SelectTarget(self, foes);
         if (target == null)
         {
             self.PlannedManeuver = ManeuverType.Normal;
@@ -91,9 +67,8 @@ public static class EnemyAI
             return;
         }
 
-        // The transport's lumbering course is always plain to see.
         Vector2 targetEnd;
-        if (readOrders || target is ObjectiveShip)
+        if (readOrders)
             target.RoutePoint(target.PlannedManeuver, target.PlannedTurnAngleRadians ?? 0f, target.PlannedPathDistance, 1f,
                 out targetEnd, out _);
         else

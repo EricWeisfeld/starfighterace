@@ -34,7 +34,6 @@ public partial class SpaceBackdrop : CanvasLayer
         ["shallows"] = new(new Color(0.12f, 0.44f, 0.34f), new Color(0.12f, 0.26f, 0.50f), "WetPlanet1", new Vector2(0.95f, 0.56f)),
         ["gravel-field"] = new(new Color(0.26f, 0.32f, 0.44f), new Color(0.30f, 0.22f, 0.40f), "BaronPlanet1", new Vector2(0.05f, 0.30f)),
         ["knife-fight"] = new(new Color(0.60f, 0.14f, 0.14f), new Color(0.36f, 0.12f, 0.36f), "LavaPlanet1", new Vector2(0.95f, 0.64f)),
-        ["escort-corridor"] = new(new Color(0.16f, 0.30f, 0.58f), new Color(0.40f, 0.26f, 0.16f), "GasPlanet1", new Vector2(0.95f, 0.30f)),
     };
 
     /// <summary>The look for a map id, or a neutral blue sky for unknown maps.</summary>

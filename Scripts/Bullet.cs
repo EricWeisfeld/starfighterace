@@ -15,7 +15,6 @@ public partial class Bullet : Node2D
     int _damage;
     float _damageMultiplier = 1f; // fire-time bonuses, such as Long Shot
     bool _canHit; // misses are decided at fire time and just fly past
-    ObjectiveShip _objectiveTarget;
     Sprite2D _sprite;
     float _age;
 
@@ -31,13 +30,6 @@ public partial class Bullet : Node2D
         _color = color;
         _damage = damage;
         _canHit = canHit;
-    }
-
-    public void InitObjective(Fighter shooter, ObjectiveShip target, Vector2 pos, Vector2 vel, float maxDist, Color color, int damage, bool canHit,
-        float damageMultiplier = 1f)
-    {
-        Init(shooter, pos, vel, maxDist, color, damage, canHit, damageMultiplier);
-        _objectiveTarget = target;
     }
 
     public override void _Ready()
@@ -78,15 +70,6 @@ public partial class Bullet : Node2D
 
         if (_canHit)
         {
-            if (_objectiveTarget != null && _objectiveTarget.IsAlive && Position.DistanceTo(_objectiveTarget.Position) < 24f)
-            {
-                int hullBefore = _objectiveTarget.Hp;
-                _objectiveTarget.TakeDamage(_shooter?.RollShotDamage(null, _damageMultiplier) ?? _damage);
-                _shooter?.RecordHit(false);
-                mgr.SpawnImpact(Position, _vel, _objectiveTarget.Hp < hullBefore ? ImpactSparks.Kind.Hull : ImpactSparks.Kind.Shield);
-                QueueFree();
-                return;
-            }
             foreach (Fighter f in mgr.GetTeam(1 - _team))
             {
                 if (f.IsAlive && Position.DistanceTo(f.Position) < 16f)

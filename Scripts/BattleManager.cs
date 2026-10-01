@@ -33,7 +33,6 @@ public partial class BattleManager : Node2D
     // Movement advances in fixed slices so asteroid contacts are checked
     // along the whole route, whatever the frame rate.
     const float MovementSimulationStep = ExecTime / 240f;
-    const float EscortReinforcementProgress = 0.60f;
 
     public static BattleManager Instance { get; private set; }
 
@@ -41,9 +40,6 @@ public partial class BattleManager : Node2D
     public readonly List<Fighter> PlayerFighters = new();
     public readonly List<Fighter> EnemyFighters = new();
     public BattleMapDefinition Map { get; private set; }
-    public ObjectiveShip EscortShip { get; private set; }
-    Fighter _priorityTarget;
-    public Fighter PriorityTarget => _priorityTarget;
     BattleMission CurrentMission => GameSetup.Mission;
     /// <summary>Who the enemy brings: the run's mission, or a quick battle's patrol.</summary>
     BattleMission Forces => GameSetup.IsTestBattle ? GameSetup.QuickBattleForces : CurrentMission;
@@ -67,7 +63,6 @@ public partial class BattleManager : Node2D
     float _movementSimulationPending;
     Fighter _draggingGhost;
     Vector2 _ghostGrabOffset;
-    bool _escortReinforcementsSpawned;
     string _notice;
     double _noticeUntil;
 
@@ -326,19 +321,6 @@ public partial class BattleManager : Node2D
             BattleSpawn enemySpawn = Map.EnemySpawns[i];
             SpawnFighter(1, enemySpawn.Position, Mathf.DegToRad(enemySpawn.HeadingDegrees), enemySquad[i]);
         }
-        if (!GameSetup.IsTestBattle && CurrentMission?.Objective == MissionObjective.DestroyTarget)
-            _priorityTarget = EnemyFighters.FirstOrDefault();
-        if (!GameSetup.IsTestBattle && CurrentMission?.Objective == MissionObjective.EscortShip)
-        {
-            EscortShip = new ObjectiveShip();
-            BattleSpawn escortSpawn = Map.EscortSpawn ?? new BattleSpawn(ArenaW / 2f, ArenaH - 360f, -90f);
-            Vector2 destination = Map.EscortDestination == Vector2.Zero
-                ? new Vector2(ArenaW / 2f, 350f)
-                : Map.EscortDestination;
-            float destinationRadius = Map.EscortDestinationRadius > 0f ? Map.EscortDestinationRadius : 95f;
-            EscortShip.Setup(escortSpawn.Position, destination, destinationRadius);
-            _fighterLayer.AddChild(EscortShip);
-        }
 
         _hud = new BattleHud();
         AddChild(_hud);
@@ -360,29 +342,10 @@ public partial class BattleManager : Node2D
         GetTeam(team).Add(f);
     }
 
-    void SpawnEscortReinforcements()
-    {
-        _escortReinforcementsSpawned = true;
-        _waveSpawned = true;
-        ShipType[] enemyWave = Forces?.Reinforcements ?? System.Array.Empty<ShipType>();
-        BattleSpawn[] spawnPoints = Map.EscortReinforcementSpawns;
-        if (spawnPoints == null || spawnPoints.Length == 0 || enemyWave.Length == 0)
-            return;
-
-        int spawnCount = Mathf.Min(enemyWave.Length, spawnPoints.Length);
-        for (int i = 0; i < spawnCount; i++)
-        {
-            BattleSpawn spawn = spawnPoints[i];
-            SpawnFighter(1, spawn.Position, Mathf.DegToRad(spawn.HeadingDegrees), enemyWave[i]);
-            SpawnFlash(spawn.Position);
-        }
-        Announce($"REINFORCEMENTS · {spawnCount} HOSTILES ENTERING THE CORRIDOR");
-    }
-
     /// <summary>A timed wave is due: it is the reinforcement turn, or the first group is already gone.</summary>
     bool WaveDue(bool enemiesWiped) =>
         !_waveSpawned && Forces is { } forces && forces.Reinforcements.Length > 0 &&
-        forces.Objective != MissionObjective.EscortShip && (enemiesWiped || _turn >= forces.ReinforcementTurn);
+        (enemiesWiped || _turn >= forces.ReinforcementTurn);
 
     /// <summary>
     /// Brings in a mission's reinforcements at the enemy's start positions
@@ -422,13 +385,7 @@ public partial class BattleManager : Node2D
     {
         get
         {
-            if (EscortShip != null)
-                return EscortShip.Escaped ? "TRANSPORT SECURED"
-                    : EscortShip.IsAlive ? $"ESCORT · TRANSPORT {EscortShip.DistanceRemaining:0} FROM JUMP"
-                    : "TRANSPORT LOST";
             int hostiles = EnemyFighters.Count(f => f.IsAlive);
-            if (_priorityTarget != null)
-                return _priorityTarget.IsAlive ? "DESTROY THE MARKED TARGET" : "TARGET DESTROYED";
             return hostiles == 1 ? "ELIMINATE · 1 HOSTILE LEFT" : $"ELIMINATE · {hostiles} HOSTILES LEFT";
         }
     }
@@ -472,8 +429,6 @@ public partial class BattleManager : Node2D
             if (includeGhosts && fighter.Team == 0)
                 yield return GetGhostEndpoint(fighter);
         }
-        if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped)
-            yield return EscortShip.Position;
     }
 
     /// <summary>Before any shots, the action camera also shows enemies within this multiple of gun range of your ships.</summary>
@@ -511,7 +466,7 @@ public partial class BattleManager : Node2D
     /// <summary>
     /// The action camera's shot: the ships trading fire, each held a moment
     /// after its last shot, hit or crash (a ship that just died stays in shot
-    /// while it burns). Before anyone fires: your squadron, the transport and
+    /// while it burns). Before anyone fires: your squadron and
     /// any enemy closing on them.
     /// </summary>
     IEnumerable<Vector2> ActionPoints()
@@ -521,8 +476,6 @@ public partial class BattleManager : Node2D
         if (fight.Count > 0)
             return fight;
         var friendly = PlayerFighters.Where(f => f.IsAlive).ToList();
-        if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped)
-            friendly.Add(EscortShip);
         IEnumerable<Fighter> closing = EnemyFighters.Where(enemy => enemy.IsAlive && friendly.Any(ours =>
             ours.Position.DistanceTo(enemy.Position) <= Mathf.Max(ours.EffectiveFireRange, enemy.EffectiveFireRange) * ActionApproachRangeFactor));
         return friendly.Concat(closing).Select(f => f.Position).ToList();
@@ -1042,21 +995,11 @@ public partial class BattleManager : Node2D
         if (!CanExecuteTurn())
             return;
 
-        // Plan the objective first so enemy interceptors can lead its real next
-        // movement instead of chasing its previous position.
-        if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped)
-            EscortShip.PlanEscapeMove(this);
-
-        var enemyTargets = PlayerFighters.Where(f => f.IsAlive).Cast<Fighter>().ToList();
-        if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped)
-            enemyTargets.Add(EscortShip);
-        MissionAITuning aiTuning = CurrentMission?.EnemyAITuning ?? new MissionAITuning();
+        var enemyTargets = PlayerFighters.Where(f => f.IsAlive).ToList();
         foreach (Fighter e in EnemyFighters.Where(f => f.IsAlive))
-            EnemyAI.Plan(e, enemyTargets, EnemyFighters, aiTuning, readOrders: Forces?.EnemiesReadOrders ?? false);
+            EnemyAI.Plan(e, enemyTargets, EnemyFighters, readOrders: Forces?.EnemiesReadOrders ?? false);
         foreach (Fighter f in AllAlive())
             f.BeginExecute();
-        if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped)
-            EscortShip.BeginExecute();
 
         _draggingGhost = null;
         _gesture = Gesture.None;
@@ -1090,8 +1033,6 @@ public partial class BattleManager : Node2D
         }
         if (_turn == 1 && Forces?.EnemiesReadOrders == true)
             Announce("ACE PILOTS · SHARPER THAN ANY PATROL", 6.0);
-        if (EscortShip != null && EscortShip.IsAlive)
-            EscortShip.RouteScale = IsInNebula(EscortShip.Position) ? NebulaRouteScale : 1f;
         PendingTargetAction = null;
         _camera.StopFollowing();
         Selected = PlayerFighters.FirstOrDefault(f => f.IsAlive);
@@ -1145,16 +1086,6 @@ public partial class BattleManager : Node2D
             f.AdvanceExecute(dt);
             ResolveShipAsteroidContacts(f, previousPosition, f.Position);
         }
-
-        if (EscortShip == null || !EscortShip.IsAlive || EscortShip.Escaped)
-            return;
-
-        Vector2 previousEscortPosition = EscortShip.Position;
-        EscortShip.AdvanceExecute(dt);
-        ResolveShipAsteroidContacts(EscortShip, previousEscortPosition, EscortShip.Position);
-        EscortShip.UpdateDestinationProgress(previousEscortPosition);
-        if (!_escortReinforcementsSpawned && EscortShip.EscapeProgress >= EscortReinforcementProgress)
-            SpawnEscortReinforcements();
     }
 
     const float BarrageShotInterval = 0.07f; // gap between shots inside one barrage
@@ -1175,7 +1106,7 @@ public partial class BattleManager : Node2D
                 {
                     if (f.BarrageTarget != null && f.BarrageTarget.IsAlive)
                     {
-                        FireShotAtSelectedTarget(f, f.BarrageTarget);
+                        FireShot(f, f.BarrageTarget);
                         f.BarrageShotsLeft--;
                         f.BarrageShotTimer += BarrageShotInterval;
                     }
@@ -1194,20 +1125,7 @@ public partial class BattleManager : Node2D
                 .Where(t => t.IsAlive)
                 .Where(t => f.Position.DistanceTo(t.Position) <= f.EffectiveFireRange)
                 .Where(t => Mathf.Abs(Mathf.Wrap((t.Position - f.Position).Angle() - f.GunHeading, -Mathf.Pi, Mathf.Pi)) <= Mathf.DegToRad(f.EffectiveFireConeDeg));
-            Fighter target;
-            if (f.Team == 1)
-            {
-                if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped &&
-                    f.Position.DistanceTo(EscortShip.Position) <= f.EffectiveFireRange &&
-                    Mathf.Abs(Mathf.Wrap((EscortShip.Position - f.Position).Angle() - f.GunHeading, -Mathf.Pi, Mathf.Pi)) <= Mathf.DegToRad(f.EffectiveFireConeDeg))
-                    possibleTargets = possibleTargets.Append(EscortShip);
-                target = EnemyAI.SelectTarget(f, possibleTargets,
-                    CurrentMission?.EnemyAITuning ?? new MissionAITuning());
-            }
-            else
-            {
-                target = possibleTargets.OrderBy(t => f.Position.DistanceSquaredTo(t.Position)).FirstOrDefault();
-            }
+            Fighter target = possibleTargets.OrderBy(t => f.Position.DistanceSquaredTo(t.Position)).FirstOrDefault();
             if (target != null)
             {
                 f.Cooldown = f.EffectiveFireCooldown;
@@ -1217,14 +1135,6 @@ public partial class BattleManager : Node2D
                 f.PlayFireAnimation(f.BarrageShotsLeft * BarrageShotInterval);
             }
         }
-    }
-
-    void FireShotAtSelectedTarget(Fighter shooter, Fighter target)
-    {
-        if (target is ObjectiveShip objective)
-            FireShotAtObjective(shooter, objective);
-        else
-            FireShot(shooter, target);
     }
 
     void FireShot(Fighter shooter, Fighter target)
@@ -1260,23 +1170,6 @@ public partial class BattleManager : Node2D
         b.Init(shooter, nose, dir * BulletSpeed, shooter.EffectiveFireRange * 1.4f, col, shooter.ShotDamage, hits,
             shooter.FireTimeDamageMultiplier(target.Position));
         _bulletLayer.AddChild(b);
-        _bulletLayer.AddChild(new MuzzleFlash { Shooter = shooter, Glow = ShipPaint.TeamGlow(shooter.Team) });
-    }
-
-    void FireShotAtObjective(Fighter shooter, ObjectiveShip target)
-    {
-        shooter.ShotsFired++;
-        NoteAction(shooter);
-        NoteAction(target);
-        Vector2 nose = shooter.Position + Vector2.FromAngle(shooter.GunHeading) * 20f;
-        Vector2 dir = (target.Position - nose).Normalized();
-        bool hits = GD.Randf() < Mathf.Clamp(shooter.EffectiveAccuracyAgainst(null) * 0.9f, 0.1f, 0.9f);
-        if (!hits)
-            dir = dir.Rotated((float)GD.RandRange(3.5, 7.0) * Mathf.DegToRad(GD.Randf() < 0.5f ? -1 : 1));
-        var bullet = new Bullet();
-        bullet.InitObjective(shooter, target, nose, dir * BulletSpeed, shooter.EffectiveFireRange * 1.4f,
-            ShipPaint.TeamGlow(shooter.Team), shooter.ShotDamage, hits, shooter.FireTimeDamageMultiplier(target.Position));
-        _bulletLayer.AddChild(bullet);
         _bulletLayer.AddChild(new MuzzleFlash { Shooter = shooter, Glow = ShipPaint.TeamGlow(shooter.Team) });
     }
 
@@ -1324,22 +1217,14 @@ public partial class BattleManager : Node2D
         bool playersAlive = PlayerFighters.Any(f => f.IsAlive);
         bool enemiesAlive = EnemyFighters.Any(f => f.IsAlive);
         // Wiping the first group early doesn't skip a wave that is on its way: it arrives now.
-        bool targetDown = CurrentMission?.Objective == MissionObjective.DestroyTarget && _priorityTarget != null && !_priorityTarget.IsAlive;
-        if (playersAlive && !enemiesAlive && !targetDown && WaveDue(enemiesWiped: true))
+        if (playersAlive && !enemiesAlive && WaveDue(enemiesWiped: true))
         {
             SpawnWave();
             enemiesAlive = true;
         }
-        bool objectiveSuccess = CurrentMission?.Objective switch
+        if (!playersAlive || !enemiesAlive)
         {
-            MissionObjective.DestroyTarget => _priorityTarget != null && !_priorityTarget.IsAlive,
-            MissionObjective.EscortShip => EscortShip != null && EscortShip.Escaped,
-            _ => !enemiesAlive,
-        };
-        bool objectiveFailed = CurrentMission?.Objective == MissionObjective.EscortShip && (EscortShip == null || !EscortShip.IsAlive);
-        if (!playersAlive || objectiveSuccess || objectiveFailed || (!enemiesAlive && CurrentMission?.Objective != MissionObjective.EscortShip))
-        {
-            bool won = playersAlive && objectiveSuccess; // mutual destruction counts as a defeat
+            bool won = playersAlive; // mutual destruction counts as a defeat
             (string headline, Color headlineColor) = won
                 ? ("VICTORY", Positive)
                 : enemiesAlive ? ("DEFEAT", Negative) : ("MUTUAL DESTRUCTION", Body);

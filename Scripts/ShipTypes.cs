@@ -11,13 +11,13 @@ public enum ShipAbility
     RotatingGuns,
     SuppressionFire,
     EmergencyThrusters,
-    SnapTurn,
     HunterLock,
     PursuitBurn,
     EcmJink,
     SensorScramble,
-    GhostRun,
     EvasiveDodge,
+    EvasiveSpin,
+    RearGuns,
 }
 
 /// <summary>Texture paths + sheet layout for one ship type on one team; loads lazily.</summary>
@@ -76,8 +76,6 @@ public sealed record ShipManeuverProfile
     public float EmergencyThrustersMoveDistance { get; init; }
     public float EmergencyThrustersTurnLimitDegrees { get; init; }
     public float EmergencyThrustersEvasionPenalty { get; init; }
-    public float SnapTurnMoveDistance { get; init; }
-    public float SnapTurnAngleDegrees { get; init; }
     public float PursuitBurnMoveDistance { get; init; }
     public float PursuitBurnTurnLimitDegrees { get; init; }
     public float HunterLockAccuracyBonus { get; init; }
@@ -88,12 +86,15 @@ public sealed record ShipManeuverProfile
     public float SensorScrambleAccuracyPenalty { get; init; }
     public int SensorScrambleDurationTurns { get; init; }
     public int SensorScrambleCooldownTurns { get; init; }
-    public float GhostRunMoveDistance { get; init; }
-    public float GhostRunTurnLimitDegrees { get; init; }
-    public float GhostRunEvasionBonus { get; init; }
     public float EvasiveDodgeMoveDistance { get; init; }
     public float EvasiveDodgeAngleDegrees { get; init; }
     public float EvasiveDodgeEvasionBonus { get; init; }
+    /// <summary>Evasion an evasive spin adds while the guns are silent.</summary>
+    public float EvasiveSpinEvasionBonus { get; init; }
+    /// <summary>Share of the normal throttle range an evasive spin flies.</summary>
+    public float EvasiveSpinDistanceScale { get; init; }
+    /// <summary>Damage of a shot from the rear guns, as a share of a normal shot.</summary>
+    public float RearGunsDamageMultiplier { get; init; }
     /// <summary>All maneuvers this class can equip; pilots choose their loadout from this pool.</summary>
     public ShipAbility[] Pool { get; init; } = System.Array.Empty<ShipAbility>();
 }
@@ -141,8 +142,6 @@ public class ShipType
     public float EmergencyThrustersMoveDistance => Maneuvers.EmergencyThrustersMoveDistance;
     public float EmergencyThrustersTurnLimitDegrees => Maneuvers.EmergencyThrustersTurnLimitDegrees;
     public float EmergencyThrustersEvasionPenalty => Maneuvers.EmergencyThrustersEvasionPenalty;
-    public float SnapTurnMoveDistance => Maneuvers.SnapTurnMoveDistance;
-    public float SnapTurnAngleDegrees => Maneuvers.SnapTurnAngleDegrees;
     public float PursuitBurnMoveDistance => Maneuvers.PursuitBurnMoveDistance;
     public float PursuitBurnTurnLimitDegrees => Maneuvers.PursuitBurnTurnLimitDegrees;
     public float HunterLockAccuracyBonus => Maneuvers.HunterLockAccuracyBonus;
@@ -153,9 +152,6 @@ public class ShipType
     public float SensorScrambleAccuracyPenalty => Maneuvers.SensorScrambleAccuracyPenalty;
     public int SensorScrambleDurationTurns => Maneuvers.SensorScrambleDurationTurns;
     public int SensorScrambleCooldownTurns => Maneuvers.SensorScrambleCooldownTurns;
-    public float GhostRunMoveDistance => Maneuvers.GhostRunMoveDistance;
-    public float GhostRunTurnLimitDegrees => Maneuvers.GhostRunTurnLimitDegrees;
-    public float GhostRunEvasionBonus => Maneuvers.GhostRunEvasionBonus;
     public float EvasiveDodgeMoveDistance => Maneuvers.EvasiveDodgeMoveDistance;
     public float EvasiveDodgeAngleDegrees => Maneuvers.EvasiveDodgeAngleDegrees;
     public float EvasiveDodgeEvasionBonus => Maneuvers.EvasiveDodgeEvasionBonus;
@@ -223,10 +219,6 @@ public static class ShipTypes
         Maneuvers = new ShipManeuverProfile
         {
             BreakTurnMoveDistance = 180f,
-            SnapTurnMoveDistance = 80f,
-            SnapTurnAngleDegrees = 145f,
-            HunterLockAccuracyBonus = 0.12f,
-            HunterLockCooldownTurns = 4,
             PursuitBurnMoveDistance = 370f,
             PursuitBurnTurnLimitDegrees = 20f,
             EcmJinkMoveDistance = 110f,
@@ -235,11 +227,10 @@ public static class ShipTypes
             SensorScrambleAccuracyPenalty = 0.20f,
             SensorScrambleDurationTurns = 2,
             SensorScrambleCooldownTurns = 4,
-            GhostRunMoveDistance = 300f,
-            GhostRunTurnLimitDegrees = 125f,
-            GhostRunEvasionBonus = 0.25f,
-            Pool = new[] { ShipAbility.BreakTurn, ShipAbility.SnapTurn, ShipAbility.HunterLock, ShipAbility.PursuitBurn,
-                ShipAbility.EcmJink, ShipAbility.SensorScramble, ShipAbility.GhostRun },
+            EvasiveSpinEvasionBonus = 0.60f,
+            EvasiveSpinDistanceScale = 0.5f,
+            Pool = new[] { ShipAbility.BreakTurn, ShipAbility.PursuitBurn, ShipAbility.EcmJink,
+                ShipAbility.SensorScramble, ShipAbility.EvasiveSpin },
         },
         SkinsByTeam = new[]
         {
@@ -286,7 +277,9 @@ public static class ShipTypes
             EvasiveDodgeMoveDistance = 110f,
             EvasiveDodgeAngleDegrees = 135f,
             EvasiveDodgeEvasionBonus = 0.40f,
-            Pool = new[] { ShipAbility.UTurn, ShipAbility.EngineBoost, ShipAbility.EvasiveDodge },
+            HunterLockAccuracyBonus = 0.12f,
+            HunterLockCooldownTurns = 4,
+            Pool = new[] { ShipAbility.UTurn, ShipAbility.EngineBoost, ShipAbility.EvasiveDodge, ShipAbility.HunterLock },
         },
         SkinsByTeam = new[]
         {
@@ -333,7 +326,8 @@ public static class ShipTypes
             EmergencyThrustersMoveDistance = 320f,
             EmergencyThrustersTurnLimitDegrees = 35f,
             EmergencyThrustersEvasionPenalty = 0.10f,
-            Pool = new[] { ShipAbility.RotatingGuns, ShipAbility.SuppressionFire, ShipAbility.EmergencyThrusters },
+            RearGunsDamageMultiplier = 0.5f,
+            Pool = new[] { ShipAbility.RotatingGuns, ShipAbility.SuppressionFire, ShipAbility.EmergencyThrusters, ShipAbility.RearGuns },
         },
         SkinsByTeam = new[]
         {

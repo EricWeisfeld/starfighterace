@@ -124,7 +124,7 @@ public partial class BattleManager : Node2D
 
     static float ClampPlannedTurn(Fighter fighter, ManeuverType maneuver, float turn, float distance)
     {
-        if (maneuver != ManeuverType.Normal)
+        if (!Fighter.FliesLikeNormal(maneuver))
             return turn;
         float maxTurn = Mathf.DegToRad(fighter.GetNormalTurnLimitDegrees(distance));
         return Mathf.Clamp(turn, -maxTurn, maxTurn);
@@ -542,7 +542,7 @@ public partial class BattleManager : Node2D
         fighter.RoutePoint(fighter.PlannedManeuver, fighter.PlannedTurnAngleRadians ?? 0f, fighter.PlannedPathDistance, 1f,
             out Vector2 ghost, out float ghostHeading);
         points.Add(ghost);
-        points.Add(ghost + Vector2.FromAngle(ghostHeading) * fighter.EffectiveFireRange * 0.8f);
+        points.Add(ghost + Vector2.FromAngle(Fighter.GunHeadingFor(fighter.PlannedManeuver, ghostHeading)) * fighter.EffectiveFireRange * 0.8f);
         float reach = fighter.NormalMoveMaxDistance;
         foreach (float angle in new[] { -1.1f, 0f, 1.1f })
             points.Add(fighter.Position + Vector2.FromAngle(fighter.Heading + angle) * reach);
@@ -821,9 +821,11 @@ public partial class BattleManager : Node2D
         return endpoint;
     }
 
+    /// <summary>Steers normal flight, or a maneuver flown like it, so its ghost lands at the endpoint.</summary>
     void SetGhostManeuver(Fighter fighter, Vector2 endpoint)
     {
-        fighter.PlannedManeuver = ManeuverType.Normal;
+        if (!Fighter.FliesLikeNormal(fighter.PlannedManeuver))
+            fighter.PlannedManeuver = ManeuverType.Normal;
         Vector2 offset = endpoint - fighter.Position;
         if (offset.LengthSquared() < 1f)
             return;
@@ -880,18 +882,18 @@ public partial class BattleManager : Node2D
         switch (fighter.PlannedManeuver)
         {
             case ManeuverType.Normal:
+            case ManeuverType.EvasiveSpin:
+            case ManeuverType.RearGuns:
                 SetGhostManeuver(fighter, endpoint);
                 break;
             case ManeuverType.EngineBoost:
             case ManeuverType.PursuitBurn:
             case ManeuverType.EcmJink:
-            case ManeuverType.GhostRun:
             case ManeuverType.EmergencyThrusters:
                 PlanAimed(fighter, fighter.PlannedManeuver, 2f * bearing);
                 break;
             case ManeuverType.UTurn:
             case ManeuverType.BreakTurn:
-            case ManeuverType.SnapTurn:
             case ManeuverType.EvasiveDodge:
                 if (Mathf.Abs(bearing) > 0.05f)
                     PlanDirectional(fighter, fighter.PlannedManeuver, Mathf.Sign(bearing));
@@ -906,9 +908,10 @@ public partial class BattleManager : Node2D
             case ManeuverType.EngineBoost: fighter.PlanEngineBoost(turn); break;
             case ManeuverType.PursuitBurn: fighter.PlanPursuitBurn(turn); break;
             case ManeuverType.EcmJink: fighter.PlanEcmJink(turn); break;
-            case ManeuverType.GhostRun: fighter.PlanGhostRun(turn); break;
             case ManeuverType.EmergencyThrusters: fighter.PlanEmergencyThrusters(turn); break;
             case ManeuverType.RotatingGuns: fighter.PlanRotatingGuns(); break;
+            case ManeuverType.EvasiveSpin:
+            case ManeuverType.RearGuns: fighter.PlanNormalStyle(maneuver, turn); break;
         }
     }
 
@@ -918,7 +921,6 @@ public partial class BattleManager : Node2D
         {
             case ManeuverType.UTurn: fighter.PlanUTurn(side); break;
             case ManeuverType.BreakTurn: fighter.PlanBreakTurn(side); break;
-            case ManeuverType.SnapTurn: fighter.PlanSnapTurn(side); break;
             case ManeuverType.EvasiveDodge: fighter.PlanEvasiveDodge(side); break;
         }
     }
@@ -1163,7 +1165,7 @@ public partial class BattleManager : Node2D
     {
         foreach (Fighter f in AllAlive())
         {
-            if (!f.CanFire)
+            if (!f.CanFire || f.IsEvasiveSpinActive)
                 continue;
             f.Cooldown -= dt;
 
@@ -1193,13 +1195,13 @@ public partial class BattleManager : Node2D
             IEnumerable<Fighter> possibleTargets = GetTeam(1 - f.Team)
                 .Where(t => t.IsAlive)
                 .Where(t => f.Position.DistanceTo(t.Position) <= f.EffectiveFireRange)
-                .Where(t => Mathf.Abs(Mathf.Wrap((t.Position - f.Position).Angle() - f.Heading, -Mathf.Pi, Mathf.Pi)) <= Mathf.DegToRad(f.EffectiveFireConeDeg));
+                .Where(t => Mathf.Abs(Mathf.Wrap((t.Position - f.Position).Angle() - f.GunHeading, -Mathf.Pi, Mathf.Pi)) <= Mathf.DegToRad(f.EffectiveFireConeDeg));
             Fighter target;
             if (f.Team == 1)
             {
                 if (EscortShip != null && EscortShip.IsAlive && !EscortShip.Escaped &&
                     f.Position.DistanceTo(EscortShip.Position) <= f.EffectiveFireRange &&
-                    Mathf.Abs(Mathf.Wrap((EscortShip.Position - f.Position).Angle() - f.Heading, -Mathf.Pi, Mathf.Pi)) <= Mathf.DegToRad(f.EffectiveFireConeDeg))
+                    Mathf.Abs(Mathf.Wrap((EscortShip.Position - f.Position).Angle() - f.GunHeading, -Mathf.Pi, Mathf.Pi)) <= Mathf.DegToRad(f.EffectiveFireConeDeg))
                     possibleTargets = possibleTargets.Append(EscortShip);
                 target = EnemyAI.SelectTarget(f, possibleTargets,
                     CurrentMission?.EnemyAITuning ?? new MissionAITuning());
@@ -1232,7 +1234,7 @@ public partial class BattleManager : Node2D
         shooter.ShotsFired++;
         NoteAction(shooter);
         NoteAction(target);
-        Vector2 nose = shooter.Position + Vector2.FromAngle(shooter.Heading) * 20f;
+        Vector2 nose = shooter.Position + Vector2.FromAngle(shooter.GunHeading) * 20f;
         float travelTime = nose.DistanceTo(target.Position) / BulletSpeed;
         Vector2 aim = target.Position + target.Velocity * travelTime; // basic lead
         Vector2 dir = (aim - nose).Normalized();
@@ -1268,7 +1270,7 @@ public partial class BattleManager : Node2D
         shooter.ShotsFired++;
         NoteAction(shooter);
         NoteAction(target);
-        Vector2 nose = shooter.Position + Vector2.FromAngle(shooter.Heading) * 20f;
+        Vector2 nose = shooter.Position + Vector2.FromAngle(shooter.GunHeading) * 20f;
         Vector2 dir = (target.Position - nose).Normalized();
         bool hits = GD.Randf() < Mathf.Clamp(shooter.EffectiveAccuracyAgainst(null) * 0.9f, 0.1f, 0.9f);
         if (!hits)

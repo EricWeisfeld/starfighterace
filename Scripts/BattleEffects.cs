@@ -125,8 +125,8 @@ public partial class MuzzleFlash : Node2D
     {
         if (!IsInstanceValid(Shooter))
             return;
-        Position = Shooter.Position + Vector2.FromAngle(Shooter.Heading) * (Shooter.VisualRadius * 0.85f);
-        Rotation = Shooter.Heading;
+        Position = Shooter.Position + Vector2.FromAngle(Shooter.GunHeading) * (Shooter.VisualRadius * 0.85f);
+        Rotation = Shooter.GunHeading;
     }
 
     public override void _Process(double delta)

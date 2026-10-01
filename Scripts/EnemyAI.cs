@@ -151,14 +151,6 @@ public static class EnemyAI
             yield return new FlightPlan(ManeuverType.BreakTurn, Mathf.Pi, self.Moves.BreakTurnMoveDistance);
         }
 
-
-        if (self.HasAbility(ShipAbility.SnapTurn) && self.IsManeuverReady(ManeuverType.SnapTurn))
-        {
-            float snapTurn = Mathf.DegToRad(self.Moves.SnapTurnAngleDegrees);
-            yield return new FlightPlan(ManeuverType.SnapTurn, -snapTurn, self.Moves.SnapTurnMoveDistance);
-            yield return new FlightPlan(ManeuverType.SnapTurn, snapTurn, self.Moves.SnapTurnMoveDistance);
-        }
-
         if (self.HasAbility(ShipAbility.RotatingGuns) && self.IsManeuverReady(ManeuverType.RotatingGuns))
             yield return new FlightPlan(ManeuverType.RotatingGuns, 0f, self.Moves.RotatingGunsMoveDistance);
 
@@ -184,12 +176,6 @@ public static class EnemyAI
         {
             foreach (float turn in TurnsFor(self.EcmJinkTurnLimitDegrees))
                 yield return new FlightPlan(ManeuverType.EcmJink, turn, self.Moves.EcmJinkMoveDistance);
-        }
-
-        if (self.HasAbility(ShipAbility.GhostRun) && self.IsManeuverReady(ManeuverType.GhostRun))
-        {
-            foreach (float turn in TurnsFor(self.GhostRunTurnLimitDegrees))
-                yield return new FlightPlan(ManeuverType.GhostRun, turn, self.Moves.GhostRunMoveDistance);
         }
 
         if (self.HasAbility(ShipAbility.EvasiveDodge) && self.IsManeuverReady(ManeuverType.EvasiveDodge))
@@ -287,7 +273,7 @@ public static class EnemyAI
     {
         self.PlannedManeuver = plan.Maneuver;
         self.PlannedTurnAngleRadians = plan.Turn;
-        if (plan.Maneuver == ManeuverType.Normal)
+        if (Fighter.FliesLikeNormal(plan.Maneuver))
             self.SetPlannedMoveDistance(plan.Distance);
         else
             self.PlannedPathDistance = plan.Distance;

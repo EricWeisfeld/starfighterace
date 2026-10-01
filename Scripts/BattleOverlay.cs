@@ -183,22 +183,24 @@ public partial class BattleOverlay : Node2D
     void DrawSelection(BattleManager mgr, Fighter f)
     {
         DrawArc(f.Position, Mathf.Max(26f, f.VisualRadius + 6f), 0, Mathf.Tau, 40, new Color(0.302f, 0.639f, 1f, 0.9f), W(2.5f), true);
-        if (f.PlannedManeuver is ManeuverType.Normal or ManeuverType.EngineBoost or ManeuverType.EmergencyThrusters or ManeuverType.PursuitBurn or ManeuverType.EcmJink or ManeuverType.GhostRun)
+        if (Fighter.FliesLikeNormal(f.PlannedManeuver) ||
+            f.PlannedManeuver is ManeuverType.EngineBoost or ManeuverType.EmergencyThrusters or ManeuverType.PursuitBurn or ManeuverType.EcmJink)
             DrawReachableFan(f);
-        if (f.PlannedManeuver == ManeuverType.Normal)
+        if (Fighter.FliesLikeNormal(f.PlannedManeuver))
             DrawThrottleGauge(f);
     }
 
     /// <summary>
-    /// The normal-flight throttle range along the ship's heading, with the
-    /// planned distance marked. The numbers live in the HUD.
+    /// The throttle range along the ship's heading, with the planned distance
+    /// marked: normal flight's, or the shorter one of an evasive spin. The
+    /// numbers live in the HUD.
     /// </summary>
     void DrawThrottleGauge(Fighter f)
     {
         // Drawn at the distances actually flown, so nebula drag shows here too.
         Vector2 forward = Vector2.FromAngle(f.Heading) * f.RouteScale;
-        Vector2 min = f.Position + forward * f.NormalMoveMinDistance;
-        Vector2 max = f.Position + forward * f.NormalMoveMaxDistance;
+        Vector2 min = f.Position + forward * f.MinMoveFor(f.PlannedManeuver);
+        Vector2 max = f.Position + forward * f.MaxMoveFor(f.PlannedManeuver);
         Vector2 current = f.Position + forward * f.PlannedPathDistance;
         DrawLine(min, max, new Color(0.302f, 0.639f, 1f, 0.55f), W(3f), true);
         DrawCircle(min, Px(4f), new Color(1f, 1f, 1f, 0.4f));
@@ -216,9 +218,7 @@ public partial class BattleOverlay : Node2D
                     ? f.PursuitBurnTurnLimitDegrees
                     : f.PlannedManeuver == ManeuverType.EcmJink
                         ? f.EcmJinkTurnLimitDegrees
-                        : f.PlannedManeuver == ManeuverType.GhostRun
-                            ? f.GhostRunTurnLimitDegrees
-                : f.PlannedNormalTurnLimitDegrees);
+                        : f.PlannedNormalTurnLimitDegrees);
         const int samples = 32;
         var edge = new Vector2[samples + 1];
         for (int i = 0; i <= samples; i++)
@@ -251,11 +251,11 @@ public partial class BattleOverlay : Node2D
             ManeuverType.EngineBoost => new Color(0.3f, 1f, 0.75f, 0.88f),
             ManeuverType.RotatingGuns => new Color(1f, 0.78f, 0.32f, 0.92f),
             ManeuverType.EmergencyThrusters => new Color(1f, 0.36f, 0.3f, 0.92f),
-            ManeuverType.SnapTurn => new Color(0.95f, 0.55f, 1f, 0.92f),
             ManeuverType.PursuitBurn => new Color(0.4f, 1f, 0.7f, 0.92f),
             ManeuverType.EcmJink => new Color(0.45f, 0.7f, 1f, 0.92f),
-            ManeuverType.GhostRun => new Color(0.6f, 0.95f, 1f, 0.92f),
             ManeuverType.EvasiveDodge => new Color(0.35f, 0.9f, 1f, 0.92f),
+            ManeuverType.EvasiveSpin => new Color(0.6f, 0.95f, 1f, 0.92f),
+            ManeuverType.RearGuns => new Color(0.95f, 0.55f, 1f, 0.92f),
             _ => PathColor,
         };
         bool fatalAsteroidPath = mgr.PathHitsAsteroid(f, f.PlannedManeuver, turn, f.PlannedPathDistance);
@@ -270,8 +270,8 @@ public partial class BattleOverlay : Node2D
             DrawPolyline(pts, new Color(pathColor, pathColor.A * alpha / 0.8f), W(2.5f), true);
 
         Vector2 end = pts[samples];
-        if (showCone)
-            DrawFireCone(end, endHeading, f.EffectiveFireRange, f.EffectiveFireConeDeg);
+        if (showCone && Fighter.GunsFireDuring(f.PlannedManeuver))
+            DrawFireCone(end, Fighter.GunHeadingFor(f.PlannedManeuver, endHeading), f.EffectiveFireRange, f.EffectiveFireConeDeg);
         Vector2 labelAt = end + new Vector2(0f, -Mathf.Max(24f, f.VisualRadius + 4f) - Px(16f));
         if (fatalAsteroidPath)
             DrawLabel(labelAt, "FATAL COLLISION", SignalUi.FontMicro, new Color(1f, 0.35f, 0.3f, alpha));
@@ -363,11 +363,14 @@ public partial class BattleOverlay : Node2D
 
     void DrawTimeSliceCones(BattleManager mgr, Fighter shooter)
     {
+        if (!Fighter.GunsFireDuring(shooter.PlannedManeuver))
+            return;
         foreach (float progress in TimeSliceProgress)
         {
             mgr.PredictExecutionPoint(shooter, shooter.PlannedManeuver, shooter.PlannedTurnAngleRadians ?? 0f,
                 shooter.PlannedPathDistance, progress, out Vector2 position, out float heading);
-            DrawFireConeOutline(position, heading, shooter.EffectiveFireRange, shooter.EffectiveFireConeDeg);
+            DrawFireConeOutline(position, Fighter.GunHeadingFor(shooter.PlannedManeuver, heading),
+                shooter.EffectiveFireRange, shooter.EffectiveFireConeDeg);
         }
     }
 
@@ -399,6 +402,9 @@ public partial class BattleOverlay : Node2D
     TargetingAnalysis AnalyzeTargeting(BattleManager mgr, Fighter shooter, Fighter target, List<TargetPlan> targetPlans)
     {
         var result = new TargetingAnalysis();
+        // Silent guns have no firing window at all.
+        if (!Fighter.GunsFireDuring(shooter.PlannedManeuver))
+            return result;
         float coneRadians = Mathf.DegToRad(shooter.EffectiveFireConeDeg);
         float range = shooter.EffectiveFireRange;
         PredictedPath shooterPath = PredictPath(mgr, shooter, shooter.PlannedManeuver,
@@ -410,7 +416,7 @@ public partial class BattleOverlay : Node2D
         for (int i = 0; i <= TargetingTimeSamples; i++)
         {
             Vector2 shooterPosition = shooterPath.Positions[i];
-            float shooterHeading = shooterPath.Headings[i];
+            float shooterHeading = Fighter.GunHeadingFor(shooter.PlannedManeuver, shooterPath.Headings[i]);
 
             int solutions = 0;
             foreach (PredictedPath targetPath in targetPaths)
@@ -479,10 +485,14 @@ public partial class BattleOverlay : Node2D
             {
                 int firingPlans = 0;
                 float sourceRisk = 0f;
-                foreach (PredictedPath enemyPath in source.Paths)
+                for (int plan = 0; plan < source.Paths.Count; plan++)
                 {
+                    PredictedPath enemyPath = source.Paths[plan];
+                    ManeuverType enemyManeuver = source.Plans[plan].Maneuver;
+                    if (!Fighter.GunsFireDuring(enemyManeuver))
+                        continue;
                     Vector2 enemyPosition = enemyPath.Positions[i];
-                    float enemyHeading = enemyPath.Headings[i];
+                    float enemyHeading = Fighter.GunHeadingFor(enemyManeuver, enemyPath.Headings[i]);
                     Vector2 offset = targetPosition - enemyPosition;
                     if (offset.Length() > source.Fighter.EffectiveFireRange)
                         continue;
@@ -606,12 +616,6 @@ public partial class BattleOverlay : Node2D
             yield return new TargetPlan(ManeuverType.BreakTurn, -Mathf.Pi, target.Moves.BreakTurnMoveDistance);
             yield return new TargetPlan(ManeuverType.BreakTurn, Mathf.Pi, target.Moves.BreakTurnMoveDistance);
         }
-        if (target.HasAbility(ShipAbility.SnapTurn) && target.IsManeuverReady(ManeuverType.SnapTurn))
-        {
-            float turn = Mathf.DegToRad(target.Moves.SnapTurnAngleDegrees);
-            yield return new TargetPlan(ManeuverType.SnapTurn, -turn, target.Moves.SnapTurnMoveDistance);
-            yield return new TargetPlan(ManeuverType.SnapTurn, turn, target.Moves.SnapTurnMoveDistance);
-        }
         if (target.HasAbility(ShipAbility.RotatingGuns) && target.IsManeuverReady(ManeuverType.RotatingGuns))
             yield return new TargetPlan(ManeuverType.RotatingGuns, 0f, target.Moves.RotatingGunsMoveDistance);
 
@@ -627,9 +631,6 @@ public partial class BattleOverlay : Node2D
         foreach (float turn in SampleTurns(target.EcmJinkTurnLimitDegrees))
             if (target.HasAbility(ShipAbility.EcmJink) && target.IsManeuverReady(ManeuverType.EcmJink))
                 yield return new TargetPlan(ManeuverType.EcmJink, turn, target.Moves.EcmJinkMoveDistance);
-        foreach (float turn in SampleTurns(target.GhostRunTurnLimitDegrees))
-            if (target.HasAbility(ShipAbility.GhostRun) && target.IsManeuverReady(ManeuverType.GhostRun))
-                yield return new TargetPlan(ManeuverType.GhostRun, turn, target.Moves.GhostRunMoveDistance);
         if (target.HasAbility(ShipAbility.EvasiveDodge) && target.IsManeuverReady(ManeuverType.EvasiveDodge))
         {
             float turn = Mathf.DegToRad(target.Moves.EvasiveDodgeAngleDegrees);

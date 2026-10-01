@@ -31,11 +31,11 @@ public enum ManeuverType
     EngineBoost,
     RotatingGuns,
     EmergencyThrusters,
-    SnapTurn,
     PursuitBurn,
     EcmJink,
-    GhostRun,
     EvasiveDodge,
+    EvasiveSpin,
+    RearGuns,
 }
 
 /// <summary>
@@ -48,7 +48,8 @@ public partial class Fighter : Node2D
 {
     public const int SpecialManeuverCooldownRounds = 1;
     public const int EngineBoostCooldownRounds = 2;
-    public const int GhostRunCooldownRounds = 2;
+    /// <summary>Barrel rolls the ship makes through one evasive spin.</summary>
+    const float EvasiveSpinRolls = 3f;
     public const float FireRange = 280f;
     public const float FireConeDeg = 12f;     // half-angle of the forward cone
     /// <summary>This ship's forward-cone half-angle; a wide gun mount widens it.</summary>
@@ -222,7 +223,6 @@ public partial class Fighter : Node2D
     public float EngineBoostTurnLimitDegrees => Mathf.Max(0f, Moves.EngineBoostTurnLimitDegrees);
     public float PursuitBurnTurnLimitDegrees => Mathf.Max(0f, Moves.PursuitBurnTurnLimitDegrees);
     public float EcmJinkTurnLimitDegrees => Mathf.Max(0f, Moves.EcmJinkTurnLimitDegrees);
-    public float GhostRunTurnLimitDegrees => Mathf.Max(0f, Moves.GhostRunTurnLimitDegrees);
     public float EmergencyThrustersTurnLimitDegrees => Mathf.Max(0f, Moves.EmergencyThrustersTurnLimitDegrees);
     /// <summary>Normal-flight maximum turn for the currently planned normal distance.</summary>
     public float PlannedNormalTurnLimitDegrees => GetNormalTurnLimitDegrees(PlannedPathDistance);
@@ -246,22 +246,41 @@ public partial class Fighter : Node2D
         }
         return turnLimitDegrees;
     }
-    public bool IsRotatingGunsActive => (BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing
-        ? _execManeuver : PlannedManeuver) == ManeuverType.RotatingGuns;
-    public bool IsEmergencyThrustersActive => (BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing
-        ? _execManeuver : PlannedManeuver) == ManeuverType.EmergencyThrusters;
-    public bool IsEcmJinkActive => (BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing
-        ? _execManeuver : PlannedManeuver) == ManeuverType.EcmJink;
-    public bool IsGhostRunActive => (BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing
-        ? _execManeuver : PlannedManeuver) == ManeuverType.GhostRun;
-    public bool IsEvasiveDodgeActive => (BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing
-        ? _execManeuver : PlannedManeuver) == ManeuverType.EvasiveDodge;
+    /// <summary>The maneuver being flown while a turn executes, or the one planned before it.</summary>
+    ManeuverType ActiveManeuver => BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing
+        ? _execManeuver : PlannedManeuver;
+    public bool IsRotatingGunsActive => ActiveManeuver == ManeuverType.RotatingGuns;
+    public bool IsEmergencyThrustersActive => ActiveManeuver == ManeuverType.EmergencyThrusters;
+    public bool IsEcmJinkActive => ActiveManeuver == ManeuverType.EcmJink;
+    public bool IsEvasiveDodgeActive => ActiveManeuver == ManeuverType.EvasiveDodge;
+    /// <summary>An evasive spin: very hard to hit, and the guns stay silent.</summary>
+    public bool IsEvasiveSpinActive => ActiveManeuver == ManeuverType.EvasiveSpin;
+    public bool IsRearGunsActive => ActiveManeuver == ManeuverType.RearGuns;
+    /// <summary>Which way the guns point: astern while the rear guns are on.</summary>
+    public float GunHeading => GunHeadingFor(ActiveManeuver, Heading);
+    /// <summary>Where the guns point for a ship flying this maneuver on this heading.</summary>
+    public static float GunHeadingFor(ManeuverType maneuver, float heading) =>
+        maneuver == ManeuverType.RearGuns ? heading + Mathf.Pi : heading;
+    /// <summary>Maneuvers whose guns can fire: all but the evasive spin.</summary>
+    public static bool GunsFireDuring(ManeuverType maneuver) => maneuver != ManeuverType.EvasiveSpin;
+
+    /// <summary>
+    /// Maneuvers steered like normal flight: dragging the ghost sets the
+    /// throttle and the turn, within the normal turn limit.
+    /// </summary>
+    public static bool FliesLikeNormal(ManeuverType maneuver) =>
+        maneuver is ManeuverType.Normal or ManeuverType.EvasiveSpin or ManeuverType.RearGuns;
+    /// <summary>Share of the normal throttle range a maneuver flown like normal flight covers.</summary>
+    public float ThrottleScale(ManeuverType maneuver) =>
+        maneuver == ManeuverType.EvasiveSpin ? Moves.EvasiveSpinDistanceScale : 1f;
+    public float MinMoveFor(ManeuverType maneuver) => NormalMoveMinDistance * ThrottleScale(maneuver);
+    public float MaxMoveFor(ManeuverType maneuver) => NormalMoveMaxDistance * ThrottleScale(maneuver);
     public float EffectiveFireConeDeg => IsRotatingGunsActive ? Moves.RotatingGunsFireConeDeg : BaseFireConeDeg;
     public float EffectiveEvasion => Mathf.Clamp(Evasion
         - (IsEmergencyThrustersActive ? Moves.EmergencyThrustersEvasionPenalty : 0f)
         + (IsEcmJinkActive ? Moves.EcmJinkEvasionBonus : 0f)
-        + (IsGhostRunActive ? Moves.GhostRunEvasionBonus : 0f)
         + (IsEvasiveDodgeActive ? Moves.EvasiveDodgeEvasionBonus : 0f)
+        + (IsEvasiveSpinActive ? Moves.EvasiveSpinEvasionBonus : 0f)
         + (StalkerActive ? Perks.StalkerEvasionBonus : 0f)
         + (DaredevilActive ? Perks.DaredevilEvasionBonus : 0f)
         - (RattledActive ? Perks.RattledEvasionPenalty : 0f)
@@ -308,7 +327,6 @@ public partial class Fighter : Node2D
         return maneuver switch
         {
             ManeuverType.EngineBoost => EngineBoostCooldownRounds,
-            ManeuverType.GhostRun => GhostRunCooldownRounds,
             _ => SpecialManeuverCooldownRounds,
         };
     }
@@ -342,9 +360,10 @@ public partial class Fighter : Node2D
         return Mathf.Clamp(accuracy, 0f, 1f);
     }
 
-    /// <summary>Damage bonus fixed when a shot is fired: a long shot keeps its bonus in flight.</summary>
+    /// <summary>Damage changes fixed when a shot is fired: a long shot or a rear-gun shot keeps its multiplier in flight.</summary>
     public float FireTimeDamageMultiplier(Vector2 targetPosition) =>
-        LongShotActiveAgainst(targetPosition) ? Perks.LongShotDamageMultiplier : 1f;
+        (LongShotActiveAgainst(targetPosition) ? Perks.LongShotDamageMultiplier : 1f)
+        * (IsRearGunsActive ? Moves.RearGunsDamageMultiplier : 1f);
 
     public int RollShotDamage(Fighter target = null, float fireTimeMultiplier = 1f)
     {
@@ -446,11 +465,17 @@ public partial class Fighter : Node2D
         BattleManager.Instance?.ShowCallout(this, perk.Name.ToUpper(), perk.Positive ? TraitCallout.InstinctColor : TraitCallout.ScarColor);
     }
 
+    /// <summary>
+    /// Sets the throttle within the planned maneuver's range. For normal
+    /// flight and the maneuvers flown like it, the throttle is remembered
+    /// across turns and maneuvers.
+    /// </summary>
     public void SetPlannedMoveDistance(float distance)
     {
-        PlannedPathDistance = Mathf.Clamp(distance, NormalMoveMinDistance, NormalMoveMaxDistance);
-        if (PlannedManeuver == ManeuverType.Normal)
-            SelectedNormalMoveDistance = PlannedPathDistance;
+        ManeuverType maneuver = FliesLikeNormal(PlannedManeuver) ? PlannedManeuver : ManeuverType.Normal;
+        PlannedPathDistance = Mathf.Clamp(distance, MinMoveFor(maneuver), MaxMoveFor(maneuver));
+        if (FliesLikeNormal(PlannedManeuver))
+            SelectedNormalMoveDistance = PlannedPathDistance / ThrottleScale(maneuver);
     }
 
     /// <summary>Prepare this hull's fixed-distance 180-degree maneuver.</summary>
@@ -467,13 +492,6 @@ public partial class Fighter : Node2D
         PlannedManeuver = ManeuverType.BreakTurn;
         PlannedPathDistance = Moves.BreakTurnMoveDistance;
         PlannedTurnAngleRadians = Mathf.Sign(direction) * Mathf.Pi;
-    }
-
-    public void PlanSnapTurn(float direction)
-    {
-        PlannedManeuver = ManeuverType.SnapTurn;
-        PlannedPathDistance = Moves.SnapTurnMoveDistance;
-        PlannedTurnAngleRadians = Mathf.Sign(direction) * Mathf.DegToRad(Moves.SnapTurnAngleDegrees);
     }
 
     /// <summary>Prepare the class's long-range engine boost.</summary>
@@ -504,13 +522,17 @@ public partial class Fighter : Node2D
             Mathf.DegToRad(EcmJinkTurnLimitDegrees));
     }
 
-    public void PlanGhostRun(float turn)
+    /// <summary>
+    /// Prepare a maneuver flown like normal flight (an evasive spin or rear
+    /// guns) at the current throttle, scaled to its range, and the current
+    /// turn within the normal limit.
+    /// </summary>
+    public void PlanNormalStyle(ManeuverType maneuver, float turn)
     {
-        PlannedManeuver = ManeuverType.GhostRun;
-        PlannedPathDistance = Moves.GhostRunMoveDistance;
-        PlannedTurnAngleRadians = Mathf.Clamp(turn,
-            -Mathf.DegToRad(GhostRunTurnLimitDegrees),
-            Mathf.DegToRad(GhostRunTurnLimitDegrees));
+        PlannedManeuver = maneuver;
+        PlannedPathDistance = SelectedNormalMoveDistance * ThrottleScale(maneuver);
+        float maxTurn = Mathf.DegToRad(GetNormalTurnLimitDegrees(PlannedPathDistance));
+        PlannedTurnAngleRadians = Mathf.Clamp(turn, -maxTurn, maxTurn);
     }
 
     /// <summary>Prepare the Raptor line's fixed sharp turn and short forward burst.</summary>
@@ -747,7 +769,8 @@ public partial class Fighter : Node2D
 
         // Engine flame reflects the planned distance while aiming and the
         // locked distance while the fighter is in flight.
-        float moveFraction = Mathf.InverseLerp(NormalMoveMinDistance, NormalMoveMaxDistance,
+        ManeuverType flown = executing ? _execManeuver : PlannedManeuver;
+        float moveFraction = Mathf.InverseLerp(MinMoveFor(flown), MaxMoveFor(flown),
             executing ? _execDist : PlannedPathDistance);
         _enginePhase += delta * (executing ? 12.0 + 4.0 * moveFraction : 7.0);
         _engineSprite.Frame = (int)_enginePhase % _engineFrames;
@@ -758,6 +781,11 @@ public partial class Fighter : Node2D
         if (executing)
             bank = Mathf.Min(1f, Mathf.Abs(_execTurn) / Mathf.DegToRad(NormalTurnLimitDegrees)) * Mathf.Sin(Mathf.Pi * _execProgress);
         _visual.Scale = new Vector2(1f - 0.25f * bank, 1f) * ArtScale;
+        // An evasive spin barrel-rolls the ship over and over through the turn.
+        if (executing && _execManeuver == ManeuverType.EvasiveSpin)
+            _visual.Scale = new Vector2(Mathf.Cos(_execProgress * Mathf.Tau * EvasiveSpinRolls), 1f) * ArtScale;
+        // Rear guns fire from the tail.
+        _weaponSprite.FlipV = IsRearGunsActive;
 
         // Weapon firing animation, one pass per barrage.
         if (_fireAnimT >= 0f)
@@ -818,12 +846,12 @@ public partial class Fighter : Node2D
         _execDist = PlannedPathDistance;
         _execProgress = 0f;
         _execManeuver = PlannedManeuver;
-        if (_execManeuver == ManeuverType.Normal)
+        if (FliesLikeNormal(_execManeuver))
         {
             float maxTurn = Mathf.DegToRad(GetNormalTurnLimitDegrees(_execDist));
             _execTurn = Mathf.Clamp(_execTurn, -maxTurn, maxTurn);
         }
-        if (_execManeuver == ManeuverType.Normal && Mathf.IsEqualApprox(PlannedPathDistance, NormalMoveMaxDistance) &&
+        if (FliesLikeNormal(_execManeuver) && Mathf.IsEqualApprox(PlannedPathDistance, NormalMoveMaxDistance) &&
             Mathf.Abs(_execTurn) > Mathf.DegToRad(GetNormalTurnLimitDegrees(_execDist)) * 0.9f)
             NoteTrait(Perks.EngineShy); // a hard turn at full throttle is where the scar bites
         _volleysThisTurn = 0;

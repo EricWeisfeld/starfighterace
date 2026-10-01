@@ -82,7 +82,7 @@ simulation is kept as it is: simultaneous planning, arc movement, terrain, targe
 
 ### Squadron (`Pilot`)
 
-- **Draft:** a run starts by setting up three level-1 pilots (`RunDraftPage`). Each picks a Kestrel, Raptor or ZT, and one of three instincts offered to them (the three pilots' offers never overlap). Both stay with the pilot for the whole run. Each pilot knows their class's signature maneuver: Break Turn, U-Turn or Rotating Guns.
+- **Draft:** a run starts by setting up three level-1 pilots (`RunDraftPage`). Each picks a Kestrel, Raptor or ZT, and one of three instincts offered to them (the three pilots' offers never overlap). Both stay with the pilot for the whole run. Each pilot knows their class's signature maneuver: Break Turn, U-Turn or Turret.
 - The roster holds up to 5 pilots, and up to 3 fly each battle.
 - XP needed per level rises (100, 150, 200, 250, 300), with a cap at level 6.
 - Level-ups and the ship are described in Phase 4.
@@ -121,11 +121,15 @@ upgrades at levels 2, 4 and 6.)
 
 - **The line decides how a ship flies and what its pilot can learn; the frame decides how it fights.** Every frame can fit any module, and every frame in a line has the line's handling. For now each line has one frame:
 
-| Line | Turn | Speed | Maneuvers it can learn |
-| --- | --- | --- | --- |
-| Kestrel | 120° | 170–235 | 7 |
-| Raptor | 110° | 145–210 | 3 |
-| ZT | 70° | 105–165 | 3 |
+| Line | Turn | Speed | Signature maneuver | Learns one of |
+| --- | --- | --- | --- | --- |
+| Kestrel | 120° | 170–235 | Break Turn | Pursuit Burn, ECM Jink, Sensor Scramble, Evasive Spin |
+| Raptor | 110° | 145–210 | U-Turn | Engine Boost, Evasive Dodge, Hunter Lock |
+| ZT | 70° | 105–165 | Turret | Suppression Fire, Emergency Thrusters, Rear Guns |
+
+- **Evasive Spin** (Kestrel) is steered like normal flight, at half the throttle range and the normal turn limit. The ship barrel-rolls through the move with +60% evasion, and its guns stay silent all turn. Mastered, it flies the full throttle range.
+- **Rear Guns** (ZT) is steered like normal flight, with the guns facing astern for the turn at half damage. The ghost's firing cone points backward. Mastered, the rear guns hit for full damage.
+- Both are usable every other turn. The AI never flies them, and enemies can't learn them, since enemies only fly their line's first two maneuvers.
 
 - **Frames.** Measured by firepower (damage × accuracy) and toughness ((hull + shield) ÷ (1 − evasion), since a hit lands at accuracy × (1 − evasion)):
 
@@ -135,7 +139,7 @@ upgrades at levels 2, 4 and 6.)
 | Raptor | 340 | 170 | 17 | 50 | 88% | 28% | 44.0 | 710 |
 | ZT Class | 500 | 250 | 25 | 45 | 82% | 15% | 36.9 | 880 |
 
-- The lines are not balanced against each other on paper: the Kestrel's firepower × toughness is about two fifths of the Raptor's or ZT's. It relies on speed, turning, its larger maneuver pool and its quicker shield regen.
+- The lines are not balanced against each other on paper: the Kestrel's firepower × toughness is about two fifths of the Raptor's or ZT's. It relies on speed, turning, Evasive Spin and its quicker shield regen.
 - **Shelved frames.** Each line also had an attack frame (S4 Striker, R3 Black Hawk, ZT-6) and a guard frame (S9 Ghost, R5 Falcon, ZT-8 Bulwark) that moved about a fifth of the balanced frame's firepower into toughness or back. They are out of play until they are redesigned; their definitions stay in `ShipTypes`, and nobody, player or enemy, flies them.
 
 - **Modules** stack: a ship can carry any number, each module once. There are nine, three for each ship system:
@@ -158,7 +162,7 @@ Frames and instincts never appear.
 
 - **Module** (ship): any module the ship doesn't already carry. It is added to the ones fitted.
 - **New maneuver** from the class pool, up to two: the class's signature maneuver and one more. Once a pilot knows two, level-ups stop offering maneuvers and offer modules and masteries instead. The ZT line's **Suppression Fire** is always on: each hit takes 8° (16° mastered) off the target's normal-flight turning, felt in full on its next turn. Under continued fire, older suppression halves each turn; a turn without being suppressed clears it. It never takes a ship below 25°, and maneuvers keep their own angles. Enemy ZT-line ships have it too. A suppressed ship shows "SUPPRESSED −X°" under its bars, and the HUD hint says so.
-- **Mastery** of a maneuver the pilot knows. It only matters on turns that maneuver is flown: Snap Turn to 180°, Boost turns 90°, U-Turn and Break Turn lose their cooldown, Lock On +25%, Scramble jams a second enemy, and so on (`Masteries.Describe`).
+- **Mastery** of a maneuver the pilot knows. It only matters on turns that maneuver is flown: Boost turns 90°, U-Turn and Break Turn lose their cooldown, Lock On +25%, Scramble jams a second enemy, Evasive Spin flies at full throttle, Rear Guns hit for full damage, and so on (`Masteries.Describe`).
 
 
 Each pilot has exactly one **instinct**, picked in the draft (recruits bring a
@@ -226,10 +230,11 @@ bump lumpy. So enemies now scale by count and pilots by refits.
 | Elite | 3 | 3 + 1 | 4 + 1 |
 | Boss | 3 + 1 | 4 + 2 mid-escort | 4 + 2 |
 
-- **Hull mix and maneuvers (composition).** Sector 1 wings are mostly Kestrels; later wings draw evenly from the three lines (elites and bosses use the next sector's mix). A strike's marked target is a ZT. (Sector 2 used to add attack frames and sector 3 to fly only attack and guard frames; those are shelved.) Enemies fly none of their line's maneuvers in sector 1. From sector 2 on they fly two, the same cap as your pilots: the line's signature maneuver and the next in its pool (Break Turn and Snap Turn, U-Turn and Boost, Turret and Suppression Fire). They weigh those maneuvers alongside normal flight when lining up a shot, not only to escape rocks.
+- **Hull mix and maneuvers (composition).** Sector 1 wings are mostly Kestrels; later wings draw evenly from the three lines (elites and bosses use the next sector's mix). A strike's marked target is a ZT. (Sector 2 used to add attack frames and sector 3 to fly only attack and guard frames; those are shelved.) Enemies fly none of their line's maneuvers in sector 1. From sector 2 on they fly two, the same cap as your pilots: the line's signature maneuver and the next in its pool (Break Turn and Pursuit Burn, U-Turn and Boost, Turret and Suppression Fire). They weigh those maneuvers alongside normal flight when lining up a shot, not only to escape rocks.
 - **Reinforcements.** A "+N" wave arrives at the start of turn 3 at the enemy start positions furthest from your ships. If the first group is wiped out before then, the wave arrives at once instead of the battle ending. The escort's wave still arrives partway along the corridor. Briefings show the wave faded as INBOUND, and the map shows "3 HOSTILES +1".
 - **Quick battle** pits the max-level (Mk IV) squadron against a late sector 3 patrol (4 + 1) instead of three basic ships.
 - **Who sees your orders.** Enemies plan when you press Engage. Most can't see your orders: they lead each of your ships along its visible course, straight on at the throttle it started the turn with (`Fighter.TurnStartPathDistance`). Only elite wings, the Ace Interceptors, read the move you actually queued (`BattleMission.EnemiesReadOrders`). The player is told only that they are aces: the briefing calls them "an ace wing, sharper than any patrol" and the battle opens with "ACE PILOTS · SHARPER THAN ANY PATROL". The escort transport's course is always visible to enemies. Measured over 480 autopilot battles: 46% overall, the same as when nobody reads orders and up from 38% when everyone did. Elite stops sit 6–13 points below their blind rates, about where they were when every enemy read orders.
+- **Maneuver pools reworked.** Snap Turn and Ghost Run are gone, Hunter Lock moved from the Kestrel to the Raptor, the Kestrel gained Evasive Spin and the ZT Rear Guns (see Phase 4). Each line now picks its second maneuver from three or four. Enemy Kestrels fly Pursuit Burn where they flew Snap Turn. Not yet measured in a win-rate batch.
 - **Attack and guard frames shelved.** Players and enemies fly only the S1 Kestrel, Raptor and ZT Class (see Phase 4). Not yet measured in a win-rate batch.
 - **Balanced frames retuned.** The Kestrel hits for 35 (was 30) and the ZT for 45 (was 50). The Raptor and ZT regenerate a tenth of their shields a turn, 17 and 25 (both were 20); the Kestrel keeps 20, a fifth of its shields, to make up for its thin hull. Enemies fly the same frames, so enemy Kestrels hit harder and enemy ZTs softer. In a straight exchange of fire a Kestrel now needs about 2.3× the shots a Raptor needs to kill it (was 2.6×) and 2.4× against a ZT (was 3.1×), while the Raptor and ZT are about even (a ZT needs 19 shots to kill a Raptor, a Raptor 20 to kill a ZT). Not yet measured in a win-rate batch.
 - **Two maneuvers, stacking modules.** Pilots learn one maneuver beyond their signature one, and every module taken is added rather than swapped into a slot (see Phase 4). Over the same 480 battles, with level-up cards taken at random: ships carry 2.8 modules at level 6 (was 1.9) and 1.9 maneuvers (was 2.5). Win rate is 49% overall (was 46%): level 1 and 3 squadrons are unchanged (18%, 39%), level 5 wins 61% (was 57%) and level 6 78% (was 70%). Per-stop changes are within the noise of 10–20 battles a cell. A player who takes modules on purpose will stack more than random picks do.

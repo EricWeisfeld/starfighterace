@@ -218,7 +218,8 @@ public partial class RunScreen
                 words.AddChild(Text(Refits.Summary, FontCaption, Body, 0, wrap: true));
                 page.AddChild(refit);
             }
-            page.AddChild(Text("CHOOSE ONE · PILOT OR SHIP", FontCaption, Muted, 4));
+            bool maneuversOnly = promotion.Cards.All(card => card.Kind == CardKind.Maneuver);
+            page.AddChild(Text(maneuversOnly ? "CHOOSE A MANEUVER TO LEARN" : "CHOOSE ONE · PILOT OR SHIP", FontCaption, Muted, 4));
         }
 
         (TouchScroll scroll, VBoxContainer content) = ScrollBody(14);

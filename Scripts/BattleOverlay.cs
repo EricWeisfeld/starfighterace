@@ -184,7 +184,7 @@ public partial class BattleOverlay : Node2D
     {
         DrawArc(f.Position, Mathf.Max(26f, f.VisualRadius + 6f), 0, Mathf.Tau, 40, new Color(0.302f, 0.639f, 1f, 0.9f), W(2.5f), true);
         if (Fighter.FliesLikeNormal(f.PlannedManeuver) ||
-            f.PlannedManeuver is ManeuverType.EngineBoost or ManeuverType.EmergencyThrusters or ManeuverType.PursuitBurn or ManeuverType.EcmJink)
+            f.PlannedManeuver is ManeuverType.EngineBoost or ManeuverType.EmergencyThrusters or ManeuverType.PursuitBurn)
             DrawReachableFan(f);
         if (Fighter.FliesLikeNormal(f.PlannedManeuver))
             DrawThrottleGauge(f);
@@ -216,9 +216,7 @@ public partial class BattleOverlay : Node2D
                 ? f.EmergencyThrustersTurnLimitDegrees
                 : f.PlannedManeuver == ManeuverType.PursuitBurn
                     ? f.PursuitBurnTurnLimitDegrees
-                    : f.PlannedManeuver == ManeuverType.EcmJink
-                        ? f.EcmJinkTurnLimitDegrees
-                        : f.PlannedNormalTurnLimitDegrees);
+                    : f.PlannedNormalTurnLimitDegrees);
         const int samples = 32;
         var edge = new Vector2[samples + 1];
         for (int i = 0; i <= samples; i++)
@@ -252,7 +250,6 @@ public partial class BattleOverlay : Node2D
             ManeuverType.RotatingGuns => new Color(1f, 0.78f, 0.32f, 0.92f),
             ManeuverType.EmergencyThrusters => new Color(1f, 0.36f, 0.3f, 0.92f),
             ManeuverType.PursuitBurn => new Color(0.4f, 1f, 0.7f, 0.92f),
-            ManeuverType.EcmJink => new Color(0.45f, 0.7f, 1f, 0.92f),
             ManeuverType.EvasiveDodge => new Color(0.35f, 0.9f, 1f, 0.92f),
             ManeuverType.EvasiveSpin => new Color(0.6f, 0.95f, 1f, 0.92f),
             ManeuverType.RearGuns => new Color(0.95f, 0.55f, 1f, 0.92f),
@@ -628,9 +625,6 @@ public partial class BattleOverlay : Node2D
         foreach (float turn in SampleTurns(target.PursuitBurnTurnLimitDegrees))
             if (target.HasAbility(ShipAbility.PursuitBurn) && target.IsManeuverReady(ManeuverType.PursuitBurn))
                 yield return new TargetPlan(ManeuverType.PursuitBurn, turn, target.Moves.PursuitBurnMoveDistance);
-        foreach (float turn in SampleTurns(target.EcmJinkTurnLimitDegrees))
-            if (target.HasAbility(ShipAbility.EcmJink) && target.IsManeuverReady(ManeuverType.EcmJink))
-                yield return new TargetPlan(ManeuverType.EcmJink, turn, target.Moves.EcmJinkMoveDistance);
         if (target.HasAbility(ShipAbility.EvasiveDodge) && target.IsManeuverReady(ManeuverType.EvasiveDodge))
         {
             float turn = Mathf.DegToRad(target.Moves.EvasiveDodgeAngleDegrees);

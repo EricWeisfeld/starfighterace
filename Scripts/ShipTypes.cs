@@ -13,7 +13,6 @@ public enum ShipAbility
     EmergencyThrusters,
     HunterLock,
     PursuitBurn,
-    EcmJink,
     SensorScramble,
     EvasiveDodge,
     EvasiveSpin,
@@ -80,9 +79,6 @@ public sealed record ShipManeuverProfile
     public float PursuitBurnTurnLimitDegrees { get; init; }
     public float HunterLockAccuracyBonus { get; init; }
     public int HunterLockCooldownTurns { get; init; }
-    public float EcmJinkMoveDistance { get; init; }
-    public float EcmJinkTurnLimitDegrees { get; init; }
-    public float EcmJinkEvasionBonus { get; init; }
     public float SensorScrambleAccuracyPenalty { get; init; }
     public int SensorScrambleDurationTurns { get; init; }
     public int SensorScrambleCooldownTurns { get; init; }
@@ -146,9 +142,6 @@ public class ShipType
     public float PursuitBurnTurnLimitDegrees => Maneuvers.PursuitBurnTurnLimitDegrees;
     public float HunterLockAccuracyBonus => Maneuvers.HunterLockAccuracyBonus;
     public int HunterLockCooldownTurns => Maneuvers.HunterLockCooldownTurns;
-    public float EcmJinkMoveDistance => Maneuvers.EcmJinkMoveDistance;
-    public float EcmJinkTurnLimitDegrees => Maneuvers.EcmJinkTurnLimitDegrees;
-    public float EcmJinkEvasionBonus => Maneuvers.EcmJinkEvasionBonus;
     public float SensorScrambleAccuracyPenalty => Maneuvers.SensorScrambleAccuracyPenalty;
     public int SensorScrambleDurationTurns => Maneuvers.SensorScrambleDurationTurns;
     public int SensorScrambleCooldownTurns => Maneuvers.SensorScrambleCooldownTurns;
@@ -221,16 +214,12 @@ public static class ShipTypes
             BreakTurnMoveDistance = 180f,
             PursuitBurnMoveDistance = 370f,
             PursuitBurnTurnLimitDegrees = 20f,
-            EcmJinkMoveDistance = 110f,
-            EcmJinkTurnLimitDegrees = 100f,
-            EcmJinkEvasionBonus = 0.25f,
             SensorScrambleAccuracyPenalty = 0.20f,
             SensorScrambleDurationTurns = 2,
             SensorScrambleCooldownTurns = 4,
             EvasiveSpinEvasionBonus = 0.55f,
             EvasiveSpinDistanceScale = 0.5f,
-            Pool = new[] { ShipAbility.BreakTurn, ShipAbility.PursuitBurn, ShipAbility.EcmJink,
-                ShipAbility.SensorScramble, ShipAbility.EvasiveSpin },
+            Pool = new[] { ShipAbility.BreakTurn, ShipAbility.PursuitBurn, ShipAbility.SensorScramble, ShipAbility.EvasiveSpin },
         },
         SkinsByTeam = new[]
         {

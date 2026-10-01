@@ -32,7 +32,6 @@ public enum ManeuverType
     RotatingGuns,
     EmergencyThrusters,
     PursuitBurn,
-    EcmJink,
     EvasiveDodge,
     EvasiveSpin,
     RearGuns,
@@ -223,7 +222,6 @@ public partial class Fighter : Node2D
     public float EjectChance => Perks.BaseEjectChance;
     public float EngineBoostTurnLimitDegrees => Mathf.Max(0f, Moves.EngineBoostTurnLimitDegrees);
     public float PursuitBurnTurnLimitDegrees => Mathf.Max(0f, Moves.PursuitBurnTurnLimitDegrees);
-    public float EcmJinkTurnLimitDegrees => Mathf.Max(0f, Moves.EcmJinkTurnLimitDegrees);
     public float EmergencyThrustersTurnLimitDegrees => Mathf.Max(0f, Moves.EmergencyThrustersTurnLimitDegrees);
     /// <summary>Normal-flight maximum turn for the currently planned normal distance.</summary>
     public float PlannedNormalTurnLimitDegrees => GetNormalTurnLimitDegrees(PlannedPathDistance);
@@ -252,7 +250,6 @@ public partial class Fighter : Node2D
         ? _execManeuver : PlannedManeuver;
     public bool IsRotatingGunsActive => ActiveManeuver == ManeuverType.RotatingGuns;
     public bool IsEmergencyThrustersActive => ActiveManeuver == ManeuverType.EmergencyThrusters;
-    public bool IsEcmJinkActive => ActiveManeuver == ManeuverType.EcmJink;
     public bool IsEvasiveDodgeActive => ActiveManeuver == ManeuverType.EvasiveDodge;
     /// <summary>An evasive spin: very hard to hit, and the guns stay silent.</summary>
     public bool IsEvasiveSpinActive => ActiveManeuver == ManeuverType.EvasiveSpin;
@@ -279,7 +276,6 @@ public partial class Fighter : Node2D
     public float EffectiveFireConeDeg => IsRotatingGunsActive ? Moves.RotatingGunsFireConeDeg : BaseFireConeDeg;
     public float EffectiveEvasion => Mathf.Clamp(Evasion
         - (IsEmergencyThrustersActive ? Moves.EmergencyThrustersEvasionPenalty : 0f)
-        + (IsEcmJinkActive ? Moves.EcmJinkEvasionBonus : 0f)
         + (IsEvasiveDodgeActive ? Moves.EvasiveDodgeEvasionBonus : 0f)
         + (IsEvasiveSpinActive ? Moves.EvasiveSpinEvasionBonus : 0f)
         + (StalkerActive ? Perks.StalkerEvasionBonus : 0f)
@@ -513,15 +509,6 @@ public partial class Fighter : Node2D
         PlannedTurnAngleRadians = Mathf.Clamp(turn,
             -Mathf.DegToRad(PursuitBurnTurnLimitDegrees),
             Mathf.DegToRad(PursuitBurnTurnLimitDegrees));
-    }
-
-    public void PlanEcmJink(float turn)
-    {
-        PlannedManeuver = ManeuverType.EcmJink;
-        PlannedPathDistance = Moves.EcmJinkMoveDistance;
-        PlannedTurnAngleRadians = Mathf.Clamp(turn,
-            -Mathf.DegToRad(EcmJinkTurnLimitDegrees),
-            Mathf.DegToRad(EcmJinkTurnLimitDegrees));
     }
 
     /// <summary>

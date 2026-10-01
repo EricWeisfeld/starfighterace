@@ -172,12 +172,6 @@ public static class EnemyAI
                 yield return new FlightPlan(ManeuverType.PursuitBurn, turn, self.Moves.PursuitBurnMoveDistance);
         }
 
-        if (self.HasAbility(ShipAbility.EcmJink) && self.IsManeuverReady(ManeuverType.EcmJink))
-        {
-            foreach (float turn in TurnsFor(self.EcmJinkTurnLimitDegrees))
-                yield return new FlightPlan(ManeuverType.EcmJink, turn, self.Moves.EcmJinkMoveDistance);
-        }
-
         if (self.HasAbility(ShipAbility.EvasiveDodge) && self.IsManeuverReady(ManeuverType.EvasiveDodge))
         {
             float dodgeTurn = Mathf.DegToRad(self.Moves.EvasiveDodgeAngleDegrees);

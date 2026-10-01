@@ -888,7 +888,6 @@ public partial class BattleManager : Node2D
                 break;
             case ManeuverType.EngineBoost:
             case ManeuverType.PursuitBurn:
-            case ManeuverType.EcmJink:
             case ManeuverType.EmergencyThrusters:
                 PlanAimed(fighter, fighter.PlannedManeuver, 2f * bearing);
                 break;
@@ -907,7 +906,6 @@ public partial class BattleManager : Node2D
         {
             case ManeuverType.EngineBoost: fighter.PlanEngineBoost(turn); break;
             case ManeuverType.PursuitBurn: fighter.PlanPursuitBurn(turn); break;
-            case ManeuverType.EcmJink: fighter.PlanEcmJink(turn); break;
             case ManeuverType.EmergencyThrusters: fighter.PlanEmergencyThrusters(turn); break;
             case ManeuverType.RotatingGuns: fighter.PlanRotatingGuns(); break;
             case ManeuverType.EvasiveSpin:

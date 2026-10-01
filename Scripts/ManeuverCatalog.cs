@@ -13,7 +13,6 @@ public enum ManeuverAction
     EngineBoost,
     PursuitBurn,
     EmergencyThrusters,
-    EcmJink,
     EvasiveSpin,
     RotatingGuns,
     RearGuns,
@@ -96,12 +95,6 @@ public static class ManeuverCatalog
         },
         new()
         {
-            Action = ManeuverAction.EcmJink, Ability = ShipAbility.EcmJink, Maneuver = ManeuverType.EcmJink, Name = "ECM JINK",
-            Color = new Color(0.45f, 0.7f, 1f), Aimable = true,
-            Summary = f => $"Jamming jink ({f.Moves.EcmJinkMoveDistance:0}). +{f.Moves.EcmJinkEvasionBonus * 100:0}% evasion.",
-        },
-        new()
-        {
             Action = ManeuverAction.EvasiveSpin, Ability = ShipAbility.EvasiveSpin, Maneuver = ManeuverType.EvasiveSpin, Name = "SPIN",
             Color = new Color(0.6f, 0.95f, 1f), Aimable = true,
             Summary = f => $"Drag to steer. Throttle {f.MinMoveFor(ManeuverType.EvasiveSpin):0}–{f.MaxMoveFor(ManeuverType.EvasiveSpin):0}. " +
@@ -166,7 +159,6 @@ public static class ManeuverCatalog
         ShipAbility.EmergencyThrusters => "A fast escape sprint, at the cost of some evasion.",
         ShipAbility.HunterLock => "Lock an enemy for extra accuracy against it.",
         ShipAbility.PursuitBurn => "A long, straight chase burn.",
-        ShipAbility.EcmJink => "A jamming jink that is hard to hit.",
         ShipAbility.SensorScramble => "Scramble an enemy's sensors to spoil its aim.",
         ShipAbility.EvasiveDodge => "A hard jink and a short burst that is hard to hit.",
         ShipAbility.EvasiveSpin => "Barrel-roll through your move: very hard to hit, but your guns fall silent.",
@@ -185,7 +177,6 @@ public static class ManeuverCatalog
         ShipAbility.EmergencyThrusters => "Emergency Thrusters",
         ShipAbility.HunterLock => "Hunter Lock",
         ShipAbility.PursuitBurn => "Pursuit Burn",
-        ShipAbility.EcmJink => "ECM Jink",
         ShipAbility.SensorScramble => "Sensor Scramble",
         ShipAbility.EvasiveDodge => "Evasive Dodge",
         ShipAbility.EvasiveSpin => "Evasive Spin",
@@ -310,7 +301,6 @@ public partial class ManeuverGlyph : Control
             ManeuverAction.EngineBoost => new[] { (18f, 2.4f) },
             ManeuverAction.PursuitBurn => new[] { (0f, 2.5f) },
             ManeuverAction.EmergencyThrusters => new[] { (28f, 2.2f) },
-            ManeuverAction.EcmJink => new[] { (-40f, 0.5f), (80f, 0.6f), (-80f, 0.6f), (40f, 0.3f) },
             ManeuverAction.EvasiveSpin => new[] { (60f, 1.1f) },
             ManeuverAction.RotatingGuns => new[] { (0f, 1.1f) },
             ManeuverAction.RearGuns => new[] { (30f, 1.6f) },
@@ -374,8 +364,6 @@ public static class Masteries
             p = p with { PursuitBurnTurnLimitDegrees = Mathf.Max(p.PursuitBurnTurnLimitDegrees, PursuitBurnTurnLimitDegrees) };
         if (mastered.Contains(ShipAbility.EvasiveDodge))
             p = p with { EvasiveDodgeEvasionBonus = p.EvasiveDodgeEvasionBonus + EvasionBonus };
-        if (mastered.Contains(ShipAbility.EcmJink))
-            p = p with { EcmJinkEvasionBonus = p.EcmJinkEvasionBonus + EvasionBonus };
         if (mastered.Contains(ShipAbility.EmergencyThrusters))
             p = p with { EmergencyThrustersEvasionPenalty = 0f };
         if (mastered.Contains(ShipAbility.RotatingGuns))
@@ -410,7 +398,6 @@ public static class Masteries
             ShipAbility.EngineBoost => $"Engine Boost can turn up to {EngineBoostTurnLimitDegrees:0}° instead of {m.EngineBoostTurnLimitDegrees:0}°.",
             ShipAbility.PursuitBurn => $"Pursuit Burn can turn up to {PursuitBurnTurnLimitDegrees:0}° instead of {m.PursuitBurnTurnLimitDegrees:0}°.",
             ShipAbility.EmergencyThrusters => "Emergency Thrusters no longer cost any evasion.",
-            ShipAbility.EcmJink => $"ECM Jink gives +{(m.EcmJinkEvasionBonus + EvasionBonus) * 100:0}% evasion instead of +{m.EcmJinkEvasionBonus * 100:0}%.",
             ShipAbility.EvasiveSpin => "Evasive Spin flies your full throttle range instead of half of it.",
             ShipAbility.RearGuns => $"Rear Guns hit for full damage instead of {m.RearGunsDamageMultiplier * 100:0}%.",
             ShipAbility.RotatingGuns => $"Rotating Guns sweep a {RotatingGunsFireConeDegrees * 2:0}° arc instead of {m.RotatingGunsFireConeDeg * 2:0}°.",

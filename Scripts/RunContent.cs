@@ -368,25 +368,31 @@ public static class RunContent
     // -------------------------------------------------------------- cards
 
     /// <summary>
-    /// Three distinct level-up choices, pilot and ship side by side: one each
-    /// of a new maneuver (until the pilot knows <see cref="Pilot.MaxManeuvers"/>),
-    /// a module and a mastery while there are any, then any of those.
+    /// Three distinct level-up choices. While a pilot can still learn a
+    /// maneuver (until they know <see cref="Pilot.MaxManeuvers"/>), the
+    /// level-up offers every maneuver their line could teach them, so the
+    /// second maneuver is chosen from all of them. After that, one each of a
+    /// module and a mastery while there are any, then any of those.
     /// </summary>
     public static List<PromotionCard> PromotionCards(Pilot pilot, RandomNumberGenerator rng)
     {
         var cards = new List<PromotionCard>();
-        var maneuvers = new List<PromotionCard>();
         if (pilot.Maneuvers.Count < Pilot.MaxManeuvers)
-            maneuvers.AddRange(pilot.UnlearnedManeuvers.Select(a => new PromotionCard { Kind = CardKind.Maneuver, Id = a.ToString() }));
+        {
+            List<ShipAbility> learnable = pilot.UnlearnedManeuvers.ToList();
+            while (learnable.Count > 3)
+                learnable.RemoveAt(rng.RandiRange(0, learnable.Count - 1));
+            cards.AddRange(learnable.Select(a => new PromotionCard { Kind = CardKind.Maneuver, Id = a.ToString() }));
+        }
         List<PromotionCard> modules = pilot.UnfittedModules
             .Select(module => new PromotionCard { Kind = CardKind.Module, Id = module.Id.ToString() }).ToList();
         List<PromotionCard> masteries = pilot.UnmasteredManeuvers
             .Select(a => new PromotionCard { Kind = CardKind.Mastery, Id = a.ToString() }).ToList();
 
-        foreach (List<PromotionCard> kind in new[] { maneuvers, modules, masteries })
-            if (kind.Count > 0)
+        foreach (List<PromotionCard> kind in new[] { modules, masteries })
+            if (cards.Count < 3 && kind.Count > 0)
                 cards.Add(TakeRandom(kind, rng));
-        var rest = maneuvers.Concat(modules).Concat(masteries).ToList();
+        var rest = modules.Concat(masteries).ToList();
         while (cards.Count < 3 && rest.Count > 0)
             cards.Add(TakeRandom(rest, rng));
         return cards;

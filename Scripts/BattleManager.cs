@@ -828,7 +828,7 @@ public partial class BattleManager : Node2D
                 return;
             }
             PullWithTractor(fighter, enemy);
-            fighter.TractorCooldownTurns = fighter.Moves.TractorCooldownTurns;
+            fighter.TractorCooldownTurns = fighter.Moves.TractorCooldownTurns + Experiments.ExtraCooldown;
             Announce($"TRACTOR BEAM · {CallsignOf(fighter)} PULLED {(enemy.IsAce ? "" : "A ")}{enemyName}");
             return;
         }
@@ -1157,13 +1157,17 @@ public partial class BattleManager : Node2D
         if (!Experiments.OnTheirSix)
             return;
         var targets = PlayerFighters.Where(f => f.IsAlive).ToList();
+        int committed = 0;
         foreach (Fighter e in EnemyFighters.Where(f => f.IsAlive).ToList())
         {
             if (!targets.Any(p => Experiments.OnSix(p, e)))
                 continue;
             EnemyAI.Plan(e, targets, EnemyFighters, readOrders: false);
             e.CommittedEarly = true;
+            committed++;
         }
+        if (committed > 0)
+            Announce(committed == 1 ? "ON THEIR SIX · YOU SEE ITS MOVE" : $"ON THEIR SIX · YOU SEE {committed} ENEMY MOVES", 5.0);
     }
 
     IEnumerable<Fighter> AllAlive() =>
@@ -1220,8 +1224,6 @@ public partial class BattleManager : Node2D
     {
         foreach (Fighter f in AllAlive())
         {
-            if (Experiments.TrackingLock)
-                UpdateTrackingLock(f, dt);
             if (!f.CanFire || f.IsEvasiveSpinActive || f.GunsOffline)
                 continue;
             f.Cooldown -= dt;
@@ -1263,32 +1265,6 @@ public partial class BattleManager : Node2D
                 f.PlayFireAnimation(f.BarrageShotsLeft * BarrageShotInterval);
             }
         }
-    }
-
-    /// <summary>Whether a target sits in this ship's guns right now: in range, inside the cone, guns live.</summary>
-    bool InGuns(Fighter f, Fighter t) =>
-        t != null && t.IsAlive && f.CanFire && !f.IsEvasiveSpinActive && !f.GunsOffline &&
-        f.Position.DistanceTo(t.Position) <= f.EffectiveFireRange &&
-        Mathf.Abs(Mathf.Wrap((t.Position - f.Position).Angle() - f.GunHeading, -Mathf.Pi, Mathf.Pi)) <= Mathf.DegToRad(f.EffectiveFireConeDeg);
-
-    /// <summary>
-    /// Tracking lock builds while the locked enemy sits in this ship's guns
-    /// and fades while it doesn't. Once it has faded, lock moves to the
-    /// nearest enemy in the guns.
-    /// </summary>
-    void UpdateTrackingLock(Fighter f, float dt)
-    {
-        if (f.LockTarget != null && InGuns(f, f.LockTarget))
-        {
-            f.Lock = Mathf.Min(1f, f.Lock + dt / Experiments.LockBuildSeconds);
-            return;
-        }
-        f.Lock = Mathf.Max(0f, f.Lock - dt / Experiments.LockFadeSeconds);
-        if (f.Lock > 0f && f.LockTarget is { IsAlive: true })
-            return;
-        f.Lock = 0f;
-        f.LockTarget = GetTeam(1 - f.Team).Where(t => InGuns(f, t))
-            .OrderBy(t => f.Position.DistanceSquaredTo(t.Position)).FirstOrDefault();
     }
 
     void FireShot(Fighter shooter, Fighter target)

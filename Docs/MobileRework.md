@@ -350,17 +350,18 @@ Staying on an enemy's tail was close to impossible: a ship that started a
 turn behind an enemy and pointed at it was still there a turn later only 13%
 of the time (0% against a Kestrel). Each turn lets a ship end anywhere in a
 fan far wider than a chaser's guns cover, both sides plan blind, and nothing
-carries over from one turn to the next. Four experimental rules try to change
+carries over from one turn to the next. Experimental rules try to change
 that, each behind its own switch (`Experiments`, saved in `GameSettings`).
+A fourth, tracking lock (accuracy building while you hold an enemy in your
+guns), was tried and removed.
 They are all off by default; one that is on applies to every battle, runs
 included.
 
 | Rule | What it does | How it shows |
 | --- | --- | --- |
-| ON THEIR SIX | A ship that starts a turn within 300 of an enemy, inside its rear 120° arc and pointed within 60° of it, is on its six. That enemy commits its move as the turn opens, against your visible courses (an ace loses its order-reading that turn), and you plan seeing it. An enemy on your six plans against your real orders, like an ace. | The committed move as a dashed red path with a faint ghost, its fire cone and "ITS MOVE" (plus the maneuver's name); targeting and threat previews use that move. "ENEMY ON YOUR SIX" under a ship being tailed. HUD notes. |
+| ON THEIR SIX | A ship that starts a turn within 400 of an enemy, anywhere behind its wings, with the enemy anywhere ahead of its own wings, is on its six (two ships can never be on each other's six). That enemy commits its move as the turn opens, against your visible courses (an ace loses its order-reading that turn), and you plan seeing it. An enemy on your six plans against your real orders, like an ace. | "ON THEIR SIX · YOU SEE ITS MOVE" in the HUD as the turn opens. The committed move as a dashed red path with a faint ghost, its fire cone and "ITS MOVE" (plus the maneuver's name); targeting and threat previews use that move. "ENEMY ON YOUR SIX" under a ship being tailed. HUD notes. |
 | HARD TURNS BLEED SPEED | A normal turn sharper than two thirds of the ship's limit (Kestrel 80°, Raptor 73°, ZT 47°) caps next turn's throttle at the minimum. Maneuvers don't bleed. | "SLOWED · HARD TURN" under the ship; the throttle gauge and HUD range shrink ("Throttle 170–170"); the HUD warns while you plan a hard turn. |
-| TURN MOMENTUM | A normal turn can differ from the last one by at most 75% of the ship's turn limit (Kestrel 90°, Raptor 82°, ZT 52°), so reversing a hard turn takes two turns. A maneuver resets it; flying straight centres the window. A ship given no order holds the gentlest turn its window allows. | The steering fan is the window, shifted to one side after a turn; the HUD reads e.g. "turn 30–120° left (momentum)". |
-| TRACKING LOCK | Lock builds while the locked enemy sits in your guns (full in 1.2 seconds of the 1.6-second turn) and fades over 0.8 seconds while it doesn't, kept between turns. It adds up to +30% accuracy against that enemy. Once it fades, lock moves to the nearest enemy in your guns. Enemies build lock too. | "LOCK 60%" under an enemy you hold, "LOCKED ON YOU 100%" under your ship. |
+| TURN MOMENTUM | A normal turn can differ from the last one by at most 75% of the ship's turn limit (Kestrel 90°, Raptor 82°, ZT 52°), so reversing a hard turn takes two turns. A maneuver resets it; flying straight centres the window. A ship given no order holds the gentlest turn its window allows. Every cooldown is a turn longer (a mastered no-cooldown maneuver waits a turn), so maneuvers, the way to break momentum, aren't a free reset every other turn. | The steering fan is the window, shifted to one side after a turn; the HUD reads e.g. "turn 30–120° left (momentum)". |
 
 The enemy pilot respects momentum and bleed (it only plans moves the rules
 allow) and uses order-reading when on your six, but doesn't yet steer to get
@@ -377,14 +378,17 @@ often it has the enemy in its cone then.
 | On their six | 92% | 8 | 16% | 25% |
 | Bleed speed | 92% | 7.5 | 21% | 19% |
 | Momentum | 85% | 7.5 | 23% | 13% |
-| Lock | 92% | 7 | 13% | 10% |
+| Tracking lock (since removed) | 92% | 7 | 13% | 10% |
 | All four | 92% | 8.5 | 20% | 22% |
 
 Each cell rests on 50–80 tail situations, so differences of a few points are
 noise. Seeing the move turns a tail into shots more than into a held tail;
-momentum and bleed make a tail last; lock changes neither, only what a held
+momentum and bleed make a tail last; lock changed neither, only what a held
 tail is worth. None of the autopilots chase deliberately, so a person playing
-for the tail should get more out of each rule than this.
+for the tail should get more out of each rule than this. (Measured with the
+first, narrower on-their-six rule and before momentum lengthened cooldowns.)
+
+- **On their six widened.** It first needed 300 range, the rear 120° arc and the chaser pointed within 60°, and didn't come up in hand testing. Now it's 400 range, anywhere behind the wings, the target anywhere ahead. Over 40 sector 1 skirmishes your ships are on an enemy's six at the start of 35% of turns (was 18%), at least once in 35 of 40 battles; an enemy gets on yours at least once in 29 of 40. Wins and fight length are unchanged.
 
 ### Quick battle setup (`TestBattleSelect`, `QuickBattleSetup`)
 
@@ -393,7 +397,7 @@ The quick battle screen now sets up any fight, on one scrolling page:
 - **Your squadron:** up to three Kestrels, Raptors or ZTs, and the pilots' level (1–6, with the matching refit). Level 1 pilots know their line's signature maneuver; from level 2, the first two.
 - **Enemy wing:** up to six ships, optionally led by an ace (refitted a step ahead of your squadron). Enemies fly the first two maneuvers of their line at base numbers.
 - **Battlefield** and **opening** (every opening but the ambush, which needs reinforcements; one-sided openings come from a random side).
-- **Experiments:** the four switches above, each with its rule spelled out.
+- **Experiments:** the switches above, each with its rule spelled out.
 
 Choices last for the session. After a quick battle the debrief offers FIGHT
 AGAIN (same setup) and CHANGE SETUP, and the pause menu's quit goes back to

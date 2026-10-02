@@ -770,15 +770,6 @@ public partial class BattleOverlay : Node2D
             DrawLabel(tagAt, "ENEMY ON YOUR SIX", SignalUi.FontMicro, new Color(SignalUi.Negative, a));
             tagAt.Y += Px(16f);
         }
-        if (mgr != null && Experiments.TrackingLock)
-        {
-            // The lock held on this ship by the other side, at its strongest.
-            float held = (f.Team == 0 ? mgr.EnemyFighters : mgr.PlayerFighters)
-                .Where(o => o.IsAlive && o.LockTarget == f).Select(o => o.Lock).DefaultIfEmpty(0f).Max();
-            if (held >= 0.05f)
-                DrawLabel(tagAt, $"{(f.Team == 0 ? "LOCKED ON YOU" : "LOCK")} {held * 100:0}%", SignalUi.FontMicro,
-                    new Color(f.Team == 0 ? SignalUi.Negative : SignalUi.Positive, a));
-        }
     }
 }
 

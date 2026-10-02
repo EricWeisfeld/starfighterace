@@ -118,9 +118,6 @@ public partial class Fighter : Node2D
     /// <summary>A hard turn last turn: this turn's throttle is capped at the minimum.</summary>
     public bool Slowed;
     bool _slowNextTurn;
-    /// <summary>The enemy this ship is building tracking lock on, and how far (0 to 1).</summary>
-    public Fighter LockTarget;
-    public float Lock;
     /// <summary>An enemy that planned at the start of the turn because one of your ships is on its six.</summary>
     public bool CommittedEarly;
     public Texture2D BaseTexture;             // for ghost previews
@@ -324,10 +321,6 @@ public partial class Fighter : Node2D
     /// <summary>This turn's top normal throttle: the minimum after a hard turn while speed bleeds.</summary>
     public float NormalMaxMove => Slowed ? NormalMoveMinDistance : NormalMoveMaxDistance;
 
-    /// <summary>Accuracy added against a target this ship holds tracking lock on.</summary>
-    public float LockBonusAgainst(Fighter target) =>
-        Experiments.TrackingLock && target != null && target == LockTarget ? Lock * Experiments.LockAccuracyBonus : 0f;
-
     /// <summary>The maneuver being flown while a turn executes, or the one planned before it.</summary>
     ManeuverType ActiveManeuver => BattleManager.Instance?.CurrentPhase == BattleManager.Phase.Executing
         ? _execManeuver : PlannedManeuver;
@@ -406,13 +399,13 @@ public partial class Fighter : Node2D
         }
     }
 
-    /// <summary>Turns a special maneuver is locked after use, after masteries.</summary>
+    /// <summary>Turns a special maneuver is locked after use, after masteries (and a turn more under turn momentum).</summary>
     public int CooldownRoundsFor(ManeuverType maneuver)
     {
         ShipAbility? ability = ManeuverCatalog.ForManeuver(maneuver).Ability;
         if (ability is ShipAbility mastered && HasMastered(mastered) && Masteries.CooldownOverride(mastered) is int rounds)
-            return rounds;
-        return maneuver switch
+            return rounds + Experiments.ExtraCooldown;
+        return Experiments.ExtraCooldown + maneuver switch
         {
             ManeuverType.EvasiveSpin => EvasiveSpinCooldownRounds,
             _ => SpecialManeuverCooldownRounds,
@@ -443,8 +436,7 @@ public partial class Fighter : Node2D
             - (TunnelVisionActive ? Perks.TunnelVisionAccuracyPenalty : 0f)
             + (CoolUnderFireActive ? Perks.CoolUnderFireAccuracyBonus : 0f)
             + (TailGunnerActiveAgainst(target) ? Perks.TailGunnerAccuracyBonus : 0f)
-            + (target != null && target == HunterLockTarget && HasAbility(ShipAbility.HunterLock) ? Moves.HunterLockAccuracyBonus : 0f)
-            + LockBonusAgainst(target);
+            + (target != null && target == HunterLockTarget && HasAbility(ShipAbility.HunterLock) ? Moves.HunterLockAccuracyBonus : 0f);
         accuracy *= 1f - SensorScrambleAccuracyPenalty;
         return Mathf.Clamp(accuracy, 0f, 1f);
     }
@@ -667,7 +659,7 @@ public partial class Fighter : Node2D
         if (!HasAbility(ShipAbility.HunterLock) || HunterLockCooldownTurns > 0 || target == null || !target.IsAlive || target.Team == Team)
             return false;
         HunterLockTarget = target;
-        HunterLockCooldownTurns = Moves.HunterLockCooldownTurns;
+        HunterLockCooldownTurns = Moves.HunterLockCooldownTurns + Experiments.ExtraCooldown;
         return true;
     }
 
@@ -697,7 +689,7 @@ public partial class Fighter : Node2D
             if (splash != null)
                 Scramble(splash);
         }
-        SensorScrambleCooldownTurns = Moves.SensorScrambleCooldownTurns;
+        SensorScrambleCooldownTurns = Moves.SensorScrambleCooldownTurns + Experiments.ExtraCooldown;
         return true;
     }
 
@@ -1013,13 +1005,13 @@ public partial class Fighter : Node2D
         if (ChaffArmed)
         {
             ChaffArmed = false;
-            ChaffCooldownTurns = Moves.ChaffCooldownTurns;
+            ChaffCooldownTurns = Moves.ChaffCooldownTurns + Experiments.ExtraCooldown;
         }
         _alphaStrikeThisTurn = AlphaStrikeArmed;
         if (AlphaStrikeArmed)
         {
             AlphaStrikeArmed = false;
-            AlphaStrikeCooldownTurns = AlphaStrikeCooldownRounds;
+            AlphaStrikeCooldownTurns = AlphaStrikeCooldownRounds + Experiments.ExtraCooldown;
         }
         Cooldown = (float)GD.RandRange(0.0, 0.15); // stagger opening barrages
         BarrageShotsLeft = 0;
